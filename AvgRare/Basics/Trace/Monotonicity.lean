@@ -71,6 +71,7 @@ private lemma sum_indicator_eq_card_nat
     exact hx
   exact this
 
+--これ以降は、1頂点ずつtraceする場合は使わないかも。
 /-! ------------------------------------------------------------
   主結果（Nat 版）：
   ∑_{B ⊆ X} |B| = |X| · 2^{|X|-1}

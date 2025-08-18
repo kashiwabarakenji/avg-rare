@@ -13,18 +13,18 @@ package AvgRare {
 lean_lib AvgRare where
   roots := #[
     -- Basics
-    `AvgRare.Basics.SetFamily,
-    `AvgRare.Basics.Trace.Common,
-    `AvgRare.Basics.Trace.Monotonicity,
-    --`AvgRare.Basics.Excess,          -- 使っていれば。未使用なら一旦外してOK
+    `AvgRare.Basics.SetFamily,         --集合族とIdealに関する基本
+    `AvgRare.Basics.Trace.Common,      --Traceに関する基本
+    `AvgRare.Basics.Trace.Monotonicity, --Traceの単調性
+    `AvgRare.Basics.Ideals,            --イデアルに関する基本
 
     -- 2) SPO（functional preorder）
-    `AvgRare.SPO.FuncSetup,
-    `AvgRare.SPO.Forest,              -- ここで is_rooted_forest の型だけ先に定義予定
+    `AvgRare.SPO.FuncSetup,           --前順序に関すること
+    `AvgRare.SPO.Forest,              -- 半順序に関すること
 
     -- 3) Forests（アルゴリズム／帰納用の補題群）
-    `AvgRare.Forests.Induction,
-    `AvgRare.Forests.DirectProduct,
+    `AvgRare.Forests.Induction,       --半順序と帰納法
+    `AvgRare.Forests.DirectProduct,   --半順序のunion product
 
     -- 4) PaperSync（論文と同期する高レベル補題・主定理）
     `AvgRare.PaperSync.IdealsTrace,   -- ← trace×FuncSetup の結合レイヤ

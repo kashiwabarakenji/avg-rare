@@ -6,6 +6,8 @@ import AvgRare.Basics.SetFamily
 universe u
 
 namespace AvgRare
+namespace Basics
+namespace Trace
 open scoped BigOperators
 
 variable {α : Type u} [DecidableEq α]
@@ -28,7 +30,7 @@ lemma imageQuot_mono {E : Setoid α} {A B : Finset α} (h : A ⊆ B) :
   rcases (mem_imageQuot (E:=E) (A:=A)).1 hq with ⟨a, haA, rfl⟩
   exact (mem_imageQuot (E:=E) (A:=B)).2 ⟨a, h haA, rfl⟩
 
-section
+--section
 variable (E : Setoid α)
 -- ★ ここで型レベルにインスタンスを用意しておく
 noncomputable local instance : DecidableEq (Quot E) := Classical.decEq _
@@ -106,41 +108,52 @@ lemma trace_mono_in_setoid
       -- q0 を像に入れてから lift して得る要素は右辺に含まれる
       exact Finset.mem_image.2 ⟨q0, this, rfl⟩)
 
+
+noncomputable def restrict {α} [DecidableEq α]
+    (F : SetFamily α) (U : Finset α) : SetFamily α := by
+  classical
+  refine
+  { ground := U
+    , sets := fun B => ∃ A : Finset α, F.sets A ∧ B ⊆ A ∧ B ⊆ U
+    , decSets := Classical.decPred _
+    , inc_ground := ?_ }
+  intro B hB
+  rcases hB with ⟨A, hA, hBsubA, hBsubU⟩
+  exact hBsubU
+
+@[simp] lemma mem_restrict_iff {α} [DecidableEq α]
+    {F : SetFamily α} {U B : Finset α} :
+    (restrict F U).sets B ↔ ∃ A, F.sets A ∧ B ⊆ A ∧ B ⊆ U := Iff.rfl
+
+/-- 記法：`𝓕 ↘ U` を `restrict 𝓕 U` の糖衣として定義。 -/
+notation:90 F "↘" U => AvgRare.Basics.Trace.restrict F U
+
+@[simp] lemma imageQuot_eq_image {E : Setoid α} (A : Finset α) :
+  imageQuot E A = A.image (fun a => Quot.mk _ a) := rfl
+
+@[simp] lemma mem_imageQuot_iff {E : Setoid α} {A : Finset α} {q : Quot E} :
+  q ∈ imageQuot E A ↔ ∃ a ∈ A, Quot.mk _ a = q :=
+by classical simp [imageQuot]
+
+/-- 画像の画像：`imageQuot E A` の各要素を恒等的に lift する形の `image` は `imageQuot` の交換で吸収できる -/
+lemma image_imageQuot_lift {E E' : Setoid α} (h : refines E E') (A : Finset α) :
+  (imageQuot E A).image (liftQuot (E:=E) (E':=E') h)
+    ⊆ imageQuot E' A := by
+  classical
+  -- 既存の `imageQuot_mono_under_refines` の言い換え
+  have := imageQuot_mono_under_refines (E:=E) (E':=E') h (A:=A)
+  -- 使っている定義の向きを合わせるだけ
+  simpa [imageQuot_eq_image] using this
+
+end Trace
+end Basics
+end AvgRare
+
+
+/- 成り立たないし、使わない。
 lemma total_size_of_hyperedges_trace_le
   {α} [DecidableEq α] (E : Setoid α) (F : SetFamily α) :
   (trace E F).total_size_of_hyperedgesNat ≤ F.total_size_of_hyperedgesNat := by
   -- 像でサイズは縮み、下閉包でさらに同じか減る、の二段論法
   sorry
-/-
-import Mathlib.Data.Finset.Basic
-import Mathlib.Data.Finset.Powerset
-import Mathlib.Algebra.BigOperators.Finsupp.Basic
-import AvgRare.Basics.SetFamily
-
-
-universe u
-
-namespace AvgRare
-open scoped BigOperators
-open Classical
-
-variable {α : Type u} [DecidableEq α]
-
-/-- `A : Finset α` を同値関係 `E` の商に写した像。 -/
-noncomputable def imageQuot (E : Setoid α) (A : Finset α) : Finset (Quot E) :=
-  A.image (fun a => Quot.mk _ a)
-
-/-- `trace E F`：各超辺の商像を取り、その**下閉包**で得た集合族。 -/
-noncomputable def trace (E : Setoid α) (F : SetFamily α) : SetFamily (Quot E) :=
-{ ground := imageQuot E F.ground
-, sets := fun B => ∃ A : Finset α, F.sets A ∧ B ⊆ imageQuot E A
-, decSets := Classical.decPred _
-, inc_ground := by
-    intro B hB; rcases hB with ⟨A, hA, hsub⟩
-    have hAg : A ⊆ F.ground := F.inc_ground hA
-    have him : imageQuot E A ⊆ imageQuot E F.ground := by
-      intro x hx
-      rcases Finset.mem_image.1 hx with ⟨a, haA, rfl⟩
-      exact Finset.mem_image.2 ⟨a, hAg haA, rfl⟩
-    exact hsub.trans him }
-    -/
+-/

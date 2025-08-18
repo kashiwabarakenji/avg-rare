@@ -4,9 +4,10 @@ import AvgRare.Basics.Trace.Common
 
 namespace AvgRare
 open FuncSetup
+open Basics Trace
 
-noncomputable instance quotientDecEq {β : Type _} (E : Setoid β) : DecidableEq (Quotient E) :=
-  Classical.decEq _
+--noncomputable instance quotientDecEq {β : Type _} (E : Setoid β) : DecidableEq (Quotient E) :=
+--  Classical.decEq _
 
 variable {α : Type _} [DecidableEq α]
 variable (S : FuncSetup α)
@@ -18,15 +19,14 @@ def IsRootedForest : Prop :=
 
 theorem condensation_is_forest : IsRootedForest S := by
   refine ⟨?hAnti, ?hOut⟩
-  · -- 反対称性：FuncSetup.antisymm_on_quot を使用
-    intro a b h1 h2
-    -- after you prove antisymm_on_quot:
-    -- exact FuncSetup.antisymm_on_quot (S:=S) h1 h2
-    sorry
-  · -- 出次数 ≤ 1：FuncSetup.outdeg_le_one_on_quot を使用
+  · -- 反対称性
+    intro a b hab hba
+    -- FuncSetup 側の補題をそのまま使用
+    exact FuncSetup.antisymm_on_quot (S:=S) hab hba
+  · -- 出次数 ≤ 1
     intro a
-    -- exact FuncSetup.outdeg_le_one_on_quot (S:=S) a
-    sorry
+    exact FuncSetup.outdeg_le_one_on_quot (S:=S) a
+
 /-
 def IsRootedForest (S : FuncSetup α) : Prop := True  -- ← 型だけ（後で定義差し替え）
 
@@ -36,10 +36,12 @@ theorem condensation_is_forest (S : FuncSetup α) : IsRootedForest S := by
 -/
 
 -- 使う側（あなたの lemma）も S を渡す
+/-
 lemma nds_leaf_step (S : FuncSetup α)
     (hforest : IsRootedForest S) :
   True := by
   trivial
+-/
 
 noncomputable instance (S : FuncSetup α) : DecidableEq (Quot S.ker) :=
   Classical.decEq _
