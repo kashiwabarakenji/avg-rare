@@ -9,6 +9,166 @@ open scoped BigOperators
 
 namespace AvgRare
 
+/-
+SetFamily.lean  —  基本集合族と計数まわり（NDSの土台）
+
+このファイルは「有限台集合上の集合族」を述語 `sets : Finset α → Prop` で表し、
+列挙・計数のための `edgeFinset` を（powerset からの filter で）構成します。
+NDS 自体の定義は Ideals 側に置く想定ですが、基礎量
+  * numHyperedges : ハイパーエッジ数
+  * totalHyperedgeSize : サイズ総和
+  * degree : 要素の出現回数
+をここで定義しておきます。
+
+注意:
+- ここでは poset/ideal など順序に依存する概念は扱いません（Ideals 側へ）。
+- トレースやリインデックスは Common/Trace 側へ。（必要ならここに移してOK）
+-/
+
+variable {α : Type u} [DecidableEq α]
+
+/-- 有限台集合 `ground` 上の集合族。`sets A` は `A` が族のメンバである述語。
+    計数・列挙のため、`edgeFinset` を powerset からの filter で構成できるように、
+    `decSets`（可判別性）と `inc_ground`（台集合に含まれること）を仮定する。 -/
+structure SetFamily (α : Type u) [DecidableEq α] where
+  ground     : Finset α
+  sets       : Finset α → Prop
+  decSets    : DecidablePred sets
+  inc_ground : ∀ {A : Finset α}, sets A → A ⊆ ground
+
+namespace SetFamily
+
+variable (F : SetFamily α)
+
+attribute [simp] SetFamily.ground
+
+instance instDecidablePred_sets (F : SetFamily α) : DecidablePred F.sets :=
+  F.decSets
+
+
+/-- 列挙用：族のメンバ全体を `powerset` から述語で filter して得る Finset。 -/
+def edgeFinset : Finset (Finset α) :=
+  F.ground.powerset.filter (fun A => decide (F.sets A))
+
+/-- `edgeFinset` の要素は台集合に含まれる。 -/
+lemma subset_ground_of_mem_edge {A : Finset α}
+    (hA : A ∈ F.edgeFinset) : A ⊆ F.ground := by
+  classical
+  rcases Finset.mem_filter.mp hA with ⟨hPow, _⟩
+  exact Finset.mem_powerset.mp hPow
+
+/-- `edgeFinset` と述語 `sets` の一致。以後の計数で便利。 -/
+lemma mem_edgeFinset_iff {A : Finset α} :
+    A ∈ F.edgeFinset ↔ F.sets A := by
+  classical
+  constructor
+  · intro h
+    rcases Finset.mem_filter.mp h with ⟨hPow, hDec⟩
+    -- decide (F.sets A) = true から F.sets A を回収
+    simp_all only [Finset.mem_powerset, decide_eq_true_eq]
+  · intro hA
+    have hSub : A ⊆ F.ground := F.inc_ground hA
+    have hPow : A ∈ F.ground.powerset := Finset.mem_powerset.mpr hSub
+    have hDec : decide (F.sets A) = true := by simp_all only [Finset.mem_powerset, decide_true]
+
+    exact Finset.mem_filter.mpr ⟨hPow, hDec⟩
+
+/-- ハイパーエッジ数。 -/
+def numHyperedges : Nat :=
+  F.edgeFinset.card
+
+/-- サイズ総和。 -/
+def totalHyperedgeSize : Nat :=
+  ∑ A ∈ F.edgeFinset, A.card
+
+/-- 要素 `x` の次数（その要素を含むエッジの個数）。 -/
+def degree (x : α) : Nat :=
+  ∑ A ∈ F.edgeFinset, (if x ∈ A then (1 : Nat) else 0)
+
+/-- `degree` を「含むエッジの個数」として書き直した版。 -/
+lemma degree_eq_card_filter (x : α) :
+    F.degree x = (F.edgeFinset.filter (fun A => x ∈ A)).card := by
+  classical
+  unfold degree
+  -- `∑ (if p then 1 else 0)` を `∑ over s.filter p 1` に移す
+  have h :
+      (∑ A ∈ F.edgeFinset, (if x ∈ A then (1 : Nat) else 0))
+        = (∑ A ∈ F.edgeFinset.filter (fun A => x ∈ A), (1 : Nat)) := by
+    -- `sum_filter`：左辺 ↔ 右辺
+    -- `simp` の向きの都合で `symm` を使う
+    simp_all only [Finset.sum_boole, Nat.cast_id, Finset.sum_const, smul_eq_mul, mul_one]
+  -- 右辺は定数 1 の総和＝個数
+  simp_all only [Finset.sum_boole, Nat.cast_id, Finset.sum_const, smul_eq_mul, mul_one]
+
+/-- `edgeFinset` は powerset の部分集合。 -/
+lemma edgeFinset_subset_powerset :
+    F.edgeFinset ⊆ F.ground.powerset := by
+  classical
+  intro A hA
+  exact (Finset.mem_filter.mp hA).1
+
+/-- `edgeFinset` 上のメンバは台集合に含まれる（便利な再掲）。 -/
+lemma mem_edgeFinset_subset_ground {A : Finset α}
+    (hA : A ∈ F.edgeFinset) : A ⊆ F.ground :=
+  F.subset_ground_of_mem_edge hA
+
+/-- 台集合の制限。ハイパーエッジは元のエッジの部分集合で、かつ `U` に含まれるもの。 -/
+noncomputable def restrict (U : Finset α) : SetFamily α := by
+  classical
+  refine
+  { ground := U
+    , sets   := fun B => ∃ A : Finset α, F.sets A ∧ B ⊆ A ∧ B ⊆ U
+    , decSets := Classical.decPred _
+    , inc_ground := ?_ }
+  intro B hB
+  rcases hB with ⟨A, hA, hBsubA, hBsubU⟩
+  exact hBsubU
+
+@[simp] lemma mem_edgeFinset :
+  A ∈ F.edgeFinset ↔ A ⊆ F.ground ∧ F.sets A := by
+  classical
+  constructor
+  · intro h
+    rcases Finset.mem_filter.mp h with ⟨hPow, hDec⟩
+    have hSub : A ⊆ F.ground := Finset.mem_powerset.mp hPow
+    have hSets : F.sets A := by
+      -- ここは decide ↔ 命題の橋渡しを simp に任せる
+      simpa using (show decide (F.sets A) = true from hDec)
+    exact ⟨hSub, hSets⟩
+  · intro h
+    rcases h with ⟨hSub, hSets⟩
+    have hPow : A ∈ F.ground.powerset := Finset.mem_powerset.mpr hSub
+    have hDec : decide (F.sets A) = true := by simpa using hSets
+    exact Finset.mem_filter.mpr ⟨hPow, hDec⟩
+
+@[simp] lemma mem_edgeFinset_iff_sets : (A ∈ F.edgeFinset) ↔ F.sets A := by
+  classical
+  constructor
+  · intro h; have := (F.mem_edgeFinset (A := A)).1 h; exact this.2
+  · intro h; have : A ⊆ F.ground := F.inc_ground h
+    exact (F.mem_edgeFinset (A := A)).2 ⟨this, h⟩
+
+/-
+-- （必要なら）リインデックス：`e : α ≃ β` で要素を書き換える。
+-- poset 側の理想再インデックスで使いたい時に、コメントアウトを外してください。
+
+def reindex {β : Type*} [DecidableEq β] (e : α ≃ β) : SetFamily β := by
+  classical
+  refine
+  { ground := F.ground.image e
+    , sets   := fun B => ∃ A : Finset α, F.sets A ∧ B = A.image e
+    , decSets := Classical.decPred _
+    , inc_ground := ?_ }
+  intro B hB
+  rcases hB with ⟨A, hA, rfl⟩
+  intro b hb
+  rcases Finset.mem_image.mp hb with ⟨a, haA, rfl⟩
+  exact Finset.mem_image.mpr ⟨a, F.inc_ground hA haA, rfl⟩
+-/
+
+/-
+
+
 /-- 有限台集合 `ground` と，その部分集合族 `sets`（判定述語＋可判定性） -/
 @[ext]
 structure SetFamily (α : Type u) [DecidableEq α] where
@@ -24,18 +184,7 @@ namespace SetFamily
 
 variable {α : Type u} [DecidableEq α]
 
-noncomputable def reindexEmbedding {α β} [DecidableEq α] [DecidableEq β]
-  (ι : β ↪ α) (F : SetFamily β) : SetFamily α :=
-{ ground := F.ground.map ι,
-  sets   := fun B => ∃ A, F.sets A ∧ B = A.image ι,
-  decSets := Classical.decPred _,     -- classical で ok
-  inc_ground := by
-    classical
-    intro B hB b hb
-    rcases hB with ⟨A, hA, rfl⟩
-    rcases Finset.mem_image.1 hb with ⟨a, haA, rfl⟩
-    have : a ∈ F.ground := F.inc_ground hA haA
-    exact Finset.mem_map.2 ⟨a, this, rfl⟩ }
+
 
 /-- 族の全メンバー（有限集合の有限集合） -/
 noncomputable def hyperedges (F : SetFamily α) : Finset (Finset α) :=
@@ -389,7 +538,59 @@ lemma erase_inj_on_hyperedges_of_parallel
   · -- x ≠ u は erase 等式から直ちに同値
     exact ⟨AtoB_ne x hx, BtoA_ne x hx⟩
 
+section
+universe v
+variable {α : Type u} {β : Type v}
+variable [DecidableEq α] [DecidableEq β]
+/-- 要素型の同型 `e : α ≃ β` による集合族 `F` のリインデックス。
+    ground は `image e`、メンバー述語は「元のメンバーの `image e` と等しいものの存在」で与える。 -/
+noncomputable def reindex (e : α ≃ β) (F : SetFamily α) [DecidableEq  β]: SetFamily β := by
+  classical
+  refine
+  { ground := F.ground.image (fun a => e a)
+    , sets := fun B : Finset β => ∃ A : Finset α, F.sets A ∧ B = A.image (fun a => e a)
+    , decSets := Classical.decPred _
+    , inc_ground := ?_ }
+  -- inc_ground：B = image e A かつ A ⊆ F.ground から B ⊆ image e ground
+  intro B hB
+  rcases hB with ⟨A, hAsets, rfl⟩
+  intro b hb
+  -- hb : b ∈ (A.image e)
+  rcases Finset.mem_image.mp hb with ⟨a, haA, hb⟩
+  -- F.inc_ground: A ⊆ F.ground
+  have hAg : A ⊆ F.ground := F.inc_ground hAsets
+  have haG : a ∈ F.ground := hAg haA
+  -- よって b = e a は image e F.ground に入る
+  exact Finset.mem_image.mpr ⟨a, haG, hb⟩
 
+/-- ground の簡約。 -/
+@[simp] lemma reindex_ground (e : α ≃ β) (F : SetFamily α) :
+  (reindex e F).ground = F.ground.image (fun a => e a) := rfl
+
+/-- メンバー述語の展開（`↔` ではなく「定義に等しい」）。 -/
+@[simp] lemma mem_reindex_sets_iff (e : α ≃ β) (F : SetFamily α)
+  {B : Finset β} :
+  (reindex e F).sets B ↔ ∃ A : Finset α, F.sets A ∧ B = A.image (fun a => e a) :=
+Iff.rfl
+
+/-- リインデックスの単調性：`A ⊆ ground` の像は `reindex` 側の ground に入る。 -/
+lemma subset_ground_image (e : α ≃ β) (F : SetFamily α)
+  {A : Finset α} (hA : F.sets A) :
+  A.image (fun a => e a) ⊆ (reindex e F).ground := by
+  classical
+  -- inc_ground をそのまま使うだけ
+  have : (reindex e F).sets (A.image (fun a => e a)) := by
+    exact ⟨A, hA, rfl⟩
+  -- （定義より）inc_ground は B∈sets → B⊆ground
+  exact (reindex e F).inc_ground this
+
+/-- 述語レベルの単調性：`F.sets A` なら `reindex e F` にもその像が入る。 -/
+lemma image_mem_reindex (e : α ≃ β) (F : SetFamily α)
+  {A : Finset α} (hA : F.sets A) :
+  (reindex e F).sets (A.image (fun a => e a)) := by
+  exact ⟨A, hA, rfl⟩
+
+end
 
 end SetFamily
 end AvgRare
@@ -399,3 +600,5 @@ end AvgRare
 
 --@[simp] lemma imageQuot_ground (E : Setoid α) (F : SetFamily α) :
 --  imageQuot E F.ground = (trace E F).ground := rfl
+
+-/

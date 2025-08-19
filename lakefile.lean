@@ -15,7 +15,7 @@ lean_lib AvgRare where
     -- Basics
     `AvgRare.Basics.SetFamily,         --集合族とIdealに関する基本
     `AvgRare.Basics.Trace.Common,      --Traceに関する基本
-    `AvgRare.Basics.Trace.Monotonicity, --Traceの単調性
+    `AvgRare.Basics.Trace.TraceErase, --Traceの単調性
     `AvgRare.Basics.Ideals,            --イデアルに関する基本
 
     -- 2) SPO（functional preorder）

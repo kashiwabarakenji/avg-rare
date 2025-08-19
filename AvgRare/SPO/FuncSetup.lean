@@ -1,4 +1,216 @@
 import Mathlib.Data.Finset.Basic
+import Mathlib.Data.Finset.Powerset
+import Mathlib.Data.Nat.Basic
+import Mathlib.Logic.Function.Iterate
+import AvgRare.Basics.SetFamily   -- 依存を薄く保ちつつ将来の接続を意識
+import AvgRare.Basics.Ideals      -- 参照だけ（ここでは使わなくても OK）
+import LeanCopilot
+
+/-
+FuncSetup.lean — 機能的前順序（functional preorder）のセットアップ（論文 §2）
+
+このファイルでは、有限台集合 `V : Finset α` と「V 上に閉じた」写像
+  f : {x // x ∈ V} → {x // x ∈ V}
+から誘導される前順序を、被覆関係 `⋖` とその反射推移閉包 `≤` として定義します。
+
+論文で使う主な言明（Lemma 2.2, 2.4 など）は **言明だけ** 用意し、
+証明は後で他ファイルの準備が整ってから埋めます。
+
+注意:
+- ここでは `Preorder` の typeclass は使いません（純粋に関係で進めます）。
+- 有限性は `V : Finset α` を介して担保し、要素型は `Elem := {x // x ∈ V}` の部分型で扱います。
+- `simpa using` は用いません。必要に応じて `simp` / `simp_all` を使います。
+-/
+
+universe u
+
+open scoped BigOperators
+
+namespace AvgRare
+namespace SPO
+
+variable {α : Type u} [DecidableEq α]
+
+/-- 機能的前順序の“入力データ”。`ground`（有限台集合）と，
+    その上に閉じた自己写像 `f` を与える。 -/
+structure FuncSetup (α : Type u) [DecidableEq α] where
+  ground : Finset α
+  f      : {x // x ∈ ground} → {y // y ∈ ground}
+
+namespace FuncSetup
+
+variable (S : FuncSetup α)
+
+@[simp] lemma ground_def : S.ground = S.ground := rfl
+
+/-- 台集合の要素型（部分型）。 -/
+abbrev Elem := {x : α // x ∈ S.ground}
+
+@[simp] lemma mem_ground_coe (x : S.Elem) : x.1 ∈ S.ground := x.2
+
+instance instDecidableEqElem : DecidableEq S.Elem := inferInstance
+
+/-- 被覆関係：`x ⋖ y` iff `f x = y`。 -/
+def cover (x y : S.Elem) : Prop := S.f x = y
+
+/-- 前順序：被覆の反射推移閉包。 -/
+def le (x y : S.Elem) : Prop := Relation.ReflTransGen S.cover x y
+
+/-- 記法：`x ≤ₛ y` / `x ⋖ₛ y` -/
+scoped infix:50 " ≤ₛ " => FuncSetup.le
+scoped infix:50 " ⋖ₛ " => FuncSetup.cover
+
+/-- 反射。 -/
+lemma le_refl (x : S.Elem) : S.le x x := by
+  -- Relation.ReflTransGen.refl
+  exact Relation.ReflTransGen.refl
+
+/-- 推移。 -/
+lemma le_trans {x y z : S.Elem} (hxy : S.le x y) (hyz : S.le y z) : S.le x z := by
+  -- Relation.ReflTransGen.trans
+  exact Relation.ReflTransGen.trans hxy hyz
+
+/-- 被覆から 1 ステップで `≤`。 -/
+lemma cover_to_le {x y : S.Elem} (h : S.cover x y) : S.le x y := by
+  -- Relation.ReflTransGen.single
+  exact Relation.ReflTransGen.single h
+
+/-- 「反復で到達できる」写像反復。 -/
+def iter (k : Nat) : S.Elem → S.Elem :=
+  Nat.iterate S.f k
+
+@[simp] lemma iter_zero (x : S.Elem) : S.iter 0 x = x := by
+  -- Nat.iterate f 0 = id
+  unfold iter
+  simp
+
+@[simp] lemma iter_succ (k : Nat) (x : S.Elem) :
+    S.iter (k+1) x = S.f (S.iter k x) := by
+  -- Nat.iterate.succ
+  unfold iter
+  simp
+  exact Function.iterate_succ_apply' S.f k x
+
+/-- 論文 Lemma 2.2：
+`x ≤ y` ↔ ある `k ≥ 0` で `f^[k] x = y`。 -/
+lemma le_iff_exists_iter (x y : S.Elem) :
+    S.le x y ↔ ∃ k : Nat, S.iter k x = y := by
+  -- ReflTransGen ↔ 反復到達 の標準対応
+  -- 後で詳細証明を埋める。
+  sorry
+
+/-- 同値関係：`x ∼ y` iff `x ≤ y ∧ y ≤ x`。 -/
+def sim (x y : S.Elem) : Prop := S.le x y ∧ S.le y x
+
+/-- `sim` は同値関係。 -/
+lemma sim_refl (x : S.Elem) : S.sim x x := by
+  constructor <;> exact S.le_refl x
+
+lemma sim_symm {x y : S.Elem} (h : S.sim x y) : S.sim y x := by
+  constructor
+  · exact h.2
+  · exact h.1
+
+lemma sim_trans {x y z : S.Elem} (hxy : S.sim x y) (hyz : S.sim y z) : S.sim x z := by
+  constructor
+  · exact S.le_trans hxy.1 hyz.1
+  · exact S.le_trans hyz.2 hxy.2
+
+/-- `sim` を `Setoid` に。 -/
+def simSetoid : Setoid S.Elem where
+  r := S.sim
+  iseqv := ⟨S.sim_refl, S.sim_symm, S.sim_trans⟩
+
+/-- 極大：`x` の上は全部 `x` に戻る（前順序版）。 -/
+def maximal (x : S.Elem) : Prop :=
+  ∀ ⦃y⦄, S.le x y → S.le y x
+
+@[simp] lemma maximal_iff (x : S.Elem) :
+    S.maximal x ↔ (∀ ⦃y⦄, S.le x y → S.le y x) := Iff.rfl
+
+/-- 「同値類が非自明（別の点がある）」の実用形。 -/
+def nontrivialClass (x : S.Elem) : Prop :=
+  ∃ y : S.Elem, y ≠ x ∧ S.sim x y
+
+/-- Lemma 2.4（カードを使わない形）：
+同値類が非自明なら、その点は極大。 -/
+lemma maximal_of_nontrivialClass {x : S.Elem}
+    (hx : S.nontrivialClass x) : S.maximal x := by
+  -- 詳細は後で。Lemma 2.2 を使って「戻る」ことを示す標準手順。
+  sorry
+
+/-- 同値類内の任意点も極大。 -/
+lemma all_maximal_in_nontrivial_class
+    {x y : S.Elem} (hxy : S.sim x y) (hx : S.nontrivialClass x) :
+    S.maximal y := by
+  -- `x` 極大 ⇒ `y` も極大（対称性＋推移）
+  sorry
+
+/- 便利：基の α への射影。 -/
+def toGround (x : S.Elem) : α := x.1
+@[simp] lemma toGround_mk {x : α} {hx : x ∈ S.ground} :
+    S.toGround ⟨x, hx⟩ = x := rfl
+
+/-- `f` の基底 α 成分（必要ならデバッグ用）。 -/
+def fBase (x : S.Elem) : α := (S.f x).1
+@[simp] lemma fBase_def (x : S.Elem) : S.fBase x = (S.f x).1 := rfl
+
+/-- 「グラフ的」表現のための有向辺集合。 -/
+def edges : Finset (S.Elem × S.Elem) :=
+  S.ground.attach.image (fun x => (x, S.f x))
+
+lemma edges_mem {e : S.Elem × S.Elem} :
+    e ∈ S.edges ↔ ∃ x : S.Elem, e = (x, S.f x) := by
+  classical
+  unfold edges
+  constructor
+  · intro h
+    rcases Finset.mem_image.mp h with ⟨x, hx, rfl⟩
+    -- x ∈ ground.attach は自明
+    simp_all
+  · rintro ⟨x, rfl⟩
+    refine Finset.mem_image.mpr ?_
+    refine ⟨x, ?_, rfl⟩
+    simp  -- x ∈ ground.attach
+
+lemma exists_partner_on_ground
+    {u : S.Elem} (h : S.nontrivialClass u) :
+     ∃ (v : α) (hv : v ∈ S.ground), v ≠ u.1 ∧ S.sim u ⟨v, hv⟩ := by
+  -- ∃ v, (v ∈ S.ground) ∧ ((hv : v ∈ S.ground) → v ≠ u.1 ∧ S.sim u ⟨v, hv⟩) := by
+  -- h から subtype の相手 y を取り出す
+  rcases h with ⟨y, hy_ne, hy_sim⟩
+  -- v := y.1, hv := y.2 をそのまま使う
+  refine ⟨y.1, y.2, ?neq, ?hsim⟩
+  -- 値が等しければ subtype が等しいので hy_ne に反する：Subtype.ext を使用
+  · intro hval
+    apply hy_ne
+    apply Subtype.ext
+    exact hval
+  -- ⟨y.1, y.2⟩ は定義的に y なので、そのまま置換して終わり
+  · change S.sim u y
+    exact hy_sim
+
+variable (S : FuncSetup α)
+
+@[inline] def toElem! {x : α} (hx : x ∈ S.ground) : S.Elem := ⟨x, hx⟩
+
+@[simp] lemma toElem!_val {x : α} {hx : x ∈ S.ground} :
+    (S.toElem! (x:=x) hx).1 = x := rfl
+
+@[simp] lemma toElem!_mem {x : α} {hx : x ∈ S.ground} :
+    (S.toElem! (x:=x) hx).2 = hx := rfl
+
+end FuncSetup
+
+/- 記法を開く（必要な箇所で使えるように）。 -/
+open FuncSetup (le cover)
+
+
+end SPO
+end AvgRare
+
+/-
+import Mathlib.Data.Finset.Basic
 import Mathlib.Logic.Function.Iterate
 import Mathlib.Data.Setoid.Basic
 import Mathlib.Algebra.BigOperators.Finsupp.Basic
@@ -555,3 +767,4 @@ noncomputable def traceErase (F : SetFamily α) (u : α) : SetFamily α :=
 
 end FuncSetup
 end AvgRare
+-/
