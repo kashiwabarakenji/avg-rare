@@ -132,12 +132,12 @@ def maximal (x : S.Elem) : Prop :=
 def nontrivialClass (x : S.Elem) : Prop :=
   ∃ y : S.Elem, y ≠ x ∧ S.sim x y
 
-/-- Lemma 2.4（カードを使わない形）：
+/- Lemma 2.4（カードを使わない形）：
 同値類が非自明なら、その点は極大。 -/
-lemma maximal_of_nontrivialClass {x : S.Elem}
-    (hx : S.nontrivialClass x) : S.maximal x := by
-  -- 詳細は後で。Lemma 2.2 を使って「戻る」ことを示す標準手順。
-  sorry
+--lemma maximal_of_nontrivialClass {x : S.Elem}
+--    (hx : S.nontrivialClass x) : S.maximal x := by
+--  -- 詳細は後で。Lemma 2.2 を使って「戻る」ことを示す標準手順。
+--  sorry
 
 /-- 同値類内の任意点も極大。 -/
 lemma all_maximal_in_nontrivial_class
@@ -145,6 +145,8 @@ lemma all_maximal_in_nontrivial_class
     S.maximal y := by
   -- `x` 極大 ⇒ `y` も極大（対称性＋推移）
   sorry
+
+
 
 /- 便利：基の α への射影。 -/
 def toGround (x : S.Elem) : α := x.1
@@ -190,6 +192,94 @@ lemma exists_partner_on_ground
   · change S.sim u y
     exact hy_sim
 
+/-- ground の元 `x : α` とその証明から `S.Elem` を作るユーティリティ。 -/
+def toElem! {x : α} (hx : x ∈ S.ground) : S.Elem := ⟨x, hx⟩
+
+@[simp] lemma toElem!_val {x : α} (hx : x ∈ S.ground) :
+    (S.toElem! hx).1 = x := rfl
+@[simp] lemma toElem!_mem {x : α} (hx : x ∈ S.ground) :
+    (S.toElem! hx).2 = hx := rfl
+
+/-- `f` の像は常に ground の中。 -/
+@[simp] lemma f_mem_ground (x : S.Elem) : (S.f x).1 ∈ S.ground := (S.f x).2
+
+/-- **復活版**：非自明同値類に属する `u` は自己固定点ではない（`f u ≠ u`）。 -/
+lemma f_ne_of_nontrivialClass {u : S.Elem}
+    (h : S.nontrivialClass u) : S.f u ≠ u := by
+  /- 方針：もし `S.f u = u` なら，`u` から到達できる点は `u` のみ。
+     しかし非自明同値類なら `u ≤ y` かつ `y ≠ u` なる `y` が存在して矛盾。
+     ここは前半整備なので証明は後で埋めます。 -/
+  sorry
+
+/-- （使い勝手用）非自明同値類のとき，後継 `f u` を
+    「u と異なる ground の元」として取り出す形。 -/
+lemma exists_succ_partner_of_nontrivial
+    {u : α} (hu : u ∈ S.ground)
+    (h : S.nontrivialClass (S.toElem! hu)) :
+    ∃ (v : α) (hv : v ∈ S.ground), v ≠ u := by
+  classical
+  let ue : S.Elem := ⟨u, hu⟩
+  let ve : S.Elem := S.f ue
+  refine ⟨ve.1, ve.2, ?_⟩
+  -- `ve ≠ ue` を `Subtype.ext` で基の α に落とす
+  have hne : ve ≠ ue := S.f_ne_of_nontrivialClass (u := ue) h
+  intro hval
+  apply hne
+  apply Subtype.ext
+  exact hval
+
+-- 部分型の同値 ≠ から基底の ≠ を取り出す補助
+private lemma ne_val_of_ne {x y : {a // a ∈ S.ground}} (h : x ≠ y) : x.1 ≠ y.1 := by
+  intro hval
+  apply h
+  apply Subtype.ext
+  exact hval
+
+/-- `S.ground.erase u` 上の像を作るための“付け替え写像”（本体）。
+    `x` はすでに `S.ground.erase u` 上の点（部分型）として与えられる。 -/
+def eraseOneMap
+    (u v : {a // a ∈ S.ground}) (hvne : v ≠ u) :
+    {x // x ∈ S.ground.erase u.1} → {y // y ∈ S.ground.erase u.1} :=
+  fun x => by
+    classical
+    -- x : {x // x ∈ S.ground.erase u} から ground への包含をほどく
+    have hx_in_ground : x.1 ∈ S.ground := (Finset.mem_erase.mp x.2).2
+    -- 元の写像で 1 歩進める
+    let y : {a // a ∈ S.ground} := S.f ⟨x.1, hx_in_ground⟩
+    -- 場合分け：y = u なら v に付け替え，そうでなければ y のまま
+    by_cases hyu : y = u
+    · -- 出力は v。v が `ground.erase u` に入ることを示す。
+      have hv_val_ne : v.1 ≠ u.1 := by
+        intro hval
+        apply hvne
+        apply Subtype.ext
+        exact hval
+      have hv_in_erase : v.1 ∈ S.ground.erase u.1 := by
+        -- mem_erase ↔ (≠ ∧ ∈)
+        exact Finset.mem_erase.mpr ⟨hv_val_ne, v.2⟩
+      exact ⟨v.1, hv_in_erase⟩
+    · -- 出力は y。y が `ground.erase u` に入ることを示す。
+      have hy_val_ne : y.1 ≠ u.1 := by
+        intro hval
+        apply hyu
+        apply Subtype.ext
+        exact hval
+      have hy_in_erase : y.1 ∈ S.ground.erase u.1 := by
+        exact Finset.mem_erase.mpr ⟨hy_val_ne, y.2⟩
+      exact ⟨y.1, hy_in_erase⟩
+
+/-- ground を `ground.erase u` に差し替え，`f` を上の付け替え写像に。 -/
+def eraseOne (u v : {a // a ∈ S.ground}) (hvne : v ≠ u) : FuncSetup α :=
+{ ground := S.ground.erase u.1
+, f      := S.eraseOneMap u v hvne }
+
+def eraseOneUsingSucc (u : S.Elem)
+    (hNontriv : S.nontrivialClass u) : FuncSetup α :=
+  FuncSetup.eraseOne S u (S.f u)
+    (FuncSetup.f_ne_of_nontrivialClass (S := S) hNontriv)
+
+/-
+
 variable (S : FuncSetup α)
 
 @[inline] def toElem! {x : α} (hx : x ∈ S.ground) : S.Elem := ⟨x, hx⟩
@@ -199,8 +289,369 @@ variable (S : FuncSetup α)
 
 @[simp] lemma toElem!_mem {x : α} {hx : x ∈ S.ground} :
     (S.toElem! (x:=x) hx).2 = hx := rfl
+-/
 
 end FuncSetup
+
+section IterateRTG
+variable {α : Type*} (f : α → α)
+
+-- 関係 R_f : x R_f y ↔ f x = y
+def stepRel : α → α → Prop := fun x y => f x = y
+
+lemma iterate_commute_right (f : α → α) :
+    ∀ n x, Nat.iterate f n (f x) = f (Nat.iterate f n x) := by
+  intro n
+  induction' n with n ih
+  · intro x; rfl
+  · intro x
+    -- iterate (n+1) (f x) = iterate n (f (f x))
+    have h1 : Nat.iterate f (n+1) (f x) = Nat.iterate f n (f (f x)) := by
+      -- 定義展開
+      simp [Nat.iterate]
+    -- 右側を `ih` で一段ほどく
+    have h2 : Nat.iterate f n (f (f x)) = f (Nat.iterate f n (f x)) := by
+      -- `ih` を `x := f x` に適用
+      simpa using ih (f x)
+    -- さらに `ih` で `(f^[n]) (f x)` を置換
+    have h3 : f (Nat.iterate f n (f x)) = f (f (Nat.iterate f n x)) := by
+      -- `ih x : (f^[n]) (f x) = f ((f^[n]) x)` を `f ∘ _` の中で使用
+      simpa using congrArg f (ih x)
+    -- 仕上げ：定義で `(f^[n+1]) x = (f^[n]) (f x)` に戻す
+    calc
+      Nat.iterate f (n+1) (f x)
+          = Nat.iterate f n (f (f x)) := h1
+      _   = f (Nat.iterate f n (f x)) := h2
+      _   = f (f (Nat.iterate f n x)) := h3
+      _   = f (Nat.iterate f (n+1) x) := by
+              -- `Nat.iterate f (n+1) x = Nat.iterate f n (f x)`
+              simp [Nat.iterate]
+              simp_all only [Function.iterate_succ, Function.comp_apply]
+
+/-- 主要補題：`ReflTransGen (stepRel f) x y ↔ ∃ k, (f^[k]) x = y` -/
+lemma reflTransGen_iff_exists_iterate
+    (f : α → α) {x y : α} :
+    Relation.ReflTransGen (stepRel f) x y ↔ ∃ k : ℕ, Nat.iterate f k x = y := by
+  constructor
+  · -- →：反射推移閉包の帰納
+    intro h
+    induction h with
+    | @refl  =>
+        exact ⟨0, rfl⟩
+    | @tail  b c hxb hbc ih =>
+        rcases ih with ⟨k, hk⟩
+        refine ⟨k + 1, ?_⟩
+        calc
+          Nat.iterate f (k+1) x
+              = Nat.iterate f k (f x) := by
+                  simp [Nat.iterate]
+          _   = f (Nat.iterate f k x) := iterate_commute_right f k x
+          _   = f b := by exact congrArg f hk
+          _   = c := hbc
+  · -- ←：k による単純帰納で「k 歩の鎖」を作る
+    intro h
+    rcases h with ⟨k, hk⟩
+    -- x ⟶* (f^[k] x) の鎖を k で作る
+    have hx_to_iter : Relation.ReflTransGen (stepRel f) x (Nat.iterate f k x) := by
+      revert x
+      induction' k with k ih
+      · intro x;
+        intro hk
+        subst hk
+        simp_all only [Function.iterate_zero, id_eq]
+        rfl
+
+      · intro x
+        -- まず x ⟶* (f^[k] x)（ih）、最後の 1 歩：(f^[k] x) ⟶ (f^[k+1] x)
+        have step : stepRel f (Nat.iterate f k x) (Nat.iterate f (k+1) x) := by
+          have h1 : Nat.iterate f (k+1) x = Nat.iterate f k (f x) := by
+            simp [Nat.iterate]
+          have h2 : Nat.iterate f k (f x) = f (Nat.iterate f k x) :=
+            iterate_commute_right f k x
+          exact (Eq.trans (Eq.symm h2) (Eq.symm h1))
+        -- ⊢ Relation.ReflTransGen (stepRel f) x (f^[k + 1] x)
+        exact fun hk => Relation.ReflTransGen.head rfl (ih hk)
+
+    -- 目的は x ⟶* y。ゴール側を y から (f^[k] x) に書換えて解決
+    -- `Nat.iterate f k x = y` を左向きに使えばゴールが一致
+    -- `rw [← hk]` でゴールの右端を置換してから `exact hx_to_iter`
+    -- tactic を最小限使います（`simpa using` は不使用）
+    have : Relation.ReflTransGen (stepRel f) x y := by
+      -- ゴールを書換え
+      -- （ターミナル・ゴールの書換えは `have`/`exact` だと難しいので、`match` を避けて `show`+`rw`）
+      show Relation.ReflTransGen (stepRel f) x y
+      -- 右辺を (f^[k]) x に戻す
+      -- `have` で一旦ゴールをセットできないので、`have hx` を返す形にします
+      -- ここは tactic バインダで簡潔に：
+      exact (by
+        -- `rw` はゴール側の書換えに使える： `y` を `(f^[k]) x` に戻す
+        -- 具体的には「`(f^[k]) x = y` の対称形」を使う
+        have hk' : y = Nat.iterate f k x := hk.symm
+        -- `Eq.rec` を避け、`hk' ▸ _` でゴールを書換える
+        -- `▸` は `rw` と同様に使える
+        simpa [hk'] using hx_to_iter
+      )
+    exact this
+
+-- まず小補題： g u = u なら g^[n] u = u
+private lemma iterate_fixpoint {β} (g : β → β) (u : β) (n : ℕ) (hu : g u = u) :
+    Nat.iterate g n u = u := by
+  induction' n with n ih
+  · simp [Nat.iterate]
+  · -- iterate (n+1) u = iterate n (g u) = iterate n u = u
+    -- `simpa using` を使わずに `simp` で処理
+    have : Nat.iterate g (n + 1) u = Nat.iterate g n (g u) := by
+      simp [Nat.iterate]
+    -- 右辺を書き換えて閉じる
+    -- g u = u かつ ih : iterate g n u = u
+    -- `simp` に両方を渡すと左辺が u になる
+    have : Nat.iterate g n (g u) = u := by
+      -- g u を u に、さらに ih を使う
+      -- （`simp` は可、`simpa using` は使わない）
+      -- 具体的には： iterate g n (g u) = iterate g n u = u
+      --             ↑hu               ↑ih
+      -- 1回目の書換え
+      have : Nat.iterate g n (g u) = Nat.iterate g n u := by
+        -- `congrArg` でもよいが、ここは置換で十分
+        -- g u を u へ
+        -- `simp` を使ってもOK
+        -- （細かい書換えは `simp [hu]` で反映）
+        simp [hu]
+      -- 2回目：ih で u
+      -- `simp` で ih を使う
+      -- `simp [this, ih]` でも可だが、順に適用
+      -- ここでは this による置換→ ih 適用の順に
+      -- 置換
+      -- `rw` を使うと変数束縛が増えるので、このまま `simp` で潰す
+      -- 最終行でまとめて `simp [hu, ih]`
+      simp_all only
+    -- まとめて閉じる
+    -- 上の詳細展開は冗長なので、一気に：
+    -- `simp [Nat.iterate, hu, ih]` だけでも通る
+    simp [Nat.iterate, hu, ih]
+
+
+lemma maximal_of_nontrivialClass
+    (f : α → α) [Fintype α] {u v : α}
+    (huv : Relation.ReflTransGen (stepRel f) u v ∧
+           Relation.ReflTransGen (stepRel f) v u)
+    (hneq : u ≠ v) :
+    (∀ x, Relation.ReflTransGen (stepRel f) u x →
+          Relation.ReflTransGen (stepRel f) x u) := by
+  intro x hux
+  -- u ~ v からイテレート表示を取る
+  rcases (reflTransGen_iff_exists_iterate f).1 huv.1 with ⟨k, hk⟩
+  rcases (reflTransGen_iff_exists_iterate f).1 huv.2 with ⟨ℓ, hℓ⟩
+  rcases (reflTransGen_iff_exists_iterate f).1 hux   with ⟨m, hm⟩
+
+  -- 周期 L := ℓ + k に対し f^[L] u = u
+  --   f^[ℓ] v = u かつ v = f^[k] u から
+  have hL' : Nat.iterate f (ℓ + k) u = u := by
+    -- f^[ℓ + k] u = f^[ℓ] (f^[k] u) = f^[ℓ] v = u
+    have h1 : Nat.iterate f (ℓ + k) u
+                = Nat.iterate f ℓ (Nat.iterate f k u) :=
+      Function.iterate_add_apply f ℓ k u
+    -- 右辺を v に置換
+    have h2 : Nat.iterate f ℓ (Nat.iterate f k u)
+                = Nat.iterate f ℓ v := by
+      -- hk : f^[k] u = v を右辺に適用
+      -- `rw` で十分
+      rw [hk]
+    -- 連結して u
+    exact Eq.trans (Eq.trans h1 h2) hℓ
+
+  -- 記法：L := ℓ + k, t := L*(m+1) - m
+  let L := ℓ + k
+  have hL : Nat.iterate f L u = u := by
+    -- hL' は (ℓ + k)。L の展開で一致
+    -- `rfl` で L をほどき `hL'` を使う
+    -- `simp` は使わず、`rfl` による置換で OK
+    -- 具体的には `show Nat.iterate f (ℓ + k) u = u; exact hL'`
+    -- （`L` は `ℓ + k` と定義したので）
+    change Nat.iterate f (ℓ + k) u = u
+    exact hL'
+
+  let t : ℕ := L * (m + 1) - m
+
+  -- m ≤ L*(m+1) を示して、t + m = L*(m+1) を得る
+  have Lpos : 0 < L := by
+    -- k=0 だと hk から v = u になり hneq と矛盾。よって k>0、ゆえに L>0
+    -- 堅めにやるには反証で：
+    by_contra hLz
+    -- L = 0 ⇒ k = 0 ∧ ℓ = 0
+    have : L = 0 := le_antisymm (le_of_not_gt hLz) (Nat.zero_le _)
+    -- すると hk : f^[0] u = v、すなわち u = v で矛盾
+    -- `cases` で k=0,ℓ=0 を入れてもよいが、ここでは L=0 だけで十分
+    -- L=0 から k=0 は必ずしも出せませんが、hk だけで矛盾が作れます：
+    -- 「u ⟶* v」で k=0 しかないなら v=u。厳密には `hk` の値に依存しますが、
+    -- ここでは簡潔に：
+    -- `have : u = v := by simpa [Nat.iterate, this] using hk` を避けるため、
+    -- 直接 `cases` で k=0 として扱ってもOKです。
+    -- ただ、以後の証明で L>0 は不要（m ≤ L*(m+1) は L=0 でも成り立つ）ので、Lpos は実は不要です。
+    -- 従って、このブロック自体を削っても構いません。
+    apply False.elim
+    subst hℓ hm
+    simp_all only [not_lt, Nat.le_zero_eq, Nat.add_eq_zero, add_zero, Function.iterate_zero, id_eq, and_self, ne_eq,
+      not_true_eq_false, L]
+
+  -- 実は Lpos は使わないので無視してOK。
+  have hmle : m ≤ L * (m + 1) := by
+    -- m ≤ m+1 ≤ L*(m+1)
+    have h1 : m ≤ m + 1 := Nat.le_succ m
+    have h2 : m + 1 ≤ L * (m + 1) := by
+      -- 1 ≤ L ⇒ (m+1) ≤ L*(m+1)
+      -- たとえ L=0 でも (m+1) ≤ 0 は成り立ちませんが、ここでは
+      -- `Nat.mul_le_mul_right` は 1 ≤ L が要る。安全策として L≥1 を示すかわりに
+      -- 自明な `m ≤ L*(m+1)` は、L*(m+1) ≥ m を直接示せます：
+      -- L*(m+1) ≥ 0 ≥ m は成り立たないので、以下のように別ルートで：
+      -- 実際には `Nat.le_of_lt` を使うのは過剰なので、この行は次の一行に差し替えます。
+      exact Nat.le_mul_of_pos_left (m + 1) Lpos
+    exact Nat.le_trans h1 h2
+
+  have ht_add : t + m = L * (m + 1) := by
+    -- (L*(m+1) - m) + m = L*(m+1)
+    -- `Nat.sub_add_cancel` を使う
+    -- まず t を定義通り展開
+    change (L * (m + 1) - m) + m = L * (m + 1)
+    exact Nat.sub_add_cancel hmle
+
+  -- 目標： x ⟶* u。イテレート表示で作る
+  -- `reflTransGen_iff_exists_iterate` の ← を使う準備として等式を作る
+  have h_iter_eq : Nat.iterate f t x = u := by
+    -- x = f^[m] u を左辺に、t+m = L*(m+1) を右辺に
+    -- まず (iterate_add) で左辺を右辺に移す
+    -- base : f^[t] (f^[m] u) = f^[t+m] u
+    have base := Eq.symm (Function.iterate_add_apply f t m u)
+    -- base : Nat.iterate f t (Nat.iterate f m u) = Nat.iterate f (t + m) u
+    -- 左辺の (f^[m] u) を x に置換
+    have base' : Nat.iterate f t x = Nat.iterate f (t + m) u := by
+      -- `rw` を base に適用
+      -- いったんコピーしてから書換え
+      have tmp := base
+      -- hm : f^[m] u = x
+      -- 左辺の `Nat.iterate f t (Nat.iterate f m u)` を `Nat.iterate f t x` に
+      -- 置換する
+      -- `rw [hm]` を at に
+      -- `simp` は使わず `rw` でOK
+      -- （`tmp` の左辺内部がきちんと書換えられる）
+      -- 注意：Lean によっては `rw [hm] at tmp` の後、`exact tmp`
+      -- と書くのが最も確実です。
+      -- 実際の書換え：
+      -- （`tmp` は等式なので `at` が必要）
+      -- ここで具体的に：
+      --   tmp : Nat.iterate f t (Nat.iterate f m u) = Nat.iterate f (t + m) u
+      --   →    Nat.iterate f t x = Nat.iterate f (t + m) u
+      -- となります。
+      have tmp' := tmp
+      -- 書換え
+      -- `rw` はゴール／仮定に対する戦術なので、`have` の行で `rw` するのではなく、
+      -- 新しい仮定を作ってから `rw` を当てます。
+      -- ここでは `tmp'` に当てる：
+      --   `rw [hm] at tmp'`
+      -- これにより型が変わるので、そのまま返します。
+      -- ただし、このエディタ外では `rw` を `tmp'` に当てることができないため、
+      -- 代替として `calc` で同じ式を作ります。
+      -- より簡潔に、`calc` で直接：
+      --   f^[t] x = f^[t] (f^[m] u) := by rw [←hm]
+      --   ...    = f^[t+m] u         := by exact base
+      -- を書きます。
+      -- こちらの方が確実です。
+      -- 差し替え：
+      clear tmp
+      -- calc で書き直し
+      calc
+        Nat.iterate f t x
+            = Nat.iterate f t (Nat.iterate f m u) := by
+                -- `x` を展開（hm の逆向き）
+                -- `rw [←hm]` を使う
+                rw [←hm]
+        _   = Nat.iterate f (t + m) u := base
+    -- つづいて t+m を L*(m+1) に、さらに (L*(m+1)) を「(f^[L])^[m+1]」へ
+    have h_right1 : Nat.iterate f (t + m) u = Nat.iterate f (L * (m + 1)) u := by
+      -- `rw [ht_add]`
+      -- ゴール側を書き換え
+      -- `calc` を使っても良いが単発の `rw` で十分
+      -- `exact` で返すために中間値に置く
+      -- 直接：
+      --   by simpa [ht_add] とはせず、`rw` で。
+      -- ここも `calc` を使います。
+      have : t + m = L * (m + 1) := ht_add
+      -- `this` を用いて右辺を書き換え
+      -- `Eq.trans` を使ってもよいですが、ここも `calc` で：
+      --   f^[t+m] u = f^[L*(m+1)] u
+      --   （指数の等式に基づく置換）
+      -- 置換は `rw` の方が簡潔です。
+      -- `rw [this]` を `Nat.iterate f (t+m) u` 側に当てたいので、
+      -- 下のトップレベルでまとめて使います。
+      -- いったん戻ります。
+
+      -- 直接返す：
+      -- `by cases this; rfl` の形にできます（指数が同じなら refl）
+      -- ただし `cases` は指数の等式で置換してしまうので、ここは：
+      --   `have := this; cases this; rfl`
+      -- でもOK。簡潔に `rw [this]` は tactic 文脈が必要。
+      -- ここでは calc の方へ寄せます：
+      -- 置換を呼び出し元で行うため、この補題は使わずに先で `rw` します。
+      -- （このローカル have は不要になったので消します）
+      -- 以降、上で `base'` を使う側で `rw [ht_add]` を直接当てます。
+      subst hℓ hm
+      simp_all only [Nat.sub_add_cancel, ne_eq, L, t]
+
+    -- 最終まとめ： base' と ht_add、さらに乗法版 iterate で u
+    -- まず base' の右辺を ht_add で置換
+    --   f^[t] x = f^[t+m] u  →  = f^[L*(m+1)] u
+    -- そのうえで 乗法版 iterate と `iterate_fixpoint` で u
+    -- 乗法： f^[L*(m+1)] u = (f^[L])^[m+1] u
+    have h_mul : Nat.iterate f (L * (m + 1)) u
+                  = Nat.iterate (Nat.iterate f L) (m + 1) u := by
+      let fi := Function.iterate_mul f L (m + 1)
+      exact congrFun fi u
+
+    -- g := f^[L] は u を固定する（hL）
+    have h_fix : Nat.iterate (Nat.iterate f L) (m + 1) u = u :=
+      iterate_fixpoint (Nat.iterate f L) u (m + 1) hL
+    -- 以上を直列に当てていく
+    -- まず base' を取得
+    -- その右辺を `rw [ht_add]`、さらに `rw [h_mul]`、最後に `rw [h_fix]`
+    -- tactic を使わず `calc` で書きます。
+    -- base' : f^[t] x = f^[t+m] u
+    -- なので：
+    -- f^[t] x
+    --   = f^[t+m] u           : base'
+    --   = f^[L*(m+1)] u       : by rw [ht_add]
+    --   = (f^[L])^[m+1] u     : by rw [h_mul]
+    --   = u                   : by rw [h_fix]
+    calc
+      Nat.iterate f t x
+          = Nat.iterate f (t + m) u := base'
+      _   = Nat.iterate f (L * (m + 1)) u := by
+              -- ここで `rw [ht_add]`
+              -- `simp` は使わずに `rw`
+              -- ただし `calc` 内では `simp`/`rw` はその場で使えます
+              -- 直接：
+              have : t + m = L * (m + 1) := ht_add
+              exact by
+                -- 置換して refl
+                -- `rw` と違い、`exact` で返す必要があるので Eq.rec を意識せずに
+                -- `cases` で置換します
+                -- ここでは素直に：
+                --   by rw [this]
+                -- を tactic で書けないので、もう一段 `calc` はやめて
+                -- 上の `by` ブロック内で `rw` を使います。
+                -- 簡潔に：
+                --    `rw [this]`
+                -- で終了
+                -- （この `by` ブロックは tactic 文脈なので `rw` が使えます）
+                rw [this]
+      _   = Nat.iterate (Nat.iterate f L) (m + 1) u := h_mul
+      _   = u := by
+              -- `h_fix` を当てる
+              exact h_fix
+
+  -- イテレート等式から ReflTransGen を得る（← 方向）
+  exact (reflTransGen_iff_exists_iterate f).2 ⟨t, h_iter_eq⟩
+
+end IterateRTG
 
 /- 記法を開く（必要な箇所で使えるように）。 -/
 open FuncSetup (le cover)
@@ -292,37 +743,6 @@ lemma reach_iff_iterate (x y : S.Elem) :
 
 
 
-def leQuot (a b : S.QuotElem) : Prop :=
-  ∃ x y : S.Elem, a = Quot.mk _ x ∧ b = Quot.mk _ y ∧ x ≤ y
-
-/-- `QuotElem` 上の半順序：代表を選んで `≤` を判定し、それが良定義であることを示す -/
-def preQuot : Preorder S.QuotElem where
-  -- 主要定義：`le` を `Quot.liftOn₂` で与える
-  le := S.leQuot
-  le_refl := by
-    intro a
-    -- 代表に戻して反射律
-    refine Quot.induction_on a (fun x => ⟨x, x, rfl, rfl, (S.pre).le_refl x⟩)
-  le_trans := by
-    intro a b c hab hbc
-    rcases hab with ⟨x, y, hax, hby, hxy⟩
-    rcases hbc with ⟨y', z, hb'y, hcz, hyz⟩
-    -- b の 2 つの表現から y ~ y' を得る
-    -- `Quot.mk _ y = Quot.mk _ y'` を作り、そこから核関係へ
-    have hyyq : Quot.mk (S.ker) y = Quot.mk (S.ker) y' := by
-      -- b = ⟦y⟧ かつ b = ⟦y'⟧ なので ⟦y⟧ = ⟦y'⟧
-      exact (Eq.trans (by rw [←hby]) hb'y)
-    have hyy : S.ker.r y y' := by
-      --subst hby hcz hax
-      rw [Quot.eq] at hyyq
-      rw [Equivalence.eqvGen_iff] at hyyq
-      · exact hyyq
-      · show Equivalence ⇑S.ker
-        exact S.ker.iseqv
-    have hyy' : y ≤ y' := S.ker_le_of_rel_right hyy
-    have hxz  : x ≤ z  := (S.pre).le_trans x y z hxy ((S.pre).le_trans y y' z hyy' hyz)
-    exact ⟨x, z, hax, hcz, hxz⟩
-
 /-- 1ステップ遷移：x→f x。 -/
 def Step (x y : S.Elem) : Prop := S.fV x = y
 
@@ -384,6 +804,41 @@ lemma reach_eq_reflTrans (x y : S.Elem) :
         have e3 : Nat.iterate S.fV (n+1) x = b :=
           Eq.trans e2 hab
         exact ⟨n+1, e3⟩
+
+
+
+def leQuot (a b : S.QuotElem) : Prop :=
+  ∃ x y : S.Elem, a = Quot.mk _ x ∧ b = Quot.mk _ y ∧ x ≤ y
+
+/-- `QuotElem` 上の半順序：代表を選んで `≤` を判定し、それが良定義であることを示す -/
+def preQuot : Preorder S.QuotElem where
+  -- 主要定義：`le` を `Quot.liftOn₂` で与える
+  le := S.leQuot
+  le_refl := by
+    intro a
+    -- 代表に戻して反射律
+    refine Quot.induction_on a (fun x => ⟨x, x, rfl, rfl, (S.pre).le_refl x⟩)
+  le_trans := by
+    intro a b c hab hbc
+    rcases hab with ⟨x, y, hax, hby, hxy⟩
+    rcases hbc with ⟨y', z, hb'y, hcz, hyz⟩
+    -- b の 2 つの表現から y ~ y' を得る
+    -- `Quot.mk _ y = Quot.mk _ y'` を作り、そこから核関係へ
+    have hyyq : Quot.mk (S.ker) y = Quot.mk (S.ker) y' := by
+      -- b = ⟦y⟧ かつ b = ⟦y'⟧ なので ⟦y⟧ = ⟦y'⟧
+      exact (Eq.trans (by rw [←hby]) hb'y)
+    have hyy : S.ker.r y y' := by
+      --subst hby hcz hax
+      rw [Quot.eq] at hyyq
+      rw [Equivalence.eqvGen_iff] at hyyq
+      · exact hyyq
+      · show Equivalence ⇑S.ker
+        exact S.ker.iseqv
+    have hyy' : y ≤ y' := S.ker_le_of_rel_right hyy
+    have hxz  : x ≤ z  := (S.pre).le_trans x y z hxy ((S.pre).le_trans y y' z hyy' hyz)
+    exact ⟨x, z, hax, hcz, hxz⟩
+
+--------
 
 /-- SCC 商上での「一歩」：代表を取って f を1回当てる像。 -/
 def stepQuot (a b : S.QuotElem) : Prop :=
@@ -700,52 +1155,7 @@ lemma nontrivial_class_is_maximal
   have : r ≠ q := by exact fun h => (lt_irrefl q) (by exact h ▸ hqr)
   exact this hrq
 
-def eraseOneFun (S : FuncSetup α) (u v : S.Elem) (hvne : v ≠ u) : α → α :=
-  fun x =>
-    if x ∈ S.V.erase u then
-      let y := S.f x
-      if y = u then v else y
-    else
-      -- ground 外は自由。以降は ground = S.V.erase u で評価するので使われない
-      v
 
-/-- ground を V.erase u に差し替え、f を上の付け替え関数に。 -/
-def eraseOne (S : FuncSetup α) (u v : S.Elem) (hvne : v ≠ u) : FuncSetup α :=
-{ V      := S.V.erase u
-, f      := S.eraseOneFun u v hvne
-, mapsTo := by
-    intro x hx
-    -- x ∈ V.erase u
-    have hxV : x ∈ S.V := (Finset.mem_erase.mp hx).2
-    have hyV : S.f x ∈ S.V := S.mapsTo hxV
-    -- 場合分け：S.f x = u なら v に付け替える（v ∈ V, v ≠ u）
-    by_cases hfu : S.f x = u
-    · -- 付け替え像 v は V.erase u に入る
-      have hvV  : (v : α) ∈ S.V := v.property
-      have hneq : (v : α) ≠ u := by
-        intro contra; exact hvne (Subtype.ext (by simpa using contra))
-      -- f' x = v
-      have : S.eraseOneFun u v hvne x = v := by
-        -- x は ground 内なので if の左枝、さらに hfu により右枝の if も左分岐
-        unfold eraseOneFun
-        by_cases hxg : x ∈ S.V.erase u
-        · simp_all
-        · exact (False.elim (by exact hxg hx))
-      -- よって mapsTo
-      simp_all only [Finset.mem_erase, ne_eq, and_true, Finset.coe_mem, not_false_eq_true, and_self]
-    · -- S.f x ≠ u なら f' x = S.f x ∈ V.erase u
-      have : S.eraseOneFun u v hvne x = S.f x := by
-        unfold eraseOneFun
-        by_cases hxg : x ∈ S.V.erase u
-        · simp_all
-        · exact (False.elim (by exact hxg hx))
-      -- S.f x ∈ V、かつ S.f x ≠ u
-      have hneq : S.f x ≠ u := hfu
-      have hy_in : S.f x ∈ S.V.erase u := by
-        refine Finset.mem_erase.mpr ?_
-        exact ⟨hneq, hyV⟩
-      simpa [this] using hy_in
-}
 
 /-- traceErase: ground から u を消して、集合族を A.erase u に対応させる。 -/
 noncomputable def traceErase (F : SetFamily α) (u : α) : SetFamily α :=

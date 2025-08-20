@@ -21,11 +21,13 @@ IdealsTrace.lean — 「functional preorder × ideals × trace」の結合層（
 
 universe u
 open Classical
+
 open scoped BigOperators
 
 namespace AvgRare
 namespace PaperSync
 open Trace
+open SPO
 
 variable {α : Type u} [DecidableEq α]
 
@@ -101,22 +103,35 @@ lemma trace_injective_of_sim
 
 /-! ## 5) Lemma 3.6：トレースの2主張（(1) functional 保持, (2) NDS は増えない） -/
 
-/-- (3.6-1 の言明)：
+/-(3.6-1 の言明)：
 `u` が非自明クラスに属するとき，`I(V,≤)` の 1点トレースは
 ある機能的前順序 S' の `idealFamily S'` に一致する（同型を許して）。 -/
+
+
+/-- （3.6(1) の精密版の言明だけ）
+    非自明クラスの点 `u` を 1 個潰すと，
+    `idealFamily S` の 1点トレースは，`eraseOne S u` のイデアル族に一致する。 -/
+lemma idealFamily_traceAt_eq_eraseOne
+    (S : SPO.FuncSetup α) (u : S.Elem)
+    (hNontriv : SPO.FuncSetup.nontrivialClass S u) :
+    idealFamily (SPO.FuncSetup.eraseOne S u (S.f u)
+                  (SPO.FuncSetup.f_ne_of_nontrivialClass (S := S) hNontriv))
+      = Trace.traceAt u.1 (idealFamily S) := by
+  classical
+  -- （ここは従来どおり `sets` 同値の証明を進めればOK）
+  sorry
+
+/-- 使い勝手の良い “存在形” の再掲（既存の `traced_is_functional_family` を置換）。 -/
 lemma traced_is_functional_family
     (S : SPO.FuncSetup α) (u : S.Elem)
     (hNontriv : SPO.FuncSetup.nontrivialClass S u) :
     ∃ S' : SPO.FuncSetup α,
-      -- ground とエッジの対応（必要なら reindex を通じて一致）：
-      True ∧
-      -- 族の一致（必要なら同型での書き換え）
-      True := by
-  -- 実装方針：
-  --   · S から u を潰した ground と f の制限で `S'` を構成。
-  --   · `idealFamily S` の 1点トレースと `idealFamily S'` の一致（必要なら reindex）。
-  -- ここでは骨格だけ置く。
-  exact ⟨S, True.intro, True.intro⟩
+      idealFamily S' = Trace.traceAt u.1 (idealFamily S) := by
+  refine ⟨SPO.FuncSetup.eraseOneUsingSucc (S := S) u hNontriv, ?_⟩
+  exact idealFamily_traceAt_eq_eraseOne S u hNontriv
+
+
+
 
 /-- (3.6-2 の言明)：
 `u` が非自明クラスに属するとき，1点トレースは NDS を増やさない。 -/
@@ -472,6 +487,8 @@ lemma nds_monotone_under_trace
 
   -- まとめ： NDS ≤ L ≤ NDS(traceAt)
   exact le_trans hNDS_le_L hL_le_trace
+
+
 
 end PaperSync
 end AvgRare
