@@ -329,7 +329,52 @@ lemma mem_principalIdeal_iff_le (S : FuncSetup α)
   · intro hle
     exact (S.mem_principalIdeal_iff (a:=a) (y:=y) ha).2 ⟨hy, hle⟩
 
+/-! ## 1) 功能的前順序 S から ground 上の関係を作る -/
 
+/-- `leOn S y x` : ground 上の要素 `y, x : α` について，
+S の部分型 `S.Elem` 上の `S.le ⟨y,hy⟩ ⟨x,hx⟩` が成り立つことを「存在」で述べる。 -/
+def leOn (S : SPO.FuncSetup α) (y x : α) : Prop :=
+  ∃ (hy : y ∈ S.ground) (hx : x ∈ S.ground),
+      SPO.FuncSetup.le S ⟨y, hy⟩ ⟨x, hx⟩
+
+lemma leOn_iff_subtype (S : FuncSetup α) {a b : α}
+  (ha : a ∈ S.ground) (hb : b ∈ S.ground) :
+  S.leOn a b ↔ S.le ⟨a, ha⟩ ⟨b, hb⟩ := by
+  constructor
+  · rintro ⟨ha', hb', h⟩
+    -- 証明部の差だけなので書換えで揃える
+    have ea : (⟨a, ha'⟩ : S.Elem) = ⟨a, ha⟩ := Subtype.ext (rfl)
+    have eb : (⟨b, hb'⟩ : S.Elem) = ⟨b, hb⟩ := Subtype.ext (rfl)
+    cases ea; cases eb; exact h
+  · intro h; exact ⟨ha, hb, h⟩
+
+lemma leOn_refl (S : FuncSetup α) {x : α} (hx : x ∈ S.ground) :
+  S.leOn x x :=
+by
+  exact ⟨hx, hx, Relation.ReflTransGen.refl⟩
+
+lemma leOn_trans (S : FuncSetup α) {y x z : α}
+  (h₁ : S.leOn y x) (h₂ : S.leOn x z) :
+  S.leOn y z :=
+by
+  rcases h₁ with ⟨hy, hx, h_yx⟩
+  rcases h₂ with ⟨hx', hz, h_xz⟩
+  -- 中点 x の証明部を揃える（値は同じなので Subtype.ext rfl）
+  have h_yx' : S.le ⟨y, hy⟩ ⟨x, hx'⟩ := by
+    -- ゴール側の第2引数を ⟨x,hx⟩ に書き換えてから h_yx を使う
+    have e : (⟨x, hx⟩ : S.Elem) = ⟨x, hx'⟩ := Subtype.ext (by rfl)
+    -- 目標を書換え
+    -- `cases e` で ⟨x,hx'⟩ を ⟨x,hx⟩ に統一
+    cases e
+    exact h_yx
+  -- S.le の推移律（= ReflTransGen.trans）で連結
+  have h_yz : S.le ⟨y, hy⟩ ⟨z, hz⟩ :=
+    Relation.ReflTransGen.trans h_yx' h_xz
+  exact ⟨hy, hz, h_yz⟩
+
+/-- S に対応する order-ideal family を ground 型 `α` 上の `SetFamily` として与える。 -/
+noncomputable def idealFamily (S : SPO.FuncSetup α) : SetFamily α :=
+  orderIdealFamily (le := leOn S) (V := S.ground)
 
 
 /-
@@ -484,7 +529,7 @@ private lemma iterate_fixpoint {β} (g : β → β) (u : β) (n : ℕ) (hu : g u
     -- `simp [Nat.iterate, hu, ih]` だけでも通る
     simp [Nat.iterate, hu, ih]
 
-
+--補題のタイトルからすると、Nontrivialなuは、maximalということを示す定理っぽいけど違う。
 lemma maximal_of_nontrivialClass
     (f : α → α) [Fintype α] {u v : α}
     (huv : Relation.ReflTransGen (stepRel f) u v ∧
@@ -704,6 +749,8 @@ lemma maximal_of_nontrivialClass
 
   -- イテレート等式から ReflTransGen を得る（← 方向）
   exact (reflTransGen_iff_exists_iterate f).2 ⟨t, h_iter_eq⟩
+
+
 
 end IterateRTG
 
