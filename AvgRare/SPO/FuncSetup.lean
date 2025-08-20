@@ -25,6 +25,7 @@ FuncSetup.lean — 機能的前順序（functional preorder）のセットアッ
 universe u
 
 open scoped BigOperators
+open Classical
 
 namespace AvgRare
 namespace SPO
@@ -277,6 +278,59 @@ def eraseOneUsingSucc (u : S.Elem)
     (hNontriv : S.nontrivialClass u) : FuncSetup α :=
   FuncSetup.eraseOne S u (S.f u)
     (FuncSetup.f_ne_of_nontrivialClass (S := S) hNontriv)
+
+-- 便利記法：S の台集合上の要素
+--abbrev Elem := S.Elem
+
+noncomputable def principalIdeal (S : FuncSetup α) (a : α) (ha : a ∈ S.ground) : Finset α := by
+  classical
+  -- attach は {y // y ∈ ground}、述語は `S.le y ⟨a,ha⟩`
+  exact (S.ground.attach.filter (fun (y : {z // z ∈ S.ground}) => S.le y ⟨a, ha⟩)).map
+    ⟨Subtype.val, by simp_all only [Subtype.val_injective]⟩
+
+
+/-- 会員判定（存在形）：`y ∈ ↓a` ↔ `∃ hy, y ∈ ground ∧ (⟨y,hy⟩ ≤ₛ ⟨a,ha⟩)`。 -/
+lemma mem_principalIdeal_iff (S : FuncSetup α)
+  {a y : α} (ha : a ∈ S.ground) :
+  y ∈ S.principalIdeal a ha ↔ ∃ hy : y ∈ S.ground, S.le ⟨y, hy⟩ ⟨a, ha⟩ := by
+  classical
+  constructor
+  · intro hy
+    rcases Finset.mem_map.mp hy with ⟨u, hu, huv⟩
+    -- 条件部を取り出す
+    have hcond : S.le u ⟨a, ha⟩ := (Finset.mem_filter.mp hu).2
+    -- `u.val = y`
+    cases u with
+    | mk uval up =>
+      cases huv
+      exact ⟨up, hcond⟩
+  · rintro ⟨hy, hle⟩
+    have hy_att : ⟨y, hy⟩ ∈ S.ground.attach := Finset.mem_attach _ _
+    have hy_fil :
+        ⟨y, hy⟩ ∈ S.ground.attach.filter (fun z => S.le z ⟨a, ha⟩) :=
+      Finset.mem_filter.mpr ⟨hy_att, hle⟩
+    exact Finset.mem_map.mpr ⟨⟨y, hy⟩, hy_fil, rfl⟩
+
+/-- ground 側を前提にした簡約形：`y ∈ ↓a` ↔ `⟨y,hy⟩ ≤ₛ ⟨a,ha⟩`。 -/
+lemma mem_principalIdeal_iff_le (S : FuncSetup α)
+  {a y : α} (ha : a ∈ S.ground) (hy : y ∈ S.ground) :
+  y ∈ S.principalIdeal a ha ↔ S.le ⟨y, hy⟩ ⟨a, ha⟩ := by
+  classical
+  constructor
+  · intro h
+    rcases (S.mem_principalIdeal_iff (a:=a) (y:=y) ha).1 h with ⟨hy', hle⟩
+    -- 証明部を差し替え（部分型の値は同じなので `Subtype.ext` で輸送）
+    have ey : (⟨y, hy'⟩ : S.Elem) = ⟨y, hy⟩ := Subtype.ext (by rfl)
+    -- `simpa` を使わず書換えで閉じる
+    -- `hle : S.le ⟨y,hy'⟩ ⟨a,ha⟩` を ey で左引数だけ置換
+    -- 置換は `Eq.ndrec` 相当だが、ここでは `cases ey` で十分
+    cases ey
+    exact hle
+  · intro hle
+    exact (S.mem_principalIdeal_iff (a:=a) (y:=y) ha).2 ⟨hy, hle⟩
+
+
+
 
 /-
 
@@ -724,8 +778,7 @@ def toQuot (x : S.Elem) : S.QuotElem := Quot.mk _ x
 
 def Valid : Prop := ∀ x : S.Elem, S.fV x ≠ x
 
-def isOrderIdeal (S : FuncSetup α) (A : Finset S.Elem) : Prop :=
-  ∀ {x y : S.Elem}, y ≤ x → x ∈ A → y ∈ A
+
 
 noncomputable instance (S : FuncSetup α) : DecidablePred (isOrderIdeal S) := Classical.decPred _
 

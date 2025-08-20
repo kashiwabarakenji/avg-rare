@@ -55,17 +55,23 @@ noncomputable def idealFamily (S : SPO.FuncSetup α) : SetFamily α :=
 /-- 論文 Lemma 3.3（言明）：
 `u, v` が同じ同値類（S.sim）であることと，`idealFamily S` における parallel が同値。 -/
 lemma parallel_iff_sim
-    (S : SPO.FuncSetup α) {u v : α}
-    (hu : u ∈ S.ground) (hv : v ∈ S.ground) :
-    Trace.Parallel (idealFamily S) u v
-    ↔ SPO.FuncSetup.sim S (S.toElem! hu) (S.toElem! hv) := by
-  -- 証明方針：
-  --   →：parallel から「u を含む ideal ↔ v を含む ideal」の一致を用い，
-  --      principal ideals を動かして y≤x の情報を recover して S.sim を示す。
-  --   ←：S.sim から「u, v を含む ideal の一致」を構成。
-  -- 技術要素：`isOrderIdealOn` の定義展開，`leOn` ↔ `S.le` の橋渡し。
-  -- ここでは言明のみを確定させる。
+  (S : FuncSetup α) {u v : S.Elem} :
+  Trace.Parallel (idealFamily S) u v
+  ↔ FuncSetup.sim S u v := by
+  -- 証明スケルトンだけ置いておきます。中身は後で `sorry` 埋め。
+  -- → : parallel から、全イデアルでの会員一致 ⇒ principal の比較で `le` を復元 ⇒ `sim`
+  -- ← : `sim` から、`y ≤ u ↔ y ≤ v` を示し、イデアル会員一致へ
   sorry
+
+lemma idealFamily_mem_principal
+  (S : FuncSetup α) (x : S.Elem) :
+  principalIdeal S x.1 x.2 ∈ idealFamily S := by
+  -- `idealFamily S = orderIdealFamily (le := S.leOn) (V := S.ground)`
+  -- 会員性を order-ideal 述語へ落とす
+  change isOrderIdealOn (le := S.leOn) (V := S.ground) (principalIdeal S x.1 x.2)
+  exact isOrderIdealOn_principal (S := S) (a := x.1) (ha := x.2)
+
+
 
 /-! ## 3) Lemma 3.1：maximal ⇒ rare -/
 
@@ -97,7 +103,8 @@ lemma trace_injective_of_sim
     (hSim : SPO.FuncSetup.sim S (S.toElem! hu) (S.toElem! hv)) :
     Function.Injective (Trace.eraseMap (idealFamily S) u) := by
   classical
-  have hPar : Trace.Parallel (idealFamily S) u v :=
+  have hPar : Trace.Parallel (idealFamily S) u v := by
+    search_proof
     (parallel_iff_sim S hu hv).mpr hSim
   exact trace_injective_of_parallel S hPar
 

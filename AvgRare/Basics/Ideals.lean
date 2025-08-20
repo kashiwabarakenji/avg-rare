@@ -77,6 +77,8 @@ variable (le : α → α → Prop) (V : Finset α)
     (orderIdealFamily le V).sets V := by
   simpa [sets_iff_isOrderIdeal] using isOrderIdealOn_univ (le := le) (V := V)
 
+
+
 end Ideals
 
 /-- NDS（正規化された次数和）：
@@ -230,10 +232,7 @@ universe u
 variable {α : Type u} [DecidableEq α]
 
 section
-variable (S : FuncSetup α)
 
--- 便利記法：S の台集合上の要素
---abbrev Elem := S.Elem
 
 /-- 空集合はイデアル。 -/
 @[simp] lemma isOrderIdeal_empty : S.isOrderIdeal (∅ : Finset S.Elem) := by
@@ -289,37 +288,7 @@ by
   exact Finset.mem_image.mpr
     ⟨y, hA (hmono hy') hx, rfl⟩
 
-/-- 主イデアル（\↓x）：`ground` から `≤ x` な要素を集めたもの。 -/
-noncomputable def principalIdeal (x : S.Elem) : Finset S.Elem :=
-  S.V.attach.filter (fun y => y ≤ x)
 
-@[simp] lemma mem_principalIdeal {x y : S.Elem} :
-  y ∈ S.principalIdeal x ↔ y ≤ x := by
-  classical
-  -- attach にはすべての Elem が入る
-  have hy : y ∈ S.V.attach := Finset.mem_attach _ _
-  constructor
-  · intro h
-    -- filter の条件が通っている
-    have := (Finset.mem_filter.mp h).2
-    simpa using this
-  · intro hle
-    -- attach にいる y で、かつ ≤ x
-    exact Finset.mem_filter.mpr ⟨hy, hle⟩
-
-/-- 主イデアルはイデアル。 -/
-lemma isOrderIdeal_principal (x : S.Elem) :
-  S.isOrderIdeal (S.principalIdeal x) := by
-  intro a b hba ha
-  -- a∈↓x かつ b≤a ⇒ b≤x なので b∈↓x
-  have : a ≤ x := (mem_principalIdeal (S:=S)).1 ha
-  have : b ≤ x := (S.pre).le_trans _ _ _ hba this
-  exact (mem_principalIdeal (S:=S)).2 this
-
-/-- 単元から生成される主イデアルは，その点を含む。 -/
-@[simp] lemma self_mem_principal (x : S.Elem) :
-  x ∈ S.principalIdeal x := by
-  simp_all only [mem_principalIdeal, le_refl]
 
 end
 
