@@ -23,6 +23,7 @@ open scoped BigOperators
 
 namespace AvgRare
 namespace Trace
+open SetFamily
 
 variable {α : Type u} [DecidableEq α]
 
@@ -52,7 +53,7 @@ noncomputable def traceAt (x : α) (F : SetFamily α) : SetFamily α := by
     (traceAt x F).ground = F.ground.erase x := rfl
 
 
-
+--ここからは使わないかも。
 /-- `Subtype` のエッジを `erase u` に写す自然な射。 -/
 def eraseMap (F : SetFamily α) (u : α) :
     {A // F.sets A} → Finset α := fun A => (Subtype.val A).erase u
@@ -60,8 +61,9 @@ def eraseMap (F : SetFamily α) (u : α) :
 @[simp] lemma eraseMap_apply (F : SetFamily α) (u : α) (A : {A // F.sets A}) :
     eraseMap F u A = (A.val).erase u := rfl
 
--- 以下の部分は、idealsTraceと融合する必要があり。
---消してもいい？
+-- 以下の部分は、idealsTraceと融合する必要があり。多分、全部コメントアウト
+/-
+--FuncSetupを使わない部分
 /-- （言明のみ）Lemma 3.5 に対応：
 `u` と `v` が Parallel なら，`A ↦ A.erase u` はエッジ集合上で単射。 -/
 lemma trace_injective_of_parallel
@@ -91,6 +93,388 @@ lemma NDS_traceAt_rewrite
         - (F.numHyperedges : Int) * (F.ground.card : Int) := by
   -- unfold NDS; rewrite 3つの仮定; `sum_image` の書き換えで完成（詳細は後で）
   sorry
+-/
+
+--------
+
+@[simp] lemma ground_card_trace_of_mem
+    (F : SetFamily α) {u : α} (hu : u ∈ F.ground) :
+    (traceAt u F).ground.card = F.ground.card - 1 := by
+  classical
+  -- `traceAt` の ground 定義が `F.ground.erase u` であることを使用
+  simp [traceAt, hu]
+
+/-ChatGPTの3番-/
+lemma erase_on_edges_injective_of_parallel
+    (F : SetFamily α) {u v : α}
+    (huv : F.Parallel u v) (hne : u ≠ v) :
+    Function.Injective
+      (fun (A : {A // A ∈ F.edgeFinset}) => (A.1).erase u) := by
+  classical
+  intro A B h
+  -- 目標は A = B（Subype.ext で値の一致を示せば十分）
+  apply Subtype.ext
+  -- Finset extensionality で要素ごとに同値を示す
+  apply Finset.ext
+  intro x
+  by_cases hx : x = u
+  · -- ケース1: x = u のとき，u の所属を比較したい
+
+    -- A,B がエッジであることから sets 証拠を回収
+    have hAsets : F.sets A.1 := by
+      simp_all only [SetFamily.Parallel, ne_eq]
+      obtain ⟨val, property⟩ := A
+      obtain ⟨val_1, property_1⟩ := B
+      simp_all only
+      simp_all only [SetFamily.mem_edgeFinset]
+
+    have hBsets : F.sets B.1 := by
+      simp_all only [SetFamily.Parallel, ne_eq]
+      obtain ⟨val, property⟩ := A
+      obtain ⟨val_1, property_1⟩ := B
+      simp_all only
+      simp_all only [SetFamily.mem_edgeFinset, and_true]
+
+    -- `A.erase u = B.erase u` から v の所属は一致
+    have hv_on_erases :
+        (v ∈ A.1.erase u) ↔ (v ∈ B.1.erase u) := by
+      constructor <;> intro hv' <;> simpa [h] using hv'
+    -- v ≠ u なので，`erase u` で v の所属は不変
+    have hvAB : (v ∈ A.1) ↔ (v ∈ B.1) := by
+      have hvne : v ≠ u := (ne_comm).1 hne
+      simpa [Finset.mem_erase, hvne] using hv_on_erases
+    -- Parallel: (u ∈ X) ↔ (v ∈ X) を A,B それぞれで使用し合成
+    rw [hx]
+    calc
+      u ∈ A.1 ↔ v ∈ A.1 := by
+        dsimp [SetFamily.Parallel] at huv
+        constructor
+        · intro hu
+          have : A.1 ∈ {A : Finset α | F.sets A ∧ u ∈ A} := by
+            exact Set.mem_sep hAsets hu
+          subst hx
+          simp_all only [ne_eq, Finset.mem_erase, Set.mem_setOf_eq, true_and]
+        · intro hv
+          have : A.1 ∈ {A : Finset α | F.sets A ∧ v ∈ A} := by
+            exact Set.mem_sep hAsets hv
+          --subst hx
+          have : A.1 ∈ {A : Finset α | F.sets A ∧ u ∈ A} := by
+            rw [←huv] at this
+            exact this
+          rw [Set.mem_setOf_eq] at this
+          exact this.2
+      _       ↔ v ∈ B.1 := hvAB
+      _       ↔ u ∈ B.1 := by
+        dsimp [SetFamily.Parallel] at huv
+        constructor
+        · intro hu
+          have : B.1 ∈ {A : Finset α | F.sets A ∧ v ∈ A} := by
+            exact Set.mem_sep hBsets hu
+          have : B.1 ∈ {A : Finset α | F.sets A ∧ u ∈ A} := by
+            rw [←huv] at this
+            exact this
+          rw [Set.mem_setOf_eq] at this
+          exact this.2
+        · intro hv
+          have : B.1 ∈ {A : Finset α | F.sets A ∧ u ∈ A} := by
+            exact Set.mem_sep hBsets hv
+          --subst hx
+          have : B.1 ∈ {A : Finset α | F.sets A ∧ v ∈ A} := by
+            rw [huv] at this
+            exact this
+          rw [Set.mem_setOf_eq] at this
+          exact this.2
+  · -- ケース2: x ≠ u のとき，erase の等式からそのまま同値
+    have hx_on_erases :
+        (x ∈ A.1.erase u) ↔ (x ∈ B.1.erase u) := by
+      constructor <;> intro hx' <;> simpa [h] using hx'
+    -- x ≠ u なので，`erase u` で x の所属はそのまま
+    simpa [Finset.mem_erase, hx] using hx_on_erases
+
+--4番
+@[simp] lemma sets_traceAt_iff (F : SetFamily α) (u : α) {B : Finset α} : (traceAt u F).sets B ↔ ∃ A, F.sets A ∧ B = A.erase u := by
+  rfl
+
+/-- トレース後のエッジ集合は，元のエッジ集合に `erase u` を施した像と一致。
+`parallel` はここでは不要（像集合の同一性）。 -/
+lemma edgeFinset_trace_eq_image_erase_of_parallel
+    (F : SetFamily α) {u v : α}
+    (huv : F.Parallel u v) (hne : u ≠ v) :
+    (traceAt u F).edgeFinset = F.edgeFinset.image (fun A => A.erase u) := by
+  classical
+  -- メンバーシップ同値で両包含を示す
+  apply Finset.ext
+  intro B
+  constructor
+  · -- 「→」: B がトレース側のエッジなら，元の何か A の erase になっている
+    intro hB
+    have hBsets : (traceAt u F).sets B :=
+      (mem_edgeFinset_iff_sets (F := traceAt u F) (A := B)).1 hB
+    -- トレースの特徴付け：B = A.erase u
+    rcases (sets_traceAt_iff (F := F) (u := u) (B := B)).1 hBsets with ⟨A, hA, rfl⟩
+    -- 画像の元として書き換え
+    exact Finset.mem_image.mpr
+      ⟨A, (mem_edgeFinset_iff_sets (F := F) (A := A)).2 hA, rfl⟩
+  · -- 「←」: 右辺の像の元なら，トレース側のエッジ
+    intro hB
+    rcases Finset.mem_image.mp hB with ⟨A, hAedge, hBdef⟩
+    have hAsets : F.sets A :=
+      (mem_edgeFinset_iff_sets (F := F) (A := A)).1 hAedge
+    -- A ∈ F.sets なら (A.erase u) はトレース側のエッジ
+    have : (traceAt u F).sets (A.erase u) :=
+      (sets_traceAt_iff (F := F) (u := u) (B := A.erase u)).2 ⟨A, hAsets, rfl⟩
+    -- edgeFinset への持ち上げ
+    simpa [hBdef] using
+      (mem_edgeFinset_iff_sets (F := traceAt u F) (A := A.erase u)).2 this
+
+--ChatGPTの5番 どうも証明には必要なかった。
+/- 上の二つから，全単射（存在）を明示しておく版。 -/
+/-
+lemma edges_bijection_exists_of_parallel
+    (F : SetFamily α) {u v : α}
+    (huv : F.Parallel u v) (hne : u ≠ v) :
+    ∃ e : {A // A ∈ F.edgeFinset} ≃ {B // B ∈ (traceAt u F).edgeFinset},
+      ∀ A, (e A).1 = (A.1.erase u) := by
+  sorry
+-/
+
+--ChatGPTの6番
+lemma numHyperedges_preserved_of_parallel
+    (F : SetFamily α) {u v : α}
+    (huv : F.Parallel u v) (hne : u ≠ v) :
+    (traceAt u F).numHyperedges = F.numHyperedges := by
+  classical
+  -- ④: トレース後のエッジは `erase u` の像
+  have himg :
+      (traceAt u F).edgeFinset
+        = F.edgeFinset.image (fun A => A.erase u) :=
+    edgeFinset_trace_eq_image_erase_of_parallel (F := F) (u := u) (v := v) huv hne
+
+  -- ③: `A ↦ A.erase u` は `F.edgeFinset` 上で単射
+  have hinj_on :
+      ∀ A ∈ F.edgeFinset, ∀ B ∈ F.edgeFinset,
+        (A.erase u) = (B.erase u) → A = B := by
+    intro A hA B hB hEq
+    -- サブタイプ版の単射から引き戻す
+    have hsub_inj :=
+      @erase_on_edges_injective_of_parallel α _ F u v huv hne
+    unfold Function.Injective at hsub_inj
+    simp_all only [Parallel, ne_eq, mem_edgeFinset, Subtype.forall, Subtype.mk.injEq, and_imp, subset_refl]
+    apply hsub_inj
+    · simp_all only [subset_refl]
+    · simp_all only [subset_refl]
+    · simp_all only [subset_refl]
+    · simp_all only [subset_refl]
+    · simp_all only [subset_refl]
+
+  -- `image` のカードは InjOn なら元と等しい
+  have hcard_image :
+      (F.edgeFinset.image (fun A => A.erase u)).card
+        = F.edgeFinset.card := by
+    -- お手元の補題名に応じて差し替えてください：
+    -- 例: `Finset.card_image_iff.mpr hinj_on`
+    --     または `Finset.card_image_eq_iff.mpr hinj_on`
+    --     あるいは `by
+    --        refine Finset.card_image_of_injOn ?_;
+    --        exact hinj_on`
+    -- ここでは `card_image_iff` 風の名前を仮定します。
+    simpa using Finset.card_image_iff.mpr hinj_on
+
+  -- 仕上げ：カード等式に書き換え
+  simp [numHyperedges, himg, hcard_image]
+
+lemma sum_edge_sizes_split_by_u
+    (F : SetFamily α) (u : α) :
+    (∑ A ∈ F.edgeFinset, A.card)
+      = (∑ A ∈ F.edgeFinset, (A.erase u).card) + F.degree u := by
+  classical
+  have hpt :
+      ∀ A : Finset α,
+        A.card = (A.erase u).card + (if u ∈ A then 1 else 0) := by
+    intro A; by_cases huA : u ∈ A
+    · -- u を含むとき
+      -- (A.erase u).card = A.card - 1 を使えば OK
+      have : (A.erase u).card = A.card - 1 := by
+        simp [huA]
+
+      -- 自然数なので `A.card - 1 + 1 = A.card`
+      have hpos : 0 < A.card := by
+        exact Finset.card_pos.mpr ⟨u, huA⟩
+      -- `Nat.succ_pred_eq_of_pos` を使う形に整える
+      -- ここは `simp` で流せることが多いです
+      simpa [this, huA] using by
+        have := this
+        -- 同値変形：A.card = (A.card - 1) + 1
+        exact (by
+          have := Nat.succ_pred_eq_of_pos hpos
+          -- `A.card = Nat.succ (A.card - 1)`
+          -- よって `(A.card - 1) + 1 = A.card`
+          simpa [Nat.succ_eq_add_one, Nat.add_comm] using this.symm)
+    · -- u を含まないとき
+      -- (A.erase u).card = A.card, indicator は 0
+      simp [huA]
+  -- 点ごとの恒等式を和に移す
+  have hsum :
+      (∑ A ∈ F.edgeFinset, A.card)
+        = ∑ A ∈ F.edgeFinset, ((A.erase u).card + (if u ∈ A then 1 else 0)) := by
+    refine Finset.sum_congr rfl ?_
+    intro A hA; simp [hpt A]
+  -- 右辺を分配
+  rw [hsum]
+
+  simp [Finset.sum_add_distrib]
+  exact Eq.symm (SetFamily.degree_eq_card_filter F u)
+
+/-- 上をトレースのエッジ集合で書き直した版（parallel を使って像に置換）。 -/
+lemma sum_edge_sizes_trace_version_of_parallel
+    (F : SetFamily α) {u v : α}
+    (huv : F.Parallel u v) (hne : u ≠ v) :
+    (∑ A ∈ F.edgeFinset, A.card)
+      = (∑ B ∈ (traceAt u F).edgeFinset, B.card) + F.degree u := by
+  classical
+  -- まず、parallel 不要の分解補題
+  have hsplit := sum_edge_sizes_split_by_u (F := F) u
+  -- ④: トレース後のエッジは `erase u` の像
+  have himg :
+      (traceAt u F).edgeFinset
+        = F.edgeFinset.image (fun A => A.erase u) :=
+    edgeFinset_trace_eq_image_erase_of_parallel (F := F) (u := u) (v := v) huv hne
+  -- ③ から：`A ↦ A.erase u` が `F.edgeFinset` 上で InjOn
+  have hinj_on :
+      ∀ A ∈ F.edgeFinset, ∀ B ∈ F.edgeFinset,
+        (A.erase u) = (B.erase u) → A = B := by
+    intro A hA B hB hEq
+    have hsub_inj :=
+      @erase_on_edges_injective_of_parallel α _ F u v huv hne
+    unfold Function.Injective at hsub_inj
+    simp_all only [Parallel, ne_eq, mem_edgeFinset, Subtype.forall, Subtype.mk.injEq, and_imp, subset_refl]
+    apply hsub_inj
+    · simp_all only [subset_refl]
+    · simp_all only [subset_refl]
+    · simp_all only [subset_refl]
+    · simp_all only [subset_refl]
+    · simp_all only [subset_refl]
+
+  -- `sum_image` で `∑ (A.erase u).card` を像側の和へ
+  have hsum_image :
+      (∑ A ∈ F.edgeFinset, (A.erase u).card)
+        = (∑ B ∈ (F.edgeFinset.image (fun A => A.erase u)), B.card) := by
+    -- `sum_image` は像側=元側 の向きなので `symm` を付けない形で書く
+    -- sum_image : (InjOn f s) → ∑ x in s.image f, g x = ∑ x in s, g (f x)
+    -- ここでは g := Finset.card
+    exact Eq.symm (Finset.sum_image hinj_on)
+
+  -- 仕上げ：置換して等式完成
+  calc
+    (∑ A ∈ F.edgeFinset, A.card)
+        = (∑ A ∈ F.edgeFinset, (A.erase u).card) + F.degree u := hsplit
+    _   = (∑ B ∈ (F.edgeFinset.image (fun A => A.erase u)), B.card) + F.degree u := by
+            simp [hsum_image]
+    _   = (∑ B ∈ (traceAt u F).edgeFinset, B.card) + F.degree u := by
+            simp [himg]
+
+
+/-- 目標：NDS の等式（版B）。
+  `NDS(F) = 2 * Σ|A| - |E(F)| * |ground|` を使う。
+  仮定：`u` は ground に属し，`v` は `u` の parallel パートナー。 -/
+lemma NDS_eq_of_parallel
+    (F : SetFamily α) {u v : α}
+    (huv : F.Parallel u v) (hne : u ≠ v) (hu : u ∈ F.ground)
+    (hNDSDef :
+      F.NDS
+        = 2 * (∑ A ∈ F.edgeFinset, (A.card : Int))
+          - (F.numHyperedges : Int) * (F.ground.card : Int))
+    (hNDSDefTrace :
+      (traceAt u F).NDS
+        = 2 * (∑ B ∈ (traceAt u F).edgeFinset, (B.card : Int))
+          - ((traceAt u F).numHyperedges : Int) * ((traceAt u F).ground.card : Int)) :
+    F.NDS = (traceAt u F).NDS + 2 * (F.degree u : Int) - (F.numHyperedges : Int) := by
+classical
+  -- ⑧（Nat）を Int に持ち上げる：
+  have hsum_nat :
+      (∑ A ∈ F.edgeFinset, A.card)
+        = (∑ B ∈ (traceAt u F).edgeFinset, B.card) + F.degree u :=
+    sum_edge_sizes_trace_version_of_parallel (F := F) (u := u) (v := v) huv hne
+  have hsum_int :
+      (∑ A ∈ F.edgeFinset, (A.card : Int))
+        = (∑ B ∈ (traceAt u F).edgeFinset, (B.card : Int))
+          + (F.degree u : Int) := by
+    -- Nat 等式を Int にキャスト
+    have := congrArg (fun n : ℕ => (n : Int)) hsum_nat
+    -- 和・加法の `Nat.cast` を展開
+    simpa [Nat.cast_sum, Nat.cast_add] using this
+
+  -- ⑥：辺数保存（Nat → Int）
+  have hE_nat :
+      (traceAt u F).numHyperedges = F.numHyperedges :=
+    numHyperedges_preserved_of_parallel (F := F) (u := u) (v := v) huv hne
+  have hE_int :
+      ((traceAt u F).numHyperedges : Int) = (F.numHyperedges : Int) := by
+    simpa using congrArg (fun n : ℕ => (n : Int)) hE_nat
+
+  -- ground のサイズ：`u ∈ ground` より `|V(trace)| = |V| - 1`
+  have hV_nat :
+      (traceAt u F).ground.card = F.ground.card - 1 :=
+    ground_card_trace_of_mem (F := F) hu
+  -- そこから `|V| - |V(trace)| = 1` の Int 版を作る
+  have hV_pos : 0 < F.ground.card := Finset.card_pos.mpr ⟨u, hu⟩
+  have hsucc :
+      (traceAt u F).ground.card + 1 = F.ground.card := by
+    -- `Nat.succ (F.ground.card - 1) = F.ground.card`
+    -- と `hV_nat` からの置換
+    simp
+    let nc := (Nat.succ_pred_eq_of_pos hV_pos)
+    simp_all only [Parallel, ne_eq, NDS_def, sub_left_inj, mul_eq_mul_left_iff, OfNat.ofNat_ne_zero, or_false,
+    traceAt_ground, Finset.card_erase_of_mem, Nat.cast_pred]
+    exact nc
+
+
+  have hV_int_eq :
+      (F.ground.card : Int) = ((traceAt u F).ground.card : Int) + 1 := by
+    have := congrArg (fun n : ℕ => (n : Int)) hsucc
+    simp
+    exact id (Eq.symm this)
+
+
+  -- 本体計算
+  -- 版Bの定義で `NDS(F)` と `NDS(trace)` を展開してから整理
+  calc
+    F.NDS
+        = 2 * (∑ A ∈ F.edgeFinset, (A.card : Int))
+            - (F.numHyperedges : Int) * (F.ground.card : Int) := hNDSDef
+    _   = 2 * ( (∑ B ∈ (traceAt u F).edgeFinset, (B.card : Int))
+                + (F.degree u : Int))
+            - ((traceAt u F).numHyperedges : Int) * (((traceAt u F).ground.card : Int) + 1) := by
+            -- sums を ⑧ で置換、|E| と |V| を ⑥ と hV_int_eq で置換
+            simp [hsum_int, hE_int, hV_int_eq]
+
+    _   = (2 * (∑ B ∈ (traceAt u F).edgeFinset, (B.card : Int))
+            - ((traceAt u F).numHyperedges : Int) * ((traceAt u F).ground.card : Int))
+          + (2 * (F.degree u : Int) - ((traceAt u F).numHyperedges : Int)) := by
+            -- 分配して `(a+b) - (c*(d+1)) = (2a - c*d) + (2b - c)`
+            -- 詳細：`2*(X+D) = 2X + 2D`、`E*(G+1) = E*G + E`
+            -- その後 `(x + y) - (p + q) = (x - p) + (y - q)`
+            have : 2 * ((∑ B ∈ (traceAt u F).edgeFinset, (B.card : Int))
+                        + (F.degree u : Int))
+                    = 2 * (∑ B ∈ (traceAt u F).edgeFinset, (B.card : Int))
+                      + 2 * (F.degree u : Int) := by
+              simp [two_mul, mul_add, add_comm, add_assoc]
+            have : ((traceAt u F).numHyperedges : Int)
+                      * (((traceAt u F).ground.card : Int) + 1)
+                    = ((traceAt u F).numHyperedges : Int)
+                        * ((traceAt u F).ground.card : Int)
+                      + ((traceAt u F).numHyperedges : Int) := by
+              simp [mul_add, add_comm]
+            -- まとめて変形
+            -- `simp` で `sub_eq_add_neg` を使って並べ替える
+            simp [two_mul, mul_add, add_comm, add_left_comm, add_assoc,
+                   sub_eq_add_neg]
+    _   = (traceAt u F).NDS + (2 * (F.degree u : Int) - (F.numHyperedges : Int)) := by
+            -- 版Bの `trace` 定義へ戻す＋辺数は ⑥ で置換
+            simp [ hE_int]
+            dsimp [SetFamily.totalHyperedgeSize]
+            exact Eq.symm (Nat.cast_sum (traceAt u F).edgeFinset Finset.card)
+  exact add_sub_assoc' (traceAt u F).NDS (2 * ↑(F.degree u)) ↑F.numHyperedges
 
 end Trace
 
