@@ -31,32 +31,210 @@ open SPO
 
 variable {α : Type u} [DecidableEq α]
 
+--idealFamilyの定義は、FuncSetupで与える。
 
+--variable (S : FuncSetup α) (x y : S.Elem)
+variable (S : FuncSetup α) [DecidableRel (S.le)]
+noncomputable def Iy (S : FuncSetup α) (y : S.Elem) : Finset S.Elem :=
+  S.ground.attach.filter (fun z : S.Elem => S.le z y)
 
-@[simp] lemma sets_iff_isOrderIdeal
-    (S : SPO.FuncSetup α) {I : Finset α} :
-    (S.idealFamily).sets I ↔ isOrderIdealOn (S.leOn) S.ground I := Iff.rfl
+-- 目標： hb : b ∈ S.ground, hleOn : S.leOn b a, haGround : a ∈ S.coeFinset Iy
+--       から b ∈ S.coeFinset Iy を出す
+--xとyに大小関係があれば、yを含むidealは、xも含む。
+lemma le_iff_forall_ideal_mem
+  (S : FuncSetup α) (x y : S.Elem) :
+  S.le x y ↔
+    (∀ I : Finset S.Elem,
+      (S.idealFamily).sets (S.coeFinset I) → y ∈ I → x ∈ I) := by
+  constructor
+  · -- (→) : `x ≤ y` なら、任意のイデアル I で `y ∈ I → x ∈ I`
+    intro hxy I hI hyI
+    -- イデアルの定義は α 上の order-ideal なので、`coeFinset I` に持ち上げる
+    have hIdeal :
+        isOrderIdealOn (S.leOn) S.ground (S.coeFinset I) :=
+      (S.sets_iff_isOrderIdeal).1 hI
+    -- y ∈ I から y.1 ∈ coeFinset I
+    have hy' : (y.1 : α) ∈ S.coeFinset I := by
 
-/- ground 上の比較を subtype に引き上げる便利関数。 -/
---def toElem! (S : SPO.FuncSetup α) {x : α} (hx : x ∈ S.ground) : S.Elem := ⟨x, hx⟩
+      exact (S.mem_coeFinset_iff (I:=I) (a:=y.1) (ha:=y.2)).2 hyI
+    -- order-ideal のダウンワード閉包で x.1 ∈ coeFinset I を得る
+    have hx' : (x.1 : α) ∈ S.coeFinset I := by
+      -- `S.leOn` は α 上の関係。`x y : S.Elem` からは `S.leOn x.1 y.1`
+      have hleOn : S.leOn x.1 y.1 := by exact (S.le_iff_leOn_val x y).mp hxy--S.le_to_leOn hxy
+      simp_all only [ FuncSetup.mem_coeFinset, Subtype.exists, exists_and_right,
+         exists_eq_right, Subtype.coe_eta, Finset.coe_mem, exists_const]
+      exact S.mem_of_le_of_mem_inIdeal hIdeal hleOn  hyI
 
-/-! ## 2) Lemma 3.3：同値（∼）と parallel の同値 -/
+    -- もう一度 subtype に戻す
+    simp_all only [FuncSetup.mem_coeFinset, Subtype.exists, exists_and_right,
+    exists_eq_right, Subtype.coe_eta, Finset.coe_mem, exists_const]
+
+  · -- (←) : 逆向き。`Iy` を y 以下の元の集合として取る
+    intro hAll
+    -- `Iy := { z ∈ ground | z ≤ y }` を Finset S.Elem で
+    let Iy : Finset S.Elem :=
+      S.ground.attach.filter (fun z => S.le z y)
+    have hyIy : y ∈ Iy := by
+      -- y は ground にあり、かつ y ≤ y
+      have hy₀ : y ∈ S.ground.attach := by
+        exact Finset.mem_attach S.ground y
+      have : S.le y y := S.le_refl y
+      simpa [Iy] using Finset.mem_filter.mpr ⟨hy₀, this⟩
+    -- `S.coeFinset Iy` は α 上のイデアルであることを示す
+    have hIy_sets : (S.idealFamily).sets (S.coeFinset Iy) := by
+      -- isOrderIdealOn へ落とす（あなたの `sets_iff_isOrderIdeal` を利用）
+      have : isOrderIdealOn (S.leOn) S.ground (S.coeFinset Iy) := by
+        -- ⟨downward_closed, subset_ground⟩ を And で与える
+        refine And.intro ?dc ?subset
+        · -- ?dc : downward closed
+          -- 目標: ∀ a ∈ ground, ∀ b, S.leOn b a → a ∈ S.coeFinset Iy → b ∈ S.coeFinset Iy
+          simp_all only [Finset.mem_filter, Finset.mem_attach, true_and, Iy]
+          intro z hz
+          simp_all only [FuncSetup.mem_coeFinset, Finset.mem_filter, Finset.mem_attach, true_and, Subtype.exists,
+            ]
+          simp_all only [FuncSetup.le_iff_leOn_val, FuncSetup.sets_iff_isOrderIdeal, exists_and_left, exists_prop,
+            exists_eq_right_right]
+        · -- ?subset : S.coeFinset Iy ⊆ S.ground
+          intro a haIn
+          -- a ∈ coeFinset Iy から代表元 z を取り出す
+          rcases (S.mem_coeFinset_val_iff).1 haIn with ⟨z, hzIy, hz⟩
+          -- フィルタ左成分から z ∈ ground.attach
+          have hzInAttach : z ∈ S.ground.attach :=
+            (Finset.mem_filter).1 hzIy |>.left
+          -- attach から ground へ
+          have hzGround : z.1 ∈ S.ground := by
+            subst hz
+            simp_all only [ Finset.mem_filter, Finset.mem_attach, true_and,
+              FuncSetup.mem_coeFinset, Subtype.exists, Finset.coe_mem, Iy]
+
+          -- ので a ∈ ground
+          -- `rw [hz]` を使わず等式で置換してもOK
+          have : a ∈ S.ground := by
+            -- a = z.1
+            -- `subst` でも良い
+            -- `convert hzGround using 1; exact hz.symm`
+            exact Eq.ndrec hzGround hz
+
+          intro y_1 a_1 a_2
+          subst hz
+          simp_all only [Finset.mem_attach, FuncSetup.mem_coeFinset, Subtype.exists, Finset.coe_mem,Iy]
+          simp_all
+          apply S.leOn_trans
+          exact a_2
+          exact hzIy
+          -- 目標は b ∈ S.coeFinset Iy なので、存在証明で入れる
+      simp_all only [Finset.mem_filter, Finset.mem_attach, true_and, Iy]
+      exact this
+
+    -- 仮定 `hAll` を Iy に適用すると x ∈ Iy
+    have hxIy : x ∈ Iy := hAll Iy hIy_sets hyIy
+    -- 以上より `x ≤ y` が従う
+    have hxLe : S.le x y := (Finset.mem_filter.mp hxIy).2
+    exact hxLe
+
 
 /-- 論文 Lemma 3.3（言明）：
 `u, v` が同じ同値類（S.sim）であることと，`idealFamily S` における parallel が同値。 -/
 lemma parallel_iff_sim
   (S : FuncSetup α) (u v : S.Elem) :
-  Trace.Parallel (S.idealFamily) u v
-  ↔ FuncSetup.sim S u v := by
-  -- 証明スケルトンだけ置いておきます。中身は後で `sorry` 埋め。
-  -- → : parallel から、全イデアルでの会員一致 ⇒ principal の比較で `le` を復元 ⇒ `sim`
-  -- ← : `sim` から、`y ≤ u ↔ y ≤ v` を示し、イデアル会員一致へ
-  sorry
+  (S.idealFamily).Parallel u v ↔ FuncSetup.sim S u v := by
+  constructor
+  · intro hPar
+    -- (∀ I, sets (coeFinset I) → (u∈I ↔ v∈I)) に言い換える
 
+    have hUV :
+      ∀ I : Finset S.Elem,
+        (S.idealFamily).sets (S.coeFinset I) →
+        (u ∈ I ↔ v ∈ I) := by
+      dsimp [SetFamily.Parallel, FuncSetup.coeFinset] at *
+      intro I hI
+      constructor
+      · intro hu
+        have : (Finset.image (fun x => ↑x) I) ∈ {A | S.idealFamily.sets A ∧ ↑u ∈ A} :=
+        by
+          rw [@Set.mem_setOf_eq]
+          constructor
+          · exact hI
+          · simp_all only [ Finset.mem_image, Subtype.exists, exists_and_right, exists_eq_right,
+            Subtype.coe_eta, Finset.coe_mem, exists_const]
+        simp_all only [ Set.mem_setOf_eq, Finset.mem_image, Subtype.exists, exists_and_right,
+          exists_eq_right, Subtype.coe_eta, Finset.coe_mem, exists_const, true_and]
+      · intro hv
+        have : (Finset.image (fun x => ↑x) I) ∈ {A | S.idealFamily.sets A ∧ ↑v ∈ A} :=
+        by
+          rw [@Set.mem_setOf_eq]
+          constructor
+          · exact hI
+          · simp_all only [Finset.mem_image, Subtype.exists, exists_and_right, exists_eq_right,
+            Subtype.coe_eta, Finset.coe_mem, exists_const]
+        rw [←hPar] at this
+        rw [Set.mem_setOf_eq] at this
+        simp_all only [Finset.mem_image, Subtype.exists, exists_and_right, exists_eq_right,
+          Subtype.coe_eta, Finset.coe_mem, exists_const]
+
+    -- 右向きに le_iff を使って S.le u v
+
+    have huv : S.le u v := by
+      let lifim := (le_iff_forall_ideal_mem S u v).mpr
+      apply lifim
+      intro I a a_1
+      simp_all only [SetFamily.Parallel]
+
+    -- 左向きに le_iff を使って S.le v u
+    have hvu : S.le v u := by
+      let lifim := (le_iff_forall_ideal_mem S v u).mpr
+      apply lifim
+      intro I a a_1
+      simp_all only [SetFamily.Parallel]
+    dsimp [FuncSetup.sim]
+    exact ⟨huv, hvu⟩
+
+  · intro hSim
+    -- `le_iff_forall_ideal_mem` を左右に使って各 ideal での会員同値を出す
+    rcases hSim with ⟨huv, hvu⟩
+    dsimp [SetFamily.Parallel] at *
+    ext J
+
+    constructor
+    swap
+    · intro hu
+
+      rw [@Set.mem_setOf_eq]
+      rw [@Set.mem_setOf_eq] at hu
+      constructor
+      · exact hu.1
+      · have : J ⊆ S.ground := by
+          exact S.idealFamily.inc_ground hu.1
+
+        let lifim := (le_iff_forall_ideal_mem S u v).mp huv (S.liftFinset J this)
+        rw [S.coeFinset_liftFinset] at lifim
+        specialize lifim hu.1
+        simp_all only [FuncSetup.le_iff_leOn_val, FuncSetup.sets_iff_isOrderIdeal, FuncSetup.mem_liftFinset_iff, forall_const]
+
+    · intro hv
+      -- 対称に同様
+      rw [@Set.mem_setOf_eq]
+      rw [@Set.mem_setOf_eq] at hv
+      constructor
+      · exact hv.1
+      · have : J ⊆ S.ground := by
+          exact S.idealFamily.inc_ground hv.1
+
+        let lifim := (le_iff_forall_ideal_mem S v u).mp hvu (S.liftFinset J this)
+        rw [S.coeFinset_liftFinset] at lifim
+        specialize lifim hv.1
+        simp_all only [FuncSetup.le_iff_leOn_val, FuncSetup.sets_iff_isOrderIdeal, FuncSetup.mem_liftFinset_iff, forall_const]
+
+--定理の名前からすると、nontrivialな同値類に属する点の最大性を示すものに思えるがちょっと違う。
+--この証明に利用できるかもしれない補題。
+--パラレルな元であれば、uからxにいければxからuにいける。
+--極大性は使ってない。parallel_iff_simは使う立場。
+--nontrivialClassの仮定を使って書き換えられそう。
+--nds_monotone_under_traceで利用されている。
 lemma maximal_of_parallel_nontrivial
     (S : SPO.FuncSetup α) {u v : α}
     (hu : u ∈ S.ground) (hv : v ∈ S.ground)
-    (hpar : Trace.Parallel (S.idealFamily) u v)
+    (hpar : (S.idealFamily).Parallel u v)
     (hneq : u ≠ v) :
     ∀ x : S.Elem,
       Relation.ReflTransGen (stepRel S.f) (S.toElem! hu) x →
@@ -74,7 +252,8 @@ lemma maximal_of_parallel_nontrivial
     -- 代表例：`sim_iff` がある場合
     -- exact (SPO.FuncSetup.sim_iff (S:=S) (a:=S.toElem! hu) (b:=S.toElem! hv)).1 hsim
     -- もしくは片側ずつ取り出す補題があるならそれで OK
-    sorry
+    simp_all only [SetFamily.Parallel, ne_eq]
+    exact hsim
 
   -- ③ `S.le` を `ReflTransGen (stepRel S.fV)` に落とす
   --    （`S.le` の定義が「被覆の反射推移閉包」なら `Iff.rfl`/既存のブリッジ補題で変換できます）
@@ -91,7 +270,8 @@ lemma maximal_of_parallel_nontrivial
     -- ここで h1, h2 を `ReflTransGen (stepRel S.fV)` へ移す
     -- 置換例：
     -- exact ⟨(by exact h1), (by exact h2)⟩
-    sorry
+    simp_all only [SetFamily.Parallel, ne_eq, and_self]
+    exact hsim
 
   -- ④ `u ≠ v` をサブタイプでも非自明に
   have hneq' : (S.toElem! hu) ≠ (S.toElem! hv) := by
@@ -102,7 +282,7 @@ lemma maximal_of_parallel_nontrivial
 
   -- ⑤ あなたの補題を適用（`α := S.Elem, f := S.fV`）
   have hmax :=
-    maximal_of_nontrivialClass
+    maximal_of_nontrivialClass_lemma
       (α := S.Elem) (f := S.f)
       (u := S.toElem! hu) (v := S.toElem! hv)
       huv hneq'
@@ -111,7 +291,26 @@ lemma maximal_of_parallel_nontrivial
   intro x hx
   exact hmax x hx
 
+/- Lemma 2.4（カードを使わない形）：
+同値類が非自明なら、その点は極大。 -/
+lemma maximal_of_nontrivialClass (S : SPO.FuncSetup α) {x : S.Elem}
+    (hx : S.nontrivialClass x) : S.maximal x := by
+  -- 詳細は後で。Lemma 2.2 を使って「戻る」ことを示す標準手順。
+  --プロジェクトのどこかに証明がないか？論文の証明も参考にする。
+  sorry
+
+/-- 同値類内の任意点も極大。 -/
+--これは必要なのか？
+/-
+lemma all_maximal_in_nontrivial_class (S : SPO.FuncSetup α)
+    {x y : S.Elem} (hxy : S.sim x y) (hx : S.nontrivialClass x) :
+    S.maximal y := by
+  -- `x` 極大 ⇒ `y` も極大（対称性＋推移）
+  sorry
+-/
+
 /- principal idealがIdealであること？ -/
+--FuncSetupに移動するのも、ideal関係だしへん。Idealsに移動かも？
 lemma idealFamily_mem_principal
   (S : FuncSetup α) (x : S.Elem) :
   isOrderIdealOn (le := S.leOn) (V := S.ground) (S.principalIdeal x.1 x.2)  := by
@@ -128,19 +327,9 @@ lemma idealFamily_mem_principal
     simp_all only
 
   · intro xx hx lexy y hy leyx
-    use hy
-    apply S.le_trans
-    exact FuncSetup.le_refl S ⟨y, (Iff.of_eq (Eq.refl (y ∈ S.ground))).mpr hy⟩
-    have : S.leOn xx x.1 := by
-      dsimp [FuncSetup.leOn]
-      use hx
-      exact Exists.imp' (fun a => x.property) (fun a a => lexy) leyx
-    have : S.leOn y x.1 := by
-      apply FuncSetup.leOn_trans
-      exact leyx
-      exact this
-    dsimp [FuncSetup.leOn] at this
-    simp_all only [Subtype.coe_eta, Finset.coe_mem, exists_const, exists_true_left]
+    constructor
+    · exact FuncSetup.leOn_trans S leyx hx
+    · exact hy
 
 /-! ## 3) Lemma 3.1：maximal ⇒ rare -/
 
@@ -149,43 +338,21 @@ S の極大元 `u` は，`idealFamily S` において rare。 -/
 lemma rare_of_maximal
     (S : SPO.FuncSetup α) (u : S.Elem)
     (hu_max : SPO.FuncSetup.maximal S u) :
-    Rare (S.idealFamily) u.1 := by
+    (S.idealFamily).Rare u.1 := by
   -- 証明方針：
   --   1) S.sim-クラス U をとると，Lemma 3.3 から U の各元は parallel。
   --   2) `I ↦ I \ U` の単射（`SetFamily` 側の基本操作）で deg(u) ≤ |E|/2 を得る。
   -- ここでは言明のみ。
   sorry
 
-/-! ## 4) Lemma 3.5：parallel なら 1点トレースが単射 -/
 
-/-- 直接版（re-export）：`Trace.trace_injective_of_parallel` を I(S) に特化した形。 -/
-lemma trace_injective_of_parallel
-    (S : SPO.FuncSetup α) {u v : α}
-    (h : Trace.Parallel (S.idealFamily) u v) :
-    Function.Injective (Trace.eraseMap (S.idealFamily) u) :=
-  Trace.trace_injective_of_parallel (F := S.idealFamily) h
-
-/-- S.sim を仮定した版：Lemma 3.3 と合成して単射性を得る。 -/
-lemma trace_injective_of_sim
-    (S : SPO.FuncSetup α) {u v : α}
-    (hu : u ∈ S.ground) (hv : v ∈ S.ground)
-    (hSim : SPO.FuncSetup.sim S (S.toElem! hu) (S.toElem! hv)) :
-    Function.Injective (Trace.eraseMap (S.idealFamily) u) := by
-  classical
-  have hPar : Trace.Parallel (S.idealFamily) u v := by
-    exact (parallel_iff_sim S (S.toElem! hu) (S.toElem! hv)).mpr hSim
-  exact trace_injective_of_parallel S hPar
-
-/-! ## 5) Lemma 3.6：トレースの2主張（(1) functional 保持, (2) NDS は増えない） -/
-
-/-(3.6-1 の言明)：
-`u` が非自明クラスに属するとき，`I(V,≤)` の 1点トレースは
-ある機能的前順序 S' の `idealFamily S'` に一致する（同型を許して）。 -/
+--このあたりにfunctionalのtraceはfunctionalであることを入れる予定。
 
 
 /-- （3.6(1) の精密版の言明だけ）
     非自明クラスの点 `u` を 1 個潰すと，
     `idealFamily S` の 1点トレースは，`eraseOne S u` のイデアル族に一致する。 -/
+--下で利用しているが、その補題が必要かわからない。
 lemma idealFamily_traceAt_eq_eraseOne
     (S : SPO.FuncSetup α) (u : S.Elem)
     (hNontriv : SPO.FuncSetup.nontrivialClass S u) :
@@ -196,7 +363,9 @@ lemma idealFamily_traceAt_eq_eraseOne
   -- （ここは従来どおり `sets` 同値の証明を進めればOK）
   sorry
 
+--上の補題の書き換え。
 /-- 使い勝手の良い “存在形” の再掲（既存の `traced_is_functional_family` を置換）。 -/
+--定理名に反して、functionalまで示せてなくて、traceが単にidealFamilyであることを示している。
 lemma traced_is_functional_family
     (S : SPO.FuncSetup α) (u : S.Elem)
     (hNontriv : SPO.FuncSetup.nontrivialClass S u) :
@@ -205,52 +374,49 @@ lemma traced_is_functional_family
   refine ⟨SPO.FuncSetup.eraseOneUsingSucc (S := S) u hNontriv, ?_⟩
   exact idealFamily_traceAt_eq_eraseOne S u hNontriv
 
+--ここからndsの関係
 
+/-! ## 4) Lemma 3.5：parallel なら 1点トレースが単射 -/
 
+/-- 直接版（re-export）：`Trace.trace_injective_of_parallel` を I(S) に特化した形。 -/
+lemma trace_injective_of_parallel
+    (S : SPO.FuncSetup α) {u v : α}
+    (h : (S.idealFamily).Parallel u v) :
+    Function.Injective (Trace.eraseMap (S.idealFamily) u) :=
+  Trace.trace_injective_of_parallel (F := S.idealFamily) h
 
-/-- (3.6-2 の言明)：
-`u` が非自明クラスに属するとき，1点トレースは NDS を増やさない。 -/
-/-
-lemma nds_monotone_under_trace
-    (S : SPO.FuncSetup α) {u : α}
-    (hu : u ∈ S.ground)
-    (hNontriv :
-  ∃ v, v ≠ u ∧ v ∈ S.ground ∧
-    SPO.FuncSetup.sim S (S.toElem! hu) (S.toElem! (by assumption)))
-    :
-    NDS (idealFamily S) ≤
-      NDS (Trace.traceAt u (idealFamily S)) := by
-  /-
-  証明方針：
-    1) Lemma 3.5（trace 単射）→ エッジ数保存。
-    2) `Counting.total_size_decompose_erase_add_degree` → 総サイズは `deg(u)` だけ減る。
-    3) `rare_of_maximal`（Lemma 3.1）→ `2 * deg(u) ≤ |E|`。
-    4) 代入して `NDS` 式の差が非正に落ちる。
-  ここでは言明だけに留める（Counting/NDSfacts の補題を後で埋めて使う）。
-  -/
-  sorry
--/
-
---使ってない
-lemma idealFamily_traceErase_agrees
-    (S : SPO.FuncSetup α) (u : α) (hu : u ∈ S.ground) :
-    ∃ S' : SPO.FuncSetup α,
-      True ∧
-      -- 族の一致（必要なら ground の Equiv を通す）
-      True := by
-  -- 後で（`isOrderIdealOn_reindex` 相当を噛ませて）証明
-  exact ⟨S, True.intro, True.intro⟩
-
---使ってない
-lemma parallel_of_sim
-    (S : SPO.FuncSetup α) {u v : α} (hu : u ∈ S.ground) (hv : v ∈ S.ground)
+/-- S.sim を仮定した版：Lemma 3.3 と合成して単射性を得る。 -/
+--今一使いにくい形かも。
+lemma trace_injective_of_sim
+    (S : SPO.FuncSetup α) {u v : α}
+    (hu : u ∈ S.ground) (hv : v ∈ S.ground)
     (hSim : SPO.FuncSetup.sim S (S.toElem! hu) (S.toElem! hv)) :
-    Trace.Parallel (S.idealFamily) u v := by
-  -- `parallel_iff_sim` の →← のうち、← だけを先に言明
+    Function.Injective (Trace.eraseMap (S.idealFamily) u) := by
+  classical
+  have hPar : (S.idealFamily).Parallel u v := by
+    exact (parallel_iff_sim S (S.toElem! hu) (S.toElem! hv)).mpr hSim
+  exact trace_injective_of_parallel S hPar
+
+--手で書いた言明
+lemma trace_number_of_hyperedges_eq
+    (S : SPO.FuncSetup α) (u : S.Elem)
+    (hNontriv : SPO.FuncSetup.nontrivialClass S u) :
+    (S.idealFamily).numHyperedges = (Trace.traceAt u.1 (S.idealFamily)).numHyperedges :=
+  by
+    sorry
+
+--idealに特化して書いているが、一般の集合族でも成り立つ？
+--nontirivialClassの仮定は、functionalに特化している。
+lemma trace_total_size_of_hyperedges_eq
+    (S : SPO.FuncSetup α) (u : S.Elem)
+    (hNontriv : SPO.FuncSetup.nontrivialClass S u) :
+    S.idealFamily.totalHyperedgeSize =
+      (Trace.traceAt u.1 (S.idealFamily)).totalHyperedgeSize + S.idealFamily.degree u:= by
   sorry
 
-
-lemma edgeFinset_traceAt (F : SetFamily α) (u : α) :
+--traceした時のhyperedgeがどうなるかの補題。数が減らないこともこれでわかるのかも。
+--uにパラレルな要素を仮定してない。両辺一致はするが、両方とも数が減っているかもしれないということか。
+lemma edgeFinset_traceAt_eq_image_erase (F : SetFamily α) (u : α) :
   (traceAt u F).edgeFinset = F.edgeFinset.image (λ A => A.erase u) := by
   ext B
   constructor
@@ -300,39 +466,6 @@ lemma edgeFinset_traceAt (F : SetFamily α) (u : α) :
       simp_all only [decide_eq_true_eq]
       exact ⟨A, hAsets, rfl⟩
 
-lemma NDS_traceAt_rewrite_mem {α : Type*} [DecidableEq α]
-  (F : SetFamily α) (u : α) :
-  NDS (traceAt u F) =
-    2 * ∑ A ∈ F.edgeFinset, (A.erase u).card
-      - F.numHyperedges * (F.ground.erase u).card := by
-  unfold NDS
-  simp only [traceAt, SetFamily.totalHyperedgeSize, SetFamily.numHyperedges]
-  -- edgeFinset 部分を image に書き換え
-  sorry
-
-  --rw [edgeFinset_traceAt]
-  -- sum over image を「元の和」に直す
-  --simp_rw [Finset.mem_image]
-  --rfl
-
-
-lemma edgeFinset_traceAt_eq_image_erase
-    (F : SetFamily α) (u : α) :
-    (Trace.traceAt u F).edgeFinset
-      = F.edgeFinset.image (fun A => A.erase u) := by
-  -- すでに用意済みならその名前に合わせて置き換えてください
-  -- ここは既存の `edgeFinset_traceErase` と同内容です
-  classical
-  -- `mem_edgeFinset_iff` と `Finset.mem_image` で両向きを出す標準形
-  ext B; constructor
-  · intro hB
-    sorry
-    --rcases (Trace.mem_traceAt_iff.mp hB) with ⟨A, hA, rfl⟩
-    --exact Finset.mem_image.mpr ⟨A, hA, rfl⟩
-  · intro hB
-    rcases Finset.mem_image.mp hB with ⟨A, hA, rfl⟩
-    sorry
-    --exact (Trace.mem_traceAt_iff.mpr ⟨A, hA, rfl⟩)
 
 @[simp] lemma ground_traceAt (F : SetFamily α) (u : α) :
     (Trace.traceAt u F).ground = F.ground.erase u := by
@@ -340,12 +473,15 @@ lemma edgeFinset_traceAt_eq_image_erase
   -- そうでない場合も `ext x; simp` で示せます。
   ext x; simp [Trace.traceAt]
 
+--uにパラレルな要素の存在を仮定してないし、NDSの議論をするには仮定が弱いのでは。
+--やり直し。NDS_traceAt_rewrite_parallelで使っている。
+--idealでなくて、一般の集合族で証明しているが大丈夫？
 lemma NDS_traceAt_rewrite_core
     (F : SetFamily α) (u : α)
     (hEdgeImage :
       (Trace.traceAt u F).edgeFinset
         = F.edgeFinset.image (fun A => A.erase u)) :
-    NDS (Trace.traceAt u F)
+   (Trace.traceAt u F).NDS
       =
       2 * (∑ A ∈ F.edgeFinset, (A.erase u).card : Int)
       - (((F.edgeFinset.image (fun A => A.erase u)).card : Nat) : Int)
@@ -354,7 +490,7 @@ lemma NDS_traceAt_rewrite_core
   -- 定義を開いて、`edgeFinset` は仮定で、総和は `sum_image` にし、
   -- エッジ数は `card` をそのまま使います。
   -- ground はまだ `Trace.traceAt u F).ground` のまま残しておきます。
-  unfold NDS
+  unfold SetFamily.NDS
   -- まず `totalHyperedgeSize` を `edgeFinset` 書き換え
   have h1 :
     (Trace.traceAt u F).totalHyperedgeSize
@@ -374,11 +510,16 @@ lemma NDS_traceAt_rewrite_core
 
 /-- parallel により |E| が保存され，ground は `erase` に落ちる版。
     こちらを最終的に `hL_eq_traced` に使います。 -/
+--uとvの要素が異なるという仮定が必要では。Parallelの定義では同じものもパラレル。
+
+--したの証明で重要なところに使われているが、言明がおかしいかも。
+--NDSをtraceの場合にeraseに書き直している。単射性などを使わないと示せない。
+--NDSでいきなり示さずに、numHyperedgeに関する定理とtotal sizeに関する定理にわける。
 lemma NDS_traceAt_rewrite_parallel
     (F : SetFamily α) (u v : α)
-    (hPar : Trace.Parallel F u v)
+    (hPar : F.Parallel u v)
     (huV : u ∈ F.ground) :
-    NDS (Trace.traceAt u F)
+    (Trace.traceAt u F).NDS
       =
       2 * (∑ A ∈ F.edgeFinset, (A.erase u).card : Int)
       - (F.numHyperedges : Int) * ((F.ground.erase u).card : Int) := by
@@ -412,29 +553,34 @@ lemma NDS_traceAt_rewrite_parallel
   simp [SetFamily.numHyperedges]
   sorry
 
+/-- (3.6-2 の言明)：
+`u` が非自明クラスに属するとき，1点トレースは NDS を増やさない。 -/
+--traceしたらNDSが増えないことを示す補題。論文と同じに等式を示してから、rareの条件で示したほうがいいかも。
+--合計に関する変形もこの証明の中で行っていると思われるが、それを分離する。
+--重要なことは、NDS_traceAt_rewrite_parallelのほうの割には証明が無駄にながい。
 lemma nds_monotone_under_trace
     (S : SPO.FuncSetup α) {u : α}
     (hu : u ∈ S.ground)
     (hNontriv :
       ∃ (v : α) (hv : v ∈ S.ground), v ≠ u ∧
         SPO.FuncSetup.sim S (S.toElem! hu) (S.toElem! hv)) :
-    NDS (S.idealFamily) ≤
-      NDS (Trace.traceAt u (S.idealFamily)) := by
+    (S.idealFamily).NDS ≤
+      (Trace.traceAt u (S.idealFamily)).NDS := by
   classical
   rcases hNontriv with ⟨v, hv, hne, hsim⟩
   -- ∼ ⇒ parallel
-  have hPar : Trace.Parallel (S.idealFamily) u v :=
+  have hPar : (S.idealFamily).Parallel u v :=
     (parallel_iff_sim S (S.toElem! hu) (S.toElem! hv)).mpr hsim
-  -- |E| 保持
+  -- |E| 保持 hyperedgeの数が保たれること。
   have hCard :
       (S.idealFamily).edgeFinset.card
         = ((S.idealFamily).edgeFinset.image (fun A => A.erase u)).card :=
     (Trace.card_image_erase_of_parallel (F := S.idealFamily) hPar).symm
-  -- NDS 差分式
+  -- NDS 差分式 hyperedgeのトータルサイズの等式がない。
   have hdiff :=
     AvgRare.Counting.nds_difference_by_trace
       (F := S.idealFamily) (x := u) hCard
-  -- 残りは rare を入れて ≤ に落とすところ（後で埋める）
+
   set uElem : S.Elem := ⟨u, hu⟩ with uElem_def
   have hNontrivElem : SPO.FuncSetup.nontrivialClass S uElem := by
     dsimp [SPO.FuncSetup.toElem!]
@@ -447,13 +593,13 @@ lemma nds_monotone_under_trace
   have hMax : SPO.FuncSetup.maximal S uElem := by
     exact maximal_of_parallel_nontrivial S hu hv hPar hne.symm
 
-  have hRareNat : Rare (S.idealFamily) u := by
+  have hRareNat : (S.idealFamily).Rare u := by
     -- rare_of_maximal は `S.Elem` を引数に取るので uElem を渡す
     -- 結論は `Rare (idealFamily S) uElem.1` になるが、`uElem.1 = u` なので
     -- それで書き換えておしまい
     have hR := rare_of_maximal (S := S) (u := uElem) hMax
     -- `uElem.1 = u` は構成から明らか（`uElem : ⟨u, hu⟩`）
-    change Rare (S.idealFamily) u
+    change (S.idealFamily).Rare u
     -- `rfl` で `uElem.1` を `u` に置換
     simpa [uElem_def]
 
@@ -476,13 +622,13 @@ lemma nds_monotone_under_trace
   have hExtraLe :
       ((2 : Int) * ((S.idealFamily).degree u : Int)
         - (S.idealFamily).numHyperedges) ≤ 0 := by
-    simp_all only [ne_eq, Parallel, sets_iff_isOrderIdeal, NDSfacts.NDS_def, SPO.FuncSetup.maximal_iff, Subtype.forall]
+    simp_all only [ne_eq, SPO.FuncSetup.maximal_iff, Subtype.forall]
     obtain ⟨val, property⟩ := uElem
     omega
 
   -- “余分” ≤ 0 を L に足して NDS ≤ L
   have hNDS_le_L :
-      NDS (S.idealFamily)
+      (S.idealFamily).NDS
         ≤ (2 * (∑ A ∈ (S.idealFamily).edgeFinset, (A.erase u).card : Int)
             - ((S.idealFamily).numHyperedges : Int) * ((S.idealFamily).ground.card : Int)) := by
     -- L を短名に
@@ -494,14 +640,14 @@ lemma nds_monotone_under_trace
     -- htmp : NDS = (2*Σ|A\{u}| - |E||V|) + (2deg - |E|)
     -- 右辺の最初の括弧を L に置換
     -- (等式の右側だけを書き換えるため、等式に対しての書換を使います)
-    have : NDS (S.idealFamily)
+    have : (S.idealFamily).NDS
         = L + ((2 : Int) * ((S.idealFamily).degree u : Int)
                  - (S.idealFamily).numHyperedges) := by
       -- htmp を L の定義で置換
       simpa [hLdef] using htmp
     -- 以上の等式と hExtraLe から NDS ≤ L
     calc
-      NDS (S.idealFamily)
+      (S.idealFamily).NDS
           = L + ((2 : Int) * ((S.idealFamily).degree u : Int)
                    - (S.idealFamily).numHyperedges) := this
       _ ≤ L + 0 := add_le_add_left hExtraLe L
@@ -514,7 +660,7 @@ lemma nds_monotone_under_trace
   have hGround_le :
       (((S.idealFamily).ground.erase u).card : Int)
         ≤ ((S.idealFamily).ground.card : Int) := by
-    simp_all only [ne_eq, Parallel, sets_iff_isOrderIdeal, NDSfacts.NDS_def, SPO.FuncSetup.maximal_iff, Subtype.forall,
+    simp_all only [ne_eq, SPO.FuncSetup.maximal_iff, Subtype.forall,
     add_le_iff_nonpos_right, Int.ofNat_le, uElem]
     obtain ⟨val, property⟩ := uElem
     rw [Finset.card_erase_of_mem]
@@ -530,25 +676,26 @@ lemma nds_monotone_under_trace
       - ((S.idealFamily).numHyperedges : Int) * ((S.idealFamily).ground.card : Int)
         ≤ - ((S.idealFamily).numHyperedges : Int) * (((S.idealFamily).ground.erase u).card : Int) := by
     -- まず |E||V'| ≤ |E||V|
-    simp_all only [ne_eq, Parallel, sets_iff_isOrderIdeal, NDSfacts.NDS_def, SPO.FuncSetup.maximal_iff, Subtype.forall,
-    add_le_iff_nonpos_right, Int.ofNat_le, Int.ofNat_zero_le, neg_mul, Int.neg_le_neg_iff, uElem]
+    simp_all only [ne_eq, SPO.FuncSetup.maximal_iff, Subtype.forall,
+      add_le_iff_nonpos_right, Int.ofNat_le, Int.ofNat_zero_le, neg_mul, Int.neg_le_neg_iff, uElem]
     obtain ⟨val, property⟩ := uElem
     norm_cast
     gcongr
 
   -- さらに 2*Σ|A\{u}| を両辺に足して、L ≤ 2*Σ|A\{u}| - |E||V'|
+  --もともとの和とtraceの大きさの和を比べている部分。
   have hL_le_basic :
       (2 * (∑ A ∈ (S.idealFamily).edgeFinset, (A.erase u).card : Int)
         - ((S.idealFamily).numHyperedges : Int) * ((S.idealFamily).ground.card : Int))
       ≤
       (2 * (∑ A ∈ (S.idealFamily).edgeFinset, (A.erase u).card : Int)
         - ((S.idealFamily).numHyperedges : Int) * (((S.idealFamily).ground.erase u).card : Int)) := by
-    simp_all only [ne_eq, Parallel, sets_iff_isOrderIdeal, NDSfacts.NDS_def, SPO.FuncSetup.maximal_iff, Subtype.forall,
-    add_le_iff_nonpos_right, Int.ofNat_le, Int.ofNat_zero_le, neg_mul, Int.neg_le_neg_iff, Int.sub_le_sub_left_iff,
-    uElem]
+    simp_all only [ne_eq, SPO.FuncSetup.maximal_iff, Subtype.forall,
+      add_le_iff_nonpos_right, Int.ofNat_le, Int.ofNat_zero_le, neg_mul, Int.neg_le_neg_iff,
+      Int.sub_le_sub_left_iff, uElem]
   -- NDS(traceAt) の書き換え（既に用意されている rewrite 補題）
   have hTraceRew :
-      NDS (Trace.traceAt u (S.idealFamily))
+      (Trace.traceAt u (S.idealFamily)).NDS
         =
         2 * (∑ A ∈ (S.idealFamily).edgeFinset, (A.erase u).card : Int)
           - ((S.idealFamily).numHyperedges : Int) * (((S.idealFamily).ground.erase u).card : Int) := by
@@ -558,18 +705,45 @@ lemma nds_monotone_under_trace
   have hL_le_trace :
       (2 * (∑ A ∈ (S.idealFamily).edgeFinset, (A.erase u).card : Int)
         - ((S.idealFamily).numHyperedges : Int) * ((S.idealFamily).ground.card : Int))
-      ≤ NDS (Trace.traceAt u (S.idealFamily)) :=
+      ≤ (Trace.traceAt u (S.idealFamily)).NDS :=
     hL_le_basic.trans (le_of_eq (hTraceRew).symm)
 
   -- まとめ： NDS ≤ L ≤ NDS(traceAt)
   exact le_trans hNDS_le_L hL_le_trace
 
-
-
 end PaperSync
 end AvgRare
 
+/-
+--traceしてもnumberHyperedgeが等しいことやtotalsizeの関係を直接使わずに証明する方向なので、論文の方向性と違うかも。
+使ってないようなのでコメントアウト
+lemma NDS_traceAt_rewrite_mem {α : Type*} [DecidableEq α]
+  (F : SetFamily α) (u : α) :
+  (traceAt u F).NDS =
+    2 * ∑ A ∈ F.edgeFinset, (A.erase u).card
+      - F.numHyperedges * (F.ground.erase u).card := by
+  unfold SetFamily.NDS
+  simp only [traceAt, SetFamily.totalHyperedgeSize, SetFamily.numHyperedges]
+  -- edgeFinset 部分を image に書き換え
+  sorry
 
+  --rw [edgeFinset_traceAt]
+  -- sum over image を「元の和」に直す
+  --simp_rw [Finset.mem_image]
+  --rfl
+-/
+
+/-
+--使ってない。何を目指したものか不明。
+lemma idealFamily_traceErase_agrees
+    (S : SPO.FuncSetup α) (u : α) (hu : u ∈ S.ground) :
+    ∃ S' : SPO.FuncSetup α,
+      True ∧
+      -- 族の一致（必要なら ground の Equiv を通す）
+      True := by
+  -- 後で（`isOrderIdealOn_reindex` 相当を噛ませて）証明
+  exact ⟨S, True.intro, True.intro⟩
+-/
 /-
 import Mathlib.Data.Finset.Basic
 import AvgRare.Basics.SetFamily

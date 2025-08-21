@@ -28,6 +28,7 @@ variable {α : Type u} [DecidableEq α]
 
 /-- 1点トレース：各ハイパーエッジから要素 `x` を取り除いた族。
 `ground` は `F.ground.erase x` に落とす。 -/
+--idealだけでなく、集合族一般にTraceを定義している。
 noncomputable def traceAt (x : α) (F : SetFamily α) : SetFamily α := by
   classical
   refine
@@ -50,14 +51,7 @@ noncomputable def traceAt (x : α) (F : SetFamily α) : SetFamily α := by
 @[simp] lemma traceAt_ground (x : α) (F : SetFamily α) :
     (traceAt x F).ground = F.ground.erase x := rfl
 
-/-- 並行性：族 `F` において「`u` を含むエッジの集合」と
-「`v` を含むエッジの集合」が一致する。 -/
-@[simp] def Parallel (F : SetFamily α) (u v : α) : Prop :=
-  {A : Finset α | F.sets A ∧ u ∈ A} = {A : Finset α | F.sets A ∧ v ∈ A}
 
-lemma parallel_refl (F : SetFamily α) (u : α) : Parallel F u u := rfl
-lemma parallel_symm {F : SetFamily α} {u v : α} :
-    Parallel F u v → Parallel F v u := fun h => h.symm
 
 /-- `Subtype` のエッジを `erase u` に写す自然な射。 -/
 def eraseMap (F : SetFamily α) (u : α) :
@@ -66,15 +60,41 @@ def eraseMap (F : SetFamily α) (u : α) :
 @[simp] lemma eraseMap_apply (F : SetFamily α) (u : α) (A : {A // F.sets A}) :
     eraseMap F u A = (A.val).erase u := rfl
 
+-- 以下の部分は、idealsTraceと融合する必要があり。
+--消してもいい？
 /-- （言明のみ）Lemma 3.5 に対応：
 `u` と `v` が Parallel なら，`A ↦ A.erase u` はエッジ集合上で単射。 -/
 lemma trace_injective_of_parallel
-    (F : SetFamily α) {u v : α} (h : Parallel F u v) :
+    (F : SetFamily α) {u v : α} (h : F.Parallel u v) :
     Function.Injective (eraseMap F u) := by
   -- 詳細証明は IdealsTrace で（`mem_edgeFinset_iff` などと併用）
   intro A1 A2 hEq
   -- 将来の証明埋め込みで `simp_all` を活かせるように温存
   sorry
+
+/-- Parallel なら `image (erase u)` に重複が出ない。 -/
+--uとvが一致しないという条件がない。Nontrivの条件に統一する方向。
+lemma card_image_erase_of_parallel
+    (F : SetFamily α) {u v : α} (h : F.Parallel u v) :
+    (F.edgeFinset.image (fun A => A.erase u)).card = F.edgeFinset.card := by
+  classical
+  -- `trace_injective_of_parallel` と `Finset.card_image_iff` で
+  sorry
+
+lemma NDS_traceAt_rewrite
+    (F : SetFamily α) (u : α)
+    (hEdgeImage : (Trace.traceAt u F).edgeFinset = F.edgeFinset.image (fun A => A.erase u))
+    (hCardPres : (Trace.traceAt u F).numHyperedges = F.numHyperedges)
+    (hGround   : (Trace.traceAt u F).ground = F.ground) :
+    (Trace.traceAt u F).NDS
+      = 2 * (∑ A ∈ F.edgeFinset, (A.erase u).card : Int)
+        - (F.numHyperedges : Int) * (F.ground.card : Int) := by
+  -- unfold NDS; rewrite 3つの仮定; `sum_image` の書き換えで完成（詳細は後で）
+  sorry
+
+end Trace
+
+end AvgRare
 
 /- トレース後の「`B` がトレース族のメンバである」ことの便利な再表現。 -/
 --lemma mem_traceAt_iff {x : α} {F : SetFamily α} {B : Finset α} :
@@ -138,34 +158,12 @@ lemma edgeFinset_traceErase (x : α) (F : SetFamily α) :
   sorry
 -/
 
-/-- Parallel なら `image (erase u)` に重複が出ない。 -/
-lemma card_image_erase_of_parallel
-    (F : SetFamily α) {u v : α} (h : Parallel F u v) :
-    (F.edgeFinset.image (fun A => A.erase u)).card = F.edgeFinset.card := by
-  classical
-  -- `trace_injective_of_parallel` と `Finset.card_image_iff` で
-  sorry
 
-lemma NDS_traceAt_rewrite
-    (F : SetFamily α) (u : α)
-    (hEdgeImage : (Trace.traceAt u F).edgeFinset = F.edgeFinset.image (fun A => A.erase u))
-    (hCardPres : (Trace.traceAt u F).numHyperedges = F.numHyperedges)
-    (hGround   : (Trace.traceAt u F).ground = F.ground) :
-    NDS (Trace.traceAt u F)
-      = 2 * (∑ A ∈ F.edgeFinset, (A.erase u).card : Int)
-        - (F.numHyperedges : Int) * (F.ground.card : Int) := by
-  -- unfold NDS; rewrite 3つの仮定; `sum_image` の書き換えで完成（詳細は後で）
-  sorry
-
-
-
-end Trace
 /-
 必要になったときに拡張しやすいよう、Trace とは独立の小道具をここに置いておけます
 （例えば Equiv による ground の付け替え等）。現状は最小限に留めています。
 -/
 
-end AvgRare
 
 /-
 import Mathlib.Data.Finset.Basic

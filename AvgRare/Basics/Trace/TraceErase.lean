@@ -1,11 +1,6 @@
 /-
   AvgRare/Basics/ReindexTraceErase.lean
-
-  ・SetFamily の reindex（要素同型で要素型を付け替える）を実装
-  ・traceErase（1点トレースの SetFamily 版）を実装
-  ・FuncSetup.eraseOne の要素型（S.Elem から u を除いた部分）と
-    (S.eraseOne u v hvne).Elem の間の自然な同型を実装
-  ・idealFamily_traceErase_eq_eraseOne_reindexed を証明
+このファイルは廃止の方向。
 -/
 import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Preimage

@@ -10,19 +10,12 @@ open scoped BigOperators
 namespace AvgRare
 
 /-
-SetFamily.lean  —  基本集合族と計数まわり（NDSの土台）
+SetFamily.lean  —  基本集合族とNDS。
 
-このファイルは「有限台集合上の集合族」を述語 `sets : Finset α → Prop` で表し、
-列挙・計数のための `edgeFinset` を（powerset からの filter で）構成します。
-NDS 自体の定義は Ideals 側に置く想定ですが、基礎量
-  * numHyperedges : ハイパーエッジ数
-  * totalHyperedgeSize : サイズ総和
-  * degree : 要素の出現回数
-をここで定義しておきます。
-
-注意:
+集合族に関する基本的な定義と計数を行う。
 - ここでは poset/ideal など順序に依存する概念は扱いません（Ideals 側へ）。
-- トレースやリインデックスは Common/Trace 側へ。（必要ならここに移してOK）
+- トレースは Commonへ。
+- FuncSetup が出てくるものは、FuncSetupへ。
 -/
 
 variable {α : Type u} [DecidableEq α]
@@ -85,6 +78,21 @@ def totalHyperedgeSize : Nat :=
 def degree (x : α) : Nat :=
   ∑ A ∈ F.edgeFinset, (if x ∈ A then (1 : Nat) else 0)
 
+/-- NDS（正規化された次数和）：
+`2 * (サイズ総和) - (エッジ数) * (台集合の大きさ)` を `Int` で定義。 -/
+def NDS (F : SetFamily α) : Int :=
+  2 * (F.totalHyperedgeSize : Int) - (F.numHyperedges : Int) * (F.ground.card : Int)
+
+/-- Rare（稀）要素：`deg(x) ≤ |E|/2` を（両辺 2 倍して）自然数の不等式で表現。 -/
+def Rare (F : SetFamily α) (x : α) : Prop :=
+  2 * F.degree x ≤ F.numHyperedges
+
+variable (F : SetFamily α)
+
+@[simp] lemma NDS_def :
+    NDS F = 2 * (F.totalHyperedgeSize : Int)
+             - (F.numHyperedges : Int) * (F.ground.card : Int) := rfl
+
 /-- `degree` を「含むエッジの個数」として書き直した版。 -/
 lemma degree_eq_card_filter (x : α) :
     F.degree x = (F.edgeFinset.filter (fun A => x ∈ A)).card := by
@@ -113,6 +121,7 @@ lemma mem_edgeFinset_subset_ground {A : Finset α}
   F.subset_ground_of_mem_edge hA
 
 /-- 台集合の制限。ハイパーエッジは元のエッジの部分集合で、かつ `U` に含まれるもの。 -/
+--どこで必要なのか考える。
 noncomputable def restrict (U : Finset α) : SetFamily α := by
   classical
   refine
@@ -148,28 +157,18 @@ noncomputable def restrict (U : Finset α) : SetFamily α := by
   · intro h; have : A ⊆ F.ground := F.inc_ground h
     exact (F.mem_edgeFinset (A := A)).2 ⟨this, h⟩
 
-/-
--- （必要なら）リインデックス：`e : α ≃ β` で要素を書き換える。
--- poset 側の理想再インデックスで使いたい時に、コメントアウトを外してください。
+/-- 並行性：族 `F` において「`u` を含むエッジの集合」と
+「`v` を含むエッジの集合」が一致する。 -/
+@[simp] def Parallel (F : SetFamily α) (u v : α) : Prop :=
+  {A : Finset α | F.sets A ∧ u ∈ A} = {A : Finset α | F.sets A ∧ v ∈ A}
 
-def reindex {β : Type*} [DecidableEq β] (e : α ≃ β) : SetFamily β := by
-  classical
-  refine
-  { ground := F.ground.image e
-    , sets   := fun B => ∃ A : Finset α, F.sets A ∧ B = A.image e
-    , decSets := Classical.decPred _
-    , inc_ground := ?_ }
-  intro B hB
-  rcases hB with ⟨A, hA, rfl⟩
-  intro b hb
-  rcases Finset.mem_image.mp hb with ⟨a, haA, rfl⟩
-  exact Finset.mem_image.mpr ⟨a, F.inc_ground hA haA, rfl⟩
--/
+lemma parallel_refl (F : SetFamily α) (u : α) : Parallel F u u := rfl
+lemma parallel_symm {F : SetFamily α} {u v : α} :
+    Parallel F u v → Parallel F v u := fun h => h.symm
 
 /-
 
-
-/-- 有限台集合 `ground` と，その部分集合族 `sets`（判定述語＋可判定性） -/
+/-- 有限台集合 `ground` と，その部分集合族 `sets`（判定述語＋可判定性） 古い定義-/
 @[ext]
 structure SetFamily (α : Type u) [DecidableEq α] where
   ground    : Finset α
@@ -215,7 +214,7 @@ noncomputable def normalized_degree_sum (F : SetFamily α) : Int :=
 def is_rare (F : SetFamily α) (v : α) : Prop :=
   F.normalized_degree v ≤ 0
 
-/-- 二重計数：`ground` 上の次数総和 = 超辺サイズ総和（Nat 版） -/
+/-- 二重計数：`ground` 上の次数総和 = 超辺サイズ総和（Nat 版）平均次数の議論をするには復活させてもいいかも。 -/
 lemma degree_sum_eq_total_size_of_hyperedgesNat (F : SetFamily α) :
     (∑ v ∈ F.ground, F.degreeNat v) = F.total_size_of_hyperedgesNat := by
   classical
@@ -319,278 +318,6 @@ lemma sum_normalized_degree_eq_nds (F : SetFamily α) :
             -- 二重計数を適用
             simp [hDC, mul_comm]
 
-/-- `F` による parallel（集合族の同値）：
-  すべての超辺 `A` について `x ∈ A ↔ y ∈ A` が成り立つ。 -/
-noncomputable def parallelSetoid (F : SetFamily α) : Setoid α :=
-{ r := fun x y => ∀ {A : Finset α}, F.sets A → (x ∈ A ↔ y ∈ A),
-  iseqv :=
-  ⟨
-    -- refl
-    by
-      intro x
-      intro A hA
-      exact Iff.rfl,
-    -- symm
-    by
-      intro x y hxy
-      intro A hA
-      exact (hxy (A := A) hA).symm,
-    -- trans
-    by
-      intro x y z hxy hyz
-      intro A hA
-      exact Iff.trans (hxy (A := A) hA) (hyz (A := A) hA)
-  ⟩
-}
-
-@[simp] lemma parallelSetoid_r_iff
-    {F : SetFamily α} {x y : α} :
-    (parallelSetoid F).r x y
-      ↔ (∀ {A : Finset α}, F.sets A → (x ∈ A ↔ y ∈ A)) :=
-Iff.rfl
-
-
---variable {α : Type u} [DecidableEq α]
-
-/-- 並行（parallel）：同じ超辺にちょうど同じ仕方で現れる。 -/
-def parallel (F : SetFamily α) (x y : α) : Prop :=
-  ∀ {A : Finset α}, F.sets A → (x ∈ A ↔ y ∈ A)
-
-lemma parallel_refl (F : SetFamily α) (x : α) : F.parallel x x := by
-  intro A hA; constructor <;> intro hx <;> exact hx
-
-lemma parallel_symm {F : SetFamily α} {x y : α} :
-    F.parallel x y → F.parallel y x := by
-  intro h A hA; have := h (A := A) hA; exact Iff.symm this
-
-lemma parallel_trans {F : SetFamily α} {x y z : α} :
-    F.parallel x y → F.parallel y z → F.parallel x z := by
-  intro hxy hyz A hA
-  have hx := hxy (A := A) hA
-  have hz := hyz (A := A) hA
-  exact Iff.trans hx hz
-
-/-- 並行なら次数は等しい（Nat 版）。 -/
-lemma parallel_degreeNat_eq {F : SetFamily α} {x y : α}
-    (h : F.parallel x y) :
-    F.degreeNat x = F.degreeNat y := by
-  classical
-  -- degreeNat は「hyperedges 上で x∈A を満たす A の個数」
-  unfold SetFamily.degreeNat
-  -- H の要素なら sets が成り立つ（parallel の適用に使う）
-  have hsets_of_mem : ∀ {A : Finset α}, A ∈ F.hyperedges → F.sets A := by
-    intro A hA
-    exact (Finset.mem_filter.mp hA).2
-
-  -- フィルタされた Finset が一致することを示す
-  have hfilter :
-      F.hyperedges.filter (fun A => x ∈ A)
-        = F.hyperedges.filter (fun A => y ∈ A) := by
-    ext A
-    constructor
-    · intro hAx
-      rcases Finset.mem_filter.mp hAx with ⟨hAH, hxA⟩
-      -- parallel：x∈A ↔ y∈A （A が hyperedge なので sets A）
-      have hxy : (x ∈ A ↔ y ∈ A) := h (A := A) (hsets_of_mem hAH)
-      exact Finset.mem_filter.mpr ⟨hAH, (Iff.mp hxy) hxA⟩
-    · intro hAy
-      rcases Finset.mem_filter.mp hAy with ⟨hAH, hyA⟩
-      have hxy : (x ∈ A ↔ y ∈ A) := h (A := A) (hsets_of_mem hAH)
-      exact Finset.mem_filter.mpr ⟨hAH, (Iff.mpr hxy) hyA⟩
-
-  -- 同じ Finset なので card が等しい
-  simp [hfilter]
-
-/-- 1 点トレース（u を消す）：`A` を `A.erase u` に写す像を取った集合族。 -/
-noncomputable def traceErase (F : SetFamily α) (u : α) : SetFamily α := by
-  classical
-  refine
-  { ground := F.ground.erase u
-    , sets := fun B => ∃ A : Finset α, F.sets A ∧ B = A.erase u
-    , decSets := Classical.decPred _
-    , inc_ground := ?_ }
-  -- `B = A.erase u` かつ `A ⊆ F.ground` から `B ⊆ F.ground.erase u`
-  intro B hB
-  rcases hB with ⟨A, hAsets, rfl⟩
-  intro x hx
-  -- x ∈ A.erase u ⇒ x ≠ u ∧ x ∈ A
-  have hx_ne : x ≠ u := (Finset.mem_erase.mp hx).1
-  have hxA  : x ∈ A := (Finset.mem_erase.mp hx).2
-  -- A ⊆ ground
-  have hAg : A ⊆ F.ground := F.inc_ground hAsets
-  have hxg : x ∈ F.ground := hAg hxA
-  -- よって x ∈ ground.erase u
-  exact Finset.mem_erase.mpr ⟨hx_ne, hxg⟩
-
-@[simp] lemma mem_traceErase_sets_iff
-    {F : SetFamily α} {u : α} {B : Finset α} :
-    (traceErase F u).sets B ↔ ∃ A, F.sets A ∧ B = A.erase u := Iff.rfl
-
-/-- `traceErase` の超辺は，元の超辺を `erase u` したものの像と一致。 -/
-lemma hyperedges_traceErase_eq_image_erase
-    (F : SetFamily α) (u : α) :
-    (traceErase F u).hyperedges
-      = F.hyperedges.image (fun A : Finset α => A.erase u) := by
-  classical
-  -- 等号を示すために両包含を出す
-  apply (Finset.Subset.antisymm_iff).mpr
-  constructor
-  · -- ⊆ 方向
-    intro B hB
-    -- B は trace 側の hyperedge：B ⊆ ground.erase u ∧ ∃ A, sets A ∧ B = A.erase u
-    have hPowAndSet :
-        B ∈ (F.ground.erase u).powerset ∧ (∃ A, F.sets A ∧ B = A.erase u) :=
-      Finset.mem_filter.mp hB
-    rcases hPowAndSet.2 with ⟨A, hAsets, hBE⟩
-    -- A は元の hyperedge
-    have hAin : A ∈ F.hyperedges := by
-      have hAg : A ⊆ F.ground := F.inc_ground hAsets
-      have hPow : A ∈ F.ground.powerset := (Finset.mem_powerset.mpr hAg)
-      exact Finset.mem_filter.mpr ⟨hPow, hAsets⟩
-    -- B = A.erase u は像に入る
-    subst hBE
-    simp_all only [Finset.mem_powerset, Finset.mem_image]
-    obtain ⟨left, right⟩ := hPowAndSet
-    obtain ⟨w, h⟩ := right
-    obtain ⟨left_1, right⟩ := h
-    simp_all only
-    use A
-  · -- ⊇ 方向
-    intro B hB
-    -- B = A.erase u で A は元の hyperedge
-    rcases Finset.mem_image.mp hB with ⟨A, hAin, rfl⟩
-    have hAsets : F.sets A := (Finset.mem_filter.mp hAin).2
-    have hAg    : A ⊆ F.ground := by
-      have hPowA := (Finset.mem_filter.mp hAin).1
-      exact (Finset.mem_powerset.mp hPowA)
-    -- A.erase u ⊆ ground.erase u
-    have hsub : A.erase u ⊆ F.ground.erase u := by
-      intro x hx
-      have hx_ne : x ≠ u := (Finset.mem_erase.mp hx).1
-      have hxA  : x ∈ A := (Finset.mem_erase.mp hx).2
-      have hxg  : x ∈ F.ground := hAg hxA
-      exact Finset.mem_erase.mpr ⟨hx_ne, hxg⟩
-    -- よって trace 側の hyperedge
-    have hPow : A.erase u ∈ (F.ground.erase u).powerset :=
-      Finset.mem_powerset.mpr hsub
-    have hSet : (traceErase F u).sets (A.erase u) := ⟨A, hAsets, rfl⟩
-    exact Finset.mem_filter.mpr ⟨hPow, hSet⟩
-
-/-- `erase u` は，parallel な相棒 `v (≠ u)` があるとき，
-    元 hyperedges 上で単射。 -/
-lemma erase_inj_on_hyperedges_of_parallel
-    {F : SetFamily α} {u v : α} (hpar : F.parallel u v) (hvne : v ≠ u) :
-    Set.InjOn (fun A : Finset α => A.erase u) (↑F.hyperedges : Set (Finset α)) := by
-  classical
-  intro A hA B hB hEq
-  -- Finset 側の membership に直す
-  have hA' : A ∈ F.hyperedges := Finset.mem_coe.mp hA
-  have hB' : B ∈ F.hyperedges := Finset.mem_coe.mp hB
-  have hAsets : F.sets A := (Finset.mem_filter.mp hA').2
-  have hBsets : F.sets B := (Finset.mem_filter.mp hB').2
-
-  -- （補助）x ≠ u なら A→B/B→A への包含が成り立つ（erase の等式から）
-  have AtoB_ne : ∀ x, x ≠ u → x ∈ A → x ∈ B := by
-    intro x hxne hxA
-    have hxAerase : x ∈ A.erase u := Finset.mem_erase.mpr ⟨hxne, hxA⟩
-    have hxBerase : x ∈ B.erase u := by
-      -- erase の等号から右辺へ
-      exact (Eq.mp (congrArg (fun (S : Finset α) => x ∈ S) hEq) hxAerase)
-    -- 消去して x∈B を得る
-    exact (Finset.mem_erase.mp hxBerase).2
-
-  have BtoA_ne : ∀ x, x ≠ u → x ∈ B → x ∈ A := by
-    intro x hxne hxB
-    have hxBerase : x ∈ B.erase u := Finset.mem_erase.mpr ⟨hxne, hxB⟩
-    have hxAerase : x ∈ A.erase u := by
-      -- 反対向き
-      exact (Eq.mpr (congrArg (fun (S : Finset α) => x ∈ S) hEq) hxBerase)
-    exact (Finset.mem_erase.mp hxAerase).2
-
-  -- v ≠ u なので v の会員は A ↔ B
-  have hvAtoB : v ∈ A → v ∈ B := AtoB_ne v hvne
-  have hvBtoA : v ∈ B → v ∈ A := BtoA_ne v hvne
-  have hviff : v ∈ A ↔ v ∈ B := ⟨hvAtoB, hvBtoA⟩
-
-  -- parallel で u の会員を v に移して同値化：u∈A ↔ u∈B
-  have huAtoB : u ∈ A → u ∈ B := by
-    intro huA
-    -- u∈A ⇒（parallel on A）⇒ v∈A ⇒（erase 等式＋v≠u）⇒ v∈B ⇒（parallel on B）⇒ u∈B
-    have hvA : v ∈ A := (hpar (A := A) hAsets).mp huA
-    have hvB : v ∈ B := hvAtoB hvA
-    exact (hpar (A := B) hBsets).mpr hvB
-
-  have huBtoA : u ∈ B → u ∈ A := by
-    intro huB
-    have hvB : v ∈ B := (hpar (A := B) hBsets).mp huB
-    have hvA : v ∈ A := hvBtoA hvB
-    exact (hpar (A := A) hAsets).mpr hvA
-
-  have huiff : u ∈ A ↔ u ∈ B := ⟨huAtoB, huBtoA⟩
-
-  -- 仕上げ：要素同値で ext
-  apply Finset.ext
-  intro x
-  by_cases hx : x = u
-  · -- x = u の場合は上で作った huiff を使う
-    subst hx
-    exact huiff
-  · -- x ≠ u は erase 等式から直ちに同値
-    exact ⟨AtoB_ne x hx, BtoA_ne x hx⟩
-
-section
-universe v
-variable {α : Type u} {β : Type v}
-variable [DecidableEq α] [DecidableEq β]
-/-- 要素型の同型 `e : α ≃ β` による集合族 `F` のリインデックス。
-    ground は `image e`、メンバー述語は「元のメンバーの `image e` と等しいものの存在」で与える。 -/
-noncomputable def reindex (e : α ≃ β) (F : SetFamily α) [DecidableEq  β]: SetFamily β := by
-  classical
-  refine
-  { ground := F.ground.image (fun a => e a)
-    , sets := fun B : Finset β => ∃ A : Finset α, F.sets A ∧ B = A.image (fun a => e a)
-    , decSets := Classical.decPred _
-    , inc_ground := ?_ }
-  -- inc_ground：B = image e A かつ A ⊆ F.ground から B ⊆ image e ground
-  intro B hB
-  rcases hB with ⟨A, hAsets, rfl⟩
-  intro b hb
-  -- hb : b ∈ (A.image e)
-  rcases Finset.mem_image.mp hb with ⟨a, haA, hb⟩
-  -- F.inc_ground: A ⊆ F.ground
-  have hAg : A ⊆ F.ground := F.inc_ground hAsets
-  have haG : a ∈ F.ground := hAg haA
-  -- よって b = e a は image e F.ground に入る
-  exact Finset.mem_image.mpr ⟨a, haG, hb⟩
-
-/-- ground の簡約。 -/
-@[simp] lemma reindex_ground (e : α ≃ β) (F : SetFamily α) :
-  (reindex e F).ground = F.ground.image (fun a => e a) := rfl
-
-/-- メンバー述語の展開（`↔` ではなく「定義に等しい」）。 -/
-@[simp] lemma mem_reindex_sets_iff (e : α ≃ β) (F : SetFamily α)
-  {B : Finset β} :
-  (reindex e F).sets B ↔ ∃ A : Finset α, F.sets A ∧ B = A.image (fun a => e a) :=
-Iff.rfl
-
-/-- リインデックスの単調性：`A ⊆ ground` の像は `reindex` 側の ground に入る。 -/
-lemma subset_ground_image (e : α ≃ β) (F : SetFamily α)
-  {A : Finset α} (hA : F.sets A) :
-  A.image (fun a => e a) ⊆ (reindex e F).ground := by
-  classical
-  -- inc_ground をそのまま使うだけ
-  have : (reindex e F).sets (A.image (fun a => e a)) := by
-    exact ⟨A, hA, rfl⟩
-  -- （定義より）inc_ground は B∈sets → B⊆ground
-  exact (reindex e F).inc_ground this
-
-/-- 述語レベルの単調性：`F.sets A` なら `reindex e F` にもその像が入る。 -/
-lemma image_mem_reindex (e : α ≃ β) (F : SetFamily α)
-  {A : Finset α} (hA : F.sets A) :
-  (reindex e F).sets (A.image (fun a => e a)) := by
-  exact ⟨A, hA, rfl⟩
-
-end
 
 end SetFamily
 end AvgRare

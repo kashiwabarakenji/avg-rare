@@ -10,10 +10,11 @@ Ideals.lean — イデアル族と NDS（論文 §1 の土台）
 * 有限集合 V と二項関係 `le : α → α → Prop` に対する
   「V 上の順序イデアル」の述語 `isOrderIdealOn le V I`
 * その全体を `SetFamily` として束ねる `orderIdealFamily le V`
-* NDS（正規化された次数和）`NDS : SetFamily α → Int`
-* 後で頻出する基本補題の“言明だけ”（証明は後で埋める）
 
-を定義します。
+FuncSetupを使わないものを集めているが、FuncSetup前提でなく、SetFamily前提のidealの議論そもそもあんまりないのかも。
+結果的にほとんど使われない可能性あり。
+コメントアウトされているほうに--パラレルであることと、preorderで同値なことが、等しい。など、
+FuncSetupを使ったものがあるので、将来的に復活するかも。
 
 注意：
 - ここでは `le` に可判定性や型クラス（`Preorder` 等）は**要求しません**。
@@ -21,12 +22,13 @@ Ideals.lean — イデアル族と NDS（論文 §1 の土台）
 - `∑` は `∈` を使っています。`simpa using` は使っていません。
 -/
 
-
 universe u
 
 open scoped BigOperators
 
 namespace AvgRare
+
+open SetFamily
 
 variable {α : Type u} [DecidableEq α]
 
@@ -37,6 +39,7 @@ def isOrderIdealOn (le : α → α → Prop) (V I : Finset α) : Prop :=
   I ⊆ V ∧ ∀ ⦃x⦄, x ∈ I → ∀ ⦃y⦄, y ∈ V → le y x → y ∈ I
 
 /-- 台集合 `V` と関係 `le` に対する「順序イデアル族」を `SetFamily` として束ねる。 -/
+--idealFamilyの定義として利用されている。
 noncomputable def orderIdealFamily (le : α → α → Prop) (V : Finset α) : SetFamily α := by
   classical
   refine
@@ -71,25 +74,14 @@ variable (le : α → α → Prop) (V : Finset α)
 
 @[simp] lemma empty_mem_orderIdealFamily :
     (orderIdealFamily le V).sets (∅ : Finset α) := by
-  simpa [sets_iff_isOrderIdeal] using isOrderIdealOn_empty (le := le) (V := V)
+  simp_all only [sets_iff_isOrderIdeal, isOrderIdealOn_empty]
 
 @[simp] lemma V_mem_orderIdealFamily :
     (orderIdealFamily le V).sets V := by
-  simpa [sets_iff_isOrderIdeal] using isOrderIdealOn_univ (le := le) (V := V)
-
+  simp [sets_iff_isOrderIdeal]
 
 
 end Ideals
-
-/-- NDS（正規化された次数和）：
-`2 * (サイズ総和) - (エッジ数) * (台集合の大きさ)` を `Int` で定義。 -/
-def NDS (F : SetFamily α) : Int :=
-  2 * (F.totalHyperedgeSize : Int) - (F.numHyperedges : Int) * (F.ground.card : Int)
-
-/-- Rare（稀）要素：`deg(x) ≤ |E|/2` を（両辺 2 倍して）自然数の不等式で表現。 -/
-def Rare (F : SetFamily α) (x : α) : Prop :=
-  2 * F.degree x ≤ F.numHyperedges
-
 /-
 以下，後続の Trace/Forest 側で頻繁に用いる“計数系の等式”の
 **言明だけ**を置いておきます（証明は後で埋める）。
@@ -99,14 +91,21 @@ namespace Counting
 
 variable (F : SetFamily α)
 
+
 -- 和の分解：`erase x` のサイズ和と `degree x` の関係（Trace の差分計算に使用）
+-- パラレルな要素をtraceした時にしか成り立たないので条件が足りない。xはパラレルパートナーを持つという条件を足す必要がある。
+-- もしくは、traceの写像が単射であるという条件。
+-- 現状使ってない。本当は次の補題で使うはず。
 lemma total_size_decompose_erase_add_degree (x : α) :
     (∑ A ∈ F.edgeFinset, (A.erase x).card) + F.degree x = F.totalHyperedgeSize := by
   -- 典型事実：各 A について `A.card = (A.erase x).card + (if x ∈ A then 1 else 0)`
   -- を ∑ に流し込んだもの。後で証明を埋める。
   sorry
 
+
 -- Trace がエッジ数を保つときの NDS の差分式（Lemma 3.6(2) で使用）
+-- HCardPreserveの仮定が特殊なので、集合族一般で成り立つというほどではない。
+-- サイズの合計に関する条件もいるかも。total_size_decompose_erase_add_degree
 lemma nds_difference_by_trace
     {x : α}
     (hCardPreserve : (F.edgeFinset.card = (F.edgeFinset.image fun A => A.erase x).card))
@@ -119,11 +118,12 @@ lemma nds_difference_by_trace
   sorry
 
 end Counting
+end AvgRare
 
 /-
 順序イデアル族に特化した“小さな事実”の言明。
 -/
-
+/-
 namespace SpecialToOrderIdeals
 
 variable (le : α → α → Prop) (V : Finset α)
@@ -132,6 +132,7 @@ instance instDecidablePred_rel_right (r : α → α → Prop) [DecidableRel r] (
     DecidablePred (fun x => r x y) :=
   fun x => inferInstance
 
+--principal idealを定義する。principal ideal自体がFuncSetupで定義されているのでここでは不要かも。
 /-- （推奨版）`decide` を使わず、述語のまま `filter` する。
     これにより `failed to synthesize Decidable (le x v)` を回避。 -/
 def principalOn (le : α → α → Prop) [DecidableRel le]
@@ -143,7 +144,10 @@ def principalOn (le : α → α → Prop) [DecidableRel le]
     x ∈ principalOn le V v ↔ x ∈ V ∧ le x v := by
   classical
   simp [principalOn]  -- `mem_filter`
+-/
 
+/-
+ --idealsTraceでも同じようなことを証明している。idealFamily_mem_principal。とりあえず、コメントアウト
 lemma principal_is_orderIdeal
     (le : α → α → Prop) [DecidableRel le]
     (V : Finset α) (v : α)
@@ -170,47 +174,22 @@ lemma principal_is_orderIdeal
       -- principal ideal の定義では v ∈ V を仮定しない設計が自然なため、
       -- htrans の第三引数は hy か hxV に置換できない。z ∈ V を引数に取らない版を推奨。
       -- （下で z ∈ V 仮定を外した補題版も用意します）
-      admit
+      sorry
     ) h_yx hx_le_v
     -- 以上で y ∈ V ∧ le y v
     exact Finset.mem_filter.mpr ⟨hy, hy_le_v⟩
+-/
 
+/-
 -- 台集合の大きさ以上にイデアルが存在する（Lemma 4.2 相当；型だけ用意）
+--principal idealの議論を使う。これもidealsTraceで議論するほうがいいのかも。
 lemma lower_bound_on_number_of_ideals :
     (orderIdealFamily le V).numHyperedges ≥ V.card + 1 := by
   -- 単射 v ↦ ↓v ＋ 空イデアルの 1 個を足す，という標準事実。
   sorry
-
-end SpecialToOrderIdeals
-
-/-
-NDS の基本的整形用の便利な補題（`rw` 用の等式形式）。
 -/
 
-namespace NDSfacts
 
-variable (F : SetFamily α)
-
-@[simp] lemma NDS_def :
-    NDS F = 2 * (F.totalHyperedgeSize : Int)
-             - (F.numHyperedges : Int) * (F.ground.card : Int) := rfl
-
-lemma NDS_nonpos_of_rare_sum_bound
-    (h : (2 : Int) * (F.totalHyperedgeSize : Int)
-         ≤ (F.numHyperedges : Int) * (F.ground.card : Int)) :
-    NDS F ≤ 0 := by
-  -- 左辺を右辺以下とみなすと NDS ≤ 0。
-  -- Forest 側の帰納で使い回す軽い整理補題として用意。
-  have : NDS F = (2 * (F.totalHyperedgeSize : Int)
-                  - (F.numHyperedges : Int) * (F.ground.card : Int)) := rfl
-  -- 以降は単なる引き算の符号判定。証明は後で埋める。
-  sorry
-
-end NDSfacts
-
-
-
-end AvgRare
 
 /-
 
@@ -257,6 +236,7 @@ lemma isOrderIdeal_inter {A B : Finset S.Elem}
   rcases Finset.mem_inter.mp hmem with ⟨hxA, hxB⟩
   exact Finset.mem_inter.mpr ⟨hA hy hxA, hB hy hxB⟩
 
+--idealからmaximalな要素をtraceしても、イデアル性は保たれる。ただし、functional性まで議論してない。
 lemma isOrderIdeal_erase_of_no_above
   {A : Finset S.Elem} (hA : S.isOrderIdeal A) {u : S.Elem}
   (hmax : ∀ {x : S.Elem}, u ≤ x → x = u) :
@@ -288,19 +268,11 @@ by
   exact Finset.mem_image.mpr
     ⟨y, hA (hmono hy') hx, rfl⟩
 
-
-
 end
-
-
-/-
-lemma card_ideals_ge_cardV_plus_one
-  (S : FuncSetup α) : True := by
-  trivial
--/
 
 variable (S : FuncSetup α)
 
+--パラレルであることと、preorderで同値なことが、等しい。
 lemma parallel_on_ideals_iff_ker
     {x y : S.Elem} :
     (∀ {A : Finset S.Elem}, S.isOrderIdeal A → (x ∈ A ↔ y ∈ A))
