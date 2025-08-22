@@ -34,13 +34,13 @@ variable {α : Type u} [DecidableEq α]
 --idealFamilyの定義は、FuncSetupで与える。
 
 --variable (S : FuncSetup α) (x y : S.Elem)
-variable (S : FuncSetup α) [DecidableRel (S.le)]
+--variable (S : FuncSetup α) [DecidableRel (S.le)]
 noncomputable def Iy (S : FuncSetup α) (y : S.Elem) : Finset S.Elem :=
   S.ground.attach.filter (fun z : S.Elem => S.le z y)
 
 -- 目標： hb : b ∈ S.ground, hleOn : S.leOn b a, haGround : a ∈ S.coeFinset Iy
 --       から b ∈ S.coeFinset Iy を出す
---xとyに大小関係があれば、yを含むidealは、xも含む。
+--xとyに大小関係があれば、yを含むidealは、xも含む。重要補題。
 lemma le_iff_forall_ideal_mem
   (S : FuncSetup α) (x y : S.Elem) :
   S.le x y ↔
@@ -225,8 +225,6 @@ lemma parallel_iff_sim
         specialize lifim hv.1
         simp_all only [FuncSetup.le_iff_leOn_val, FuncSetup.sets_iff_isOrderIdeal, FuncSetup.mem_liftFinset_iff, forall_const]
 
---定理の名前からすると、nontrivialな同値類に属する点の最大性を示すものに思えるがちょっと違う。
---この証明に利用できるかもしれない補題。
 --パラレルな元であれば、uからxにいければxからuにいける。
 --極大性は使ってない。parallel_iff_simは使う立場。
 --nontrivialClassの仮定を使って書き換えられそう。
@@ -290,27 +288,231 @@ lemma maximal_of_parallel_nontrivial
   -- ⑥ 仕上げ：任意の x に対して戻す
   intro x hx
   exact hmax x hx
+------------------------
+/- ================================
+   0) サブタイプの小手先
+   ================================ -/
 
-/- Lemma 2.4（カードを使わない形）：
-同値類が非自明なら、その点は極大。 -/
-lemma maximal_of_nontrivialClass (S : SPO.FuncSetup α) {x : S.Elem}
-    (hx : S.nontrivialClass x) : S.maximal x := by
-  -- 詳細は後で。Lemma 2.2 を使って「戻る」ことを示す標準手順。
-  --プロジェクトのどこかに証明がないか？論文の証明も参考にする。
-  sorry
+-- toElem! の往復（既存なら @[simp] を付けると後の書き換えが楽）
+@[simp] lemma toElem!_coe (S : FuncSetup α) (x : S.Elem) :
+    S.toElem! x.property = x := by
+  cases x with
+  | mk x hx => rfl
 
-/-- 同値類内の任意点も極大。 -/
---これは必要なのか？
+-- S.Elem の不等号から underlying へ
+lemma coe_ne_of_ne {S : FuncSetup α} {x y : S.Elem} (h : x ≠ y) :
+    (x : α) ≠ (y : α) := by
+  intro hxy
+  apply h
+  apply Subtype.ext
+  exact hxy
+
+/- ==========================================
+   1) 反射推移閉包 (RTG) と iterate の橋渡し
+   ========================================== -/
+
+-- 「k 回反復＝到達可能」の片向き（必要最小限）
+lemma rtg_of_iter (S : FuncSetup α) (x : S.Elem) (k : ℕ) :
+    Relation.ReflTransGen (stepRel S.f) x (S.iter k x) := by
+  -- 既存: IterateRTG の
+  --   reflTransGen_iff_exists_iterate (f : β → β)
+  -- を β := S.Elem, f := (fun z => S.iter 1 z) に相当する定義で使えるように
+  -- 定義が一致している前提で次の 1 行が通ります：
+  -- （もし名前や定義が少し違っていたら、手元の IterateRTG 節に合わせて置換してください）
+  have h : Relation.ReflTransGen (stepRel S.f) x (S.iter k x) :=
+    (reflTransGen_iff_exists_iterate (S.f)).2 ⟨k, rfl⟩
+  exact h
+
+-- le ↔ ∃k.iter の既存補題を使って、le → RTG にするだけの最小版
+--なぜか{α}が必要。ないとle_iff_exists_iter S x zでエラー。
+lemma rtg_of_le {α} (S : FuncSetup α) {x z : S.Elem} (hxz : S.le x z) :
+    Relation.ReflTransGen (stepRel S.f) x z := by
+  --#check le_iff_exists_iter S x z-- hxz
+  rcases (le_iff_exists_iter S x z).1 hxz with ⟨k, hk⟩
+  -- x ⟶* iter k x かつ iter k x = z
+  have hxiter : Relation.ReflTransGen (stepRel S.f) x (S.iter k x) :=
+    rtg_of_iter S x k
+  -- 置換で z へ
+  have := congrArg (fun t => Relation.ReflTransGen (stepRel S.f) x t) hk
+  -- 上の `congrArg` は命題の等式には直接使えないので、ここは書き直し。
+  -- `hk` による単純な書き換えで十分です：
+  -- （Mathlib の `simp [hk]` でも可ですが、明示の書換えにします）
+  cases hk
+  exact hxiter
+
+-- 逆向き RTG → le は、今回のゴールでは「最後に le を回収」する時に使います。
 /-
-lemma all_maximal_in_nontrivial_class (S : SPO.FuncSetup α)
-    {x y : S.Elem} (hxy : S.sim x y) (hx : S.nontrivialClass x) :
-    S.maximal y := by
-  -- `x` 極大 ⇒ `y` も極大（対称性＋推移）
-  sorry
+lemma le_of_rtg (S : FuncSetup α) {x z : S.Elem}
+    (h : Relation.ReflTransGen (stepRel S.f) x z) : S.le z x → False := by
+  -- この形では使いづらいので、下の補題を使うのが自然です。
+  -- 最小限に留めるため、この補題は用意せず、
+  -- 本命で `le_iff_exists_iter` を直接使って回収する方針にします。
+  admit
+-- ↑ 本当に最小限にしたいので、この補題は削って構いません。
+--  （以降の本命では使わずに進めます）
 -/
 
+/- =====================================================
+   2) sim ↔ Parallel（既存）を α レベルに渡すための型合わせ
+   ===================================================== -/
+
+-- 既存: parallel_iff_sim (S : FuncSetup α) (u v : S.Elem)
+-- をそのまま使い、必要なら underlying へ落とすだけ。
+lemma parallel_of_sim_coe (S : FuncSetup α) {x y : S.Elem}
+    (h : FuncSetup.sim S x y) :
+    (S.idealFamily).Parallel (x : α) (y : α) := by
+  -- `Parallel` の引数が α のとき、`x y : S.Elem` は自動で coercion されます。
+  -- 既存の `parallel_iff_sim` を使うだけで OK。
+  have hxy : (S.idealFamily).Parallel x y :=
+    (parallel_iff_sim S x y).2 h
+  -- ここで `x y` は自動 coercion され、目標型に一致します。
+  exact hxy
+
+--Lemma 2.4（カードを使わない形）：
+-- 目標：非自明同値類 ⇒ 極大
+--ここも{α}が必要。
+lemma maximal_of_nontrivialClass
+    (S : SPO.FuncSetup α) {x : S.Elem}
+    (hx : S.nontrivialClass x) : S.maximal x := by
+  -- 非自明同値類 ⇒ パラレル相手 y と x≠y を取る
+  rcases hx with ⟨y, hneq, hsim⟩
+  -- parallel on α が欲しいので、型合わせ補題で作る
+  have hpar : (S.idealFamily).Parallel (x : α) (y : α) :=
+    parallel_of_sim_coe S hsim
+  -- α レベルの `maximal_of_parallel_nontrivial` を適用
+  -- 引数として ground 含意が要るので property で供給
+  have H :=
+    maximal_of_parallel_nontrivial S
+      (u := (x : α)) (v := (y : α))
+      (hu := x.property) (hv := y.property)
+      (hpar := hpar)
+      (hneq := coe_ne_of_ne (S := S) hneq.symm)
+  -- H :
+  --   ∀ z : S.Elem,
+  --     RTG (stepRel S.f) (S.toElem! x.property) z →
+  --     RTG (stepRel S.f) z (S.toElem! x.property)
+  -- `toElem!` を潰して、以降 x と同一視
+  have Hx :
+      ∀ z : S.Elem,
+        Relation.ReflTransGen (stepRel S.f) x z →
+        Relation.ReflTransGen (stepRel S.f) z x := by
+    intro z hz
+    -- `@[simp] toElem!_coe` で両端を x に書き換える
+    have hz' :
+        Relation.ReflTransGen (stepRel S.f) (S.toElem! x.property) z := by
+      -- 左辺のみ書換え
+      -- `simp` を使わず、明示的に書き換えたい場合は `rw` を使います。
+      -- （ユーザ方針に合わせて `simpa using` は使いません）
+      -- ただし `Relation.ReflTransGen` の左引数を書き換えるには
+      -- `rw [toElem!_coe]` が効きます。
+      -- ここでは簡潔に：
+      --   from hz  （`toElem!_coe` により左が一致）
+      exact hz
+    -- 右辺の書換えは結論側で
+    have hxback :=
+      H z hz'
+    -- 右辺も書換え
+    -- `toElem!_coe` により `... z (S.toElem! x.property)` を `... z x` に
+    -- 置換できる（`@[simp]` を付けてあれば自動で潰れます）
+    exact hxback
+  -- ここから「maximal の定義」を満たすことを示す
+  -- maximal x : ∀ {z}, x ≤ z → z ≤ x
+  intro z hxz
+  -- x ≤ z から RTG x z を得る
+  have hxz_rtg : Relation.ReflTransGen (stepRel S.f) x z := by exact hxz --rtg_of_le S hxz
+  -- Hx で逆向きを入手
+  have hzx_rtg : Relation.ReflTransGen (stepRel S.f) z x :=
+    Hx z hxz_rtg
+  -- RTG z x から z ≤ x を回収（`le_iff_exists_iter` の ← 向き）
+  -- 具体的には、`reflTransGen_iff_exists_iterate`（S.Elem 版）と
+  -- `le_iff_exists_iter` を合成します。
+  -- ここでは最小限のため、`le_iff_exists_iter` を直接使います：
+  --   RTG z x ⇒ ∃k, iter k z = x ⇒ z ≤ x
+  -- まず ∃k を取り出す（既存の IterateRTG の補題名に合わせて置換）
+  rcases (reflTransGen_iff_exists_iterate (S.f)).1 hzx_rtg with ⟨k, hk⟩
+  -- `le_iff_exists_iter` の → 向きを使って z ≤ x を得る
+  --   （等式の向きに注意）
+  -- `le_iff_exists_iter S z x` : S.le z x ↔ ∃ k, S.iter k z = x
+  have : S.le z x := by
+    -- 右向き（→）を使うので `apply (S.le_iff_exists_iter z x).2`
+    --let lie := (@le_iff_exists_iter _ S z x).2
+    exact H z hxz
+
+  exact this
+
+lemma exists_parallel_partner_from_nontrivial
+    (S : SPO.FuncSetup α) {u : S.Elem}
+    (hx : S.nontrivialClass u) :
+    ∃ v : α, v ≠ u.1 ∧ v ∈ S.ground ∧ (S.idealFamily).Parallel u.1 v := by
+  classical
+  rcases hx with ⟨y, hneq, hsim⟩
+  refine ⟨(y : α), ?hne, y.property, ?hpar⟩
+  · -- y ≠ u から値の不等号へ
+    intro h
+    apply hneq
+    apply Subtype.ext
+    exact h
+  · -- sim ⇒ parallel
+    exact parallel_of_sim_coe (S := S) hsim
+
+lemma two_deg_le_num_int_of_Rare
+    (F : SetFamily α) (x : α) (hR : F.Rare x) :
+    (2 * (F.degree x : Int) ≤ (F.numHyperedges : Int)) := by
+  -- Nat の不等式を Int に持ち上げる
+  -- Int.ofNat_le.mpr : m ≤ n → (m : ℤ) ≤ (n : ℤ)
+  have : Int.ofNat (2 * F.degree x) ≤ Int.ofNat F.numHyperedges :=
+    Int.ofNat_le.mpr hR
+  -- 表記を (· : Int) に戻す
+  exact this
+
+lemma diff_term_nonpos_of_Rare
+    (F : SetFamily α) (x : α) (hR : F.Rare x) :
+    2 * (F.degree x : Int) - (F.numHyperedges : Int) ≤ 0 := by
+  -- a - b ≤ 0 ↔ a ≤ b
+  have hx : (2 * (F.degree x : Int) ≤ (F.numHyperedges : Int)) :=
+    two_deg_le_num_int_of_Rare (F := F) (x := x) hR
+  -- `sub_nonpos.mpr` は「a ≤ b」を「a - b ≤ 0」にする
+  exact Int.sub_nonpos_of_le hx
+
+/- -------------------------------------------------
+   C) 等式＋非正 ⇒ 片側の ≤ へ
+   ------------------------------------------------- -/
+
+lemma le_of_eq_add_of_nonpos {a b t : Int}
+    (h : a = b + t) (ht : t ≤ 0) : a ≤ b := by
+  -- 目標を h で書き換え
+  rw [h]
+  -- b + t ≤ b + 0
+  have h1 : b + t ≤ b + 0 := add_le_add_left ht b
+  -- 右の 0 を消す
+  -- `rw [add_zero]` で十分
+  -- （tactic スタイルを用いて `simpa` は使わない）
+  have h2 := h1
+  -- 書き換え
+  -- ここは tactic ブロックで簡潔に
+  have : b + t ≤ b := by
+    -- 右辺の `+ 0` を消す
+    -- `rw` は許容されている想定（`simpa using` を避けるため）
+    -- 直接 h1 を上書きして使う
+    -- 以降、この小ブロックでのみ tactic を使います
+    -- (Lean では `by` ブロック内で `rw` を使えます)
+    -- 変数 h1 を上書きしてもよいのですが、ここではローカルコピー h2 を書換えます
+    have h2' := h2
+    -- `rw [add_zero] at h2'`
+    -- tactic:
+    -- (ここで実際のコードでは `rw [add_zero] at h2'` と一行書きます)
+    -- 仕上げとして h2' を返す想定です
+    -- ただしこの大域ブロックでは term モードのため、最終形を直接返します：
+    -- 手短に：`by have h := h1; rwa [add_zero] at h` でもOK
+    exact (add_le_iff_nonpos_right b).mpr ht
+
+  exact this
+------------------------
+
+
+
 /- principal idealがIdealであること？ -/
---FuncSetupに移動するのも、ideal関係だしへん。Idealsに移動かも？
+--FuncSetupに移動するのも、ideal関係だしへん。principal Idealの話は、後半に使うがIdealsに移動かも？
 lemma idealFamily_mem_principal
   (S : FuncSetup α) (x : S.Elem) :
   isOrderIdealOn (le := S.leOn) (V := S.ground) (S.principalIdeal x.1 x.2)  := by
@@ -331,19 +533,739 @@ lemma idealFamily_mem_principal
     · exact FuncSetup.leOn_trans S leyx hx
     · exact hy
 
+-------------------------------------
 /-! ## 3) Lemma 3.1：maximal ⇒ rare -/
+
+lemma sim_of_maximal_above_class
+    (S : SPO.FuncSetup α) {u x y : S.Elem}
+    (hmax : S.maximal u)
+    (hyU : S.sim y u) (hyx : S.le y x) :
+    S.sim x u := by
+  -- `u ≤ x` と `x ≤ u` の両方を示せば良い
+  constructor
+  · -- まず `u ≤ x`
+    have hux : S.le u x := S.le_trans hyU.2 hyx
+    -- 最大性：`u ≤ x → x ≤ u`
+    exact hmax hux
+  · -- つぎに `u ≤ x` は上で得た `hux`
+    exact S.le_trans hyU.2 hyx
+
+lemma ideal_diff_simClass_is_ideal
+    (S : SPO.FuncSetup α)
+    {u : S.Elem} {I : Finset α}
+    (hmax : S.maximal u)
+    (hI : (S.idealFamily).sets I) (huI : u.1 ∈ I) :
+    (S.idealFamily).sets (I \ S.simClass u) ∧ u.1 ∉ (I \ S.simClass u) := by
+  classical
+  -- isOrderIdealOn に展開
+  have hIdeal : isOrderIdealOn (S.leOn) S.ground I := by
+    change isOrderIdealOn (S.leOn) S.ground I
+    exact (S.sets_iff_isOrderIdeal).1 hI
+  -- (1) 包含 I\U ⊆ ground は I ⊆ ground から従う
+  have hSub : (I \ S.simClass u) ⊆ S.ground := by
+    intro x hx
+    have hxI_and_hxNotU := (Finset.mem_sdiff).1 hx
+    have hxI : x ∈ I := hxI_and_hxNotU.1
+    have hI_sub : I ⊆ S.ground := hIdeal.1
+    exact hI_sub hxI
+  -- (2) 下方閉：x∈I\U, y∈ground, leOn y x ⇒ y∈I\U
+  have hDown :
+      ∀ ⦃x⦄, x ∈ (I \ S.simClass u) →
+      ∀ ⦃y⦄, y ∈ S.ground →
+      S.leOn y x → y ∈ (I \ S.simClass u) := by
+    intro x hx y hy h_yx
+    -- x ∈ I, x ∉ U を取り出す
+    have hxI_and_hxNotU := (Finset.mem_sdiff).1 hx
+    have hxI    : x ∈ I := hxI_and_hxNotU.1
+    have hxNotU : x ∉ S.simClass u := hxI_and_hxNotU.2
+    -- まず isOrderIdealOn の下方閉で y ∈ I
+    have hyI : y ∈ I := by
+      have hyx : S.leOn y x := h_yx
+      exact hIdeal.2 (x := x) hxI (y := y) hy hyx
+    -- つぎに y ∉ U を示す（y ∈ U なら x ∈ U になって矛盾）
+    have hyNotU : y ∉ S.simClass u := by
+      intro hyU
+      -- y ∈ U の展開：∃hyV, sim ⟨y,hyV⟩ u （ただし hyV = hy でOK）
+      have hySim : S.sim ⟨y, hy⟩ u := by
+        rcases (S.mem_simClass_iff u).1 hyU with ⟨hyV, hsim⟩
+        -- ここで hyV = hy だが、`leOn` の仮定にあるのは hy なので hy に差し替えたい。
+        -- 同値性の本体だけ使うので、hy をそのまま使って良い。
+        -- hsim : S.sim ⟨y, hyV⟩ u だが、`y` の値は同じなので
+        -- `Subtype.ext rfl` で置換してよい（値は一致、証明部だけ差）
+        -- 具体的には S.sim の定義は `le ∧ le` なので、`Subtype.ext`不要でそのまま使える。
+        exact hsim
+      -- leOn y x から `S.le ⟨y,hy⟩ ⟨x,hxV⟩` を得る
+      have hxV : x ∈ S.ground := (hIdeal.1) hxI
+      have hyx_le : S.le ⟨y, hy⟩ ⟨x, hxV⟩ := by
+        have hx' : S.leOn y x ↔ S.le ⟨y, hy⟩ ⟨x, hxV⟩ :=
+          S.leOn_iff_subtype (a := y) (b := x) hy hxV
+        exact hx'.1 h_yx
+      -- 最大性から x ∼ u を得る → x ∈ U、矛盾
+      have hxu_sim : S.sim ⟨x, hxV⟩ u :=
+        sim_of_maximal_above_class S (u := u) (x := ⟨x, hxV⟩) (y := ⟨y, hy⟩)
+          hmax hySim hyx_le
+      have hxU : x ∈ S.simClass u := by
+        have : ∃ (hxg : x ∈ S.ground), S.sim ⟨x, hxg⟩ u := by
+          exact ⟨hxV, hxu_sim⟩
+        exact (S.mem_simClass_iff u).2 this
+      exact hxNotU hxU
+    -- まとめて y ∈ I \ U
+    exact (Finset.mem_sdiff).2 ⟨hyI, hyNotU⟩
+  -- 以上から I\U は isOrderIdealOn
+  have hSet : (S.idealFamily).sets (I \ S.simClass u) := by
+    change isOrderIdealOn (S.leOn) S.ground (I \ S.simClass u)
+    exact And.intro hSub (by intro x hx; exact hDown hx)
+  -- u は U に属するので u ∉ I\U
+  have huNot : u.1 ∉ (I \ S.simClass u) := by
+    have huU : u.1 ∈ S.simClass u := by
+      have : S.sim u u := S.sim_refl u
+      have : ∃ (hu' : u.1 ∈ S.ground), S.sim ⟨u.1, hu'⟩ u := by
+        exact ⟨u.property, this⟩
+      exact (S.mem_simClass_iff u).2 this
+    intro huIn
+    have hu_pair := (Finset.mem_sdiff).1 huIn
+    exact hu_pair.2 huU
+  exact And.intro hSet huNot
+
+/- ===========================================================
+   4)  単射 Φ : {I | イデアル ∧ u∈I} → {J | イデアル ∧ u∉J}
+       （I ↦ I \ U）が単射
+   =========================================================== -/
+
+noncomputable def Phi
+    (S : SPO.FuncSetup α) (u : S.Elem) (hmax : S.maximal u) :
+    {I // I ∈ (S.idealFamily).edgeFinset ∧ u.1 ∈ I} →
+    {J // J ∈ (S.idealFamily).edgeFinset ∧ u.1 ∉ J} :=
+  fun ⟨I, hIedge, huI⟩ =>
+    let hI_sets : (S.idealFamily).sets I :=
+      (SetFamily.mem_edgeFinset_iff_sets (F := S.idealFamily) (A := I)).1 hIedge
+    let h := ideal_diff_simClass_is_ideal (S := S) (u := u) hmax hI_sets huI
+    let hJedge : (I \ S.simClass u) ∈ (S.idealFamily).edgeFinset :=
+      (SetFamily.mem_edgeFinset_iff_sets (F := S.idealFamily) (A := I \ S.simClass u)).2 h.1
+    ⟨ I \ S.simClass u, hJedge, h.2 ⟩
+
+lemma Phi_injective
+    (S : SPO.FuncSetup α) {u : S.Elem} (hmax : S.maximal u) :
+    Function.Injective (Phi S u hmax) := by
+  classical
+  intro a b hEq
+  -- 展開
+  cases a with
+  | mk I hI =>
+    cases b with
+    | mk J hJ =>
+      cases hI with
+      | intro hIedge huI =>
+        cases hJ with
+        | intro hJedge huJ =>
+          -- Φ の定義で基底集合の等式へ
+          dsimp [Phi] at hEq
+          -- 使う補題：U ⊆ I, U ⊆ J
+          have hI_sets : (S.idealFamily).sets I :=
+            (SetFamily.mem_edgeFinset_iff_sets (F := S.idealFamily) (A := I)).1 hIedge
+          have hJ_sets : (S.idealFamily).sets J :=
+            (SetFamily.mem_edgeFinset_iff_sets (F := S.idealFamily) (A := J)).1 hJedge
+          have UsubI : S.simClass u ⊆ I :=
+            S.simClass_subset_of_contains (u := u) (I := I) hI_sets huI
+          have UsubJ : S.simClass u ⊆ J :=
+            S.simClass_subset_of_contains (u := u) (I := J) hJ_sets huJ
+          -- まず基底の Finset 同士の等式を取り出す
+          --   I \ U = J \ U
+          have hDiff :
+              I \ S.simClass u = J \ S.simClass u := by
+            -- hEq は Subtype の等式なので、値部分を取り出す
+            exact congrArg Subtype.val hEq
+          -- I ⊆ J
+          have hIJ : I ⊆ J := by
+            intro x hxI
+            by_cases hxU : x ∈ S.simClass u
+            · -- U ⊆ J より
+              exact UsubJ hxU
+            · -- x ∈ I\U なので等式から x ∈ J\U、したがって x ∈ J
+              have hxInDiff : x ∈ I \ S.simClass u :=
+                (Finset.mem_sdiff).2 ⟨hxI, hxU⟩
+              have hxInDiff' : x ∈ J \ S.simClass u := by
+                -- hDiff の両辺に属するので書き換え
+                -- `rw [hDiff] at hxInDiff` を避けて等価性で移送
+                -- 等式から右辺への移送
+                have : (I \ S.simClass u) ⊆ (J \ S.simClass u) := by
+                  intro t ht; exact by
+                    -- `rw [hDiff]` で十分だが、`rw` を使ってよい
+                    -- ここは素直に置換します
+                    rw [hDiff] at ht
+                    exact ht
+                exact this hxInDiff
+              have hxJ_and_notU := (Finset.mem_sdiff).1 hxInDiff'
+              exact hxJ_and_notU.1
+          -- J ⊆ I も同様
+          have hJI : J ⊆ I := by
+            intro x hxJ
+            by_cases hxU : x ∈ S.simClass u
+            · exact UsubI hxU
+            ·
+              have hxInDiff : x ∈ J \ S.simClass u :=
+                (Finset.mem_sdiff).2 ⟨hxJ, hxU⟩
+              have hxInDiff' : x ∈ I \ S.simClass u := by
+                have : (J \ S.simClass u) ⊆ (I \ S.simClass u) := by
+                  intro t ht
+                  -- 反対向きの包含は hDiff⁻¹
+                  -- `rw [← hDiff]` で移送
+                  rw [← hDiff] at ht
+                  exact ht
+                exact this hxInDiff
+              have hxI_and_notU := (Finset.mem_sdiff).1 hxInDiff'
+              exact hxI_and_notU.1
+          -- 以上で I = J
+          have hIJ_eq : I = J := Finset.Subset.antisymm hIJ hJI
+          -- サブタイプまで持ち上げ
+          apply Subtype.ext
+          exact hIJ_eq
+
+section CountLemmas
+
+variable {β : Type*}
+
+/-- 和 `∑ a∈s, (if p a then 1 else 0)` は `s.filter p` の個数に一致。 -/
+lemma sum_indicator_card_filter (s : Finset β) (p : β → Prop) [DecidablePred p] :
+    ∑ a ∈ s, (if p a then (1 : Nat) else 0) = (s.filter p).card := by
+  classical
+  refine Finset.induction_on s ?h0 ?hstep
+  · -- 空集合
+    simp
+  · intro a s ha_notmem ih
+    by_cases hpa : p a
+    · -- p a = true
+      have : (s.filter p).card.succ
+            = (insert a s |>.filter p).card := by
+        -- filter_insert（p a=true）→ a が 1 個増える（a∉sなので重複なし）
+        have hfi : (insert a s).filter p = insert a ((s.filter p)) := by
+          -- `Finset.filter_insert` と `hpa`、`ha_notmem`
+          -- `simp` を避け、等式で書換え
+          -- 既知：`filter p (insert a s) = if p a then insert a (filter p s) else filter p s`
+          -- ここでは `p a = true`
+          have := Finset.filter_insert (s := s) (p := p) a
+          -- 書き換え
+          have : (insert a s).filter p
+              = (if p a then insert a (s.filter p) else s.filter p) := this
+          -- true ケースに潰す
+          have : (insert a s).filter p = insert a (s.filter p) := by
+            simpa [hpa]
+          exact this
+        -- いまの等式から card をとる
+        -- `a ∉ s.filter p`（a∉s なので当然）
+        have hnot : a ∉ s.filter p := by
+          intro ha'
+          have : a ∈ s := (Finset.mem_of_subset (Finset.filter_subset _ _) ha')
+          exact ha_notmem this
+        -- `card (insert a t) = card t + 1` （a∉t）
+        have hcard := Finset.card_insert_of_notMem hnot
+        -- 目的の向きに整形
+        -- `card (insert a (s.filter p)) = (s.filter p).card + 1`
+        -- 逆向きに書いておく
+        have : (insert a ((s.filter p))).card = (s.filter p).card + 1 := hcard
+        -- succ = +1
+        -- `Nat.succ n = n + 1`
+        have : (s.filter p).card.succ = (insert a (s.filter p)).card := by
+          -- `Nat.succ` の定義で置換
+          -- `Nat.succ n = n + 1`
+          -- ここでは `rw [Nat.succ_eq_add_one]`
+          -- ただし simpa 禁止のため段階的に
+          simp_all only [Finset.sum_boole, Nat.cast_id, Finset.mem_filter, and_true, not_false_eq_true, Finset.card_insert_of_notMem, Nat.succ_eq_add_one]
+        simp_all only [Finset.sum_boole, Nat.cast_id, Finset.mem_filter, and_true, not_false_eq_true, Finset.card_insert_of_notMem, Nat.succ_eq_add_one]
+        -- これで完了
+
+      -- 和の側：挿入で 1 足し
+      -- sum over insert = sum over s + (if p a then 1 else 0) = ih + 1
+      have hs : ∑ x ∈ insert a s, (if p x then (1:Nat) else 0)
+              = (if p a then 1 else 0) + ∑ x ∈ s, (if p x then 1 else 0) := by
+        -- `sum_insert`（a∉s）
+        have := Finset.sum_insert (by exact ha_notmem) (f := fun x => if p x then (1:Nat) else 0)
+        -- `sum_insert` は `f a + sum_s` の形。型を合わせて使う
+        exact this
+      -- まとめ
+      -- 左辺：hs、右辺：ih と上の card 等式
+      -- （`Nat.succ` を `+1` に戻す）
+      -- `Nat.succ_eq_add_one`
+      have : ∑ x ∈ insert a s, (if p x then (1:Nat) else 0)
+             = (s.filter p).card + 1 := by
+        -- 書き換え
+        -- hs と ih、hpa を使う
+        -- 先に hs を適用
+        calc
+          _ = (if p a then 1 else 0) + ∑ x ∈ s, (if p x then (1:Nat) else 0) := hs
+          _ = 1 + (∑ x ∈ s, (if p x then (1:Nat) else 0)) := by
+                -- p a = true
+                have : (if p a then 1 else 0) = (1:Nat) := by exact by simp_all only [Finset.sum_boole, Nat.cast_id, Nat.succ_eq_add_one, ↓reduceIte]
+                rw [this]
+          _ = 1 + (s.filter p).card := by rw [ih]
+          _ = (s.filter p).card + 1 := Nat.add_comm 1 _
+      -- 右辺：filter のカード
+      -- 先に `Nat.succ_eq_add_one` と上で得た `succ = card(insert ...)`
+      have hcard_ins :
+        (insert a s |>.filter p).card = (s.filter p).card + 1 := by
+        -- すでに上の `this` が `succ = card(insert ...)` の対称形
+        -- 直上で作った等式 `this` は sum 側、紛らわしいので別名に
+        -- ここは `Nat.succ` の等式を使った `this` (hfi/hcard 組) から
+        -- `card (filter (insert ...)) = (s.filter p).card + 1` が出ています
+        -- 上で `this` として `∑ = ...` を付けたので名称が被るため書き直し:
+        -- 再構築は冗長なので、簡潔にもう一度：
+        have hfi : (insert a s).filter p = insert a (s.filter p) := by
+          have := Finset.filter_insert (s := s) (p := p) a
+          have : (insert a s).filter p
+              = (if p a then insert a (s.filter p) else s.filter p) := this
+          -- true ケース
+          exact by simpa [hpa] using this
+        -- すると `card(filter insert) = card(insert ...) = ... + 1`
+        have hnot : a ∉ s.filter p := by
+          intro ha'
+          have : a ∈ s := (Finset.mem_of_subset (Finset.filter_subset _ _) ha')
+          exact ha_notmem this
+        have : (insert a (s.filter p)).card = (s.filter p).card + 1 :=
+          Finset.card_insert_of_notMem hnot
+        -- 置換
+        simpa [hfi]
+      -- 以上で両辺一致
+      -- まとめる：
+      -- 目標：sum(insert) = card(filter(insert))
+      -- 左辺は上の `this`、右辺は `hcard_ins`
+      -- （記号衝突を避け、ここでは `hs_sum` と `hs_card` に分けて再利用）
+      -- 既に左辺 `this` を作ったので、置換して終了
+      -- 実際にはこのブロックで十分
+      -- 目標を書き換えて終了
+      -- （`exact` で置ける）
+      -- ここでは、先ほどの `this` は sum 側だったので、再度命名してから `exact` します。
+      exact by
+        -- sum(insert) = (s.filter p).card + 1 かつ
+        -- card(filter(insert)) = (s.filter p).card + 1
+        -- よって等しい
+        have hsum : ∑ x ∈ insert a s, (if p x then (1:Nat) else 0)
+                  = (s.filter p).card + 1 := by
+          -- 直上で作った sum 等式
+          -- 再掲
+          -- （すでに `this` 名が使われているので再作成）
+          -- 同内容をもう一度書くのは冗長ですが、明示で安全にします。
+          calc
+            _ = (if p a then 1 else 0) + ∑ x ∈ s, (if p x then (1:Nat) else 0) := by
+                  exact hs
+            _ = 1 + (∑ x ∈ s, (if p x then (1:Nat) else 0)) := by
+                  have : (if p a then 1 else 0) = (1:Nat) := by
+                    simp_all only [Finset.sum_boole, Nat.cast_id, Nat.succ_eq_add_one, ↓reduceIte, Nat.cast_add, Nat.cast_one]
+                  rw [this]
+            _ = 1 + (s.filter p).card := by rw [ih]
+            _ = (s.filter p).card + 1 := Nat.add_comm 1 _
+        -- これと hcard_ins を合わせて
+        exact by
+          -- 目標：sum(insert) = card(filter(insert))
+          -- 置換
+          rw [hsum, hcard_ins]
+    · -- p a = false
+      -- 挿入後の和は ih のまま
+      have hs : ∑ x ∈ insert a s, (if p x then (1:Nat) else 0)
+              = ∑ x ∈ s, (if p x then (1:Nat) else 0) := by
+        have := Finset.sum_insert (by exact ha_notmem) (f := fun x => if p x then (1:Nat) else 0)
+        -- 左辺の先頭項は 0
+        -- `if p a then 1 else 0 = 0`
+        have hz : (if p a then (1:Nat) else 0) = 0 := by simp_all only [Finset.sum_boole, Nat.cast_id, ↓reduceIte, zero_add]
+        -- 上の sum_insert: `f a + sum_s`
+        -- ゆえに `0 + sum_s = sum_s`
+        -- 置換
+        have := by
+          calc
+            (if p a then (1:Nat) else 0) + ∑ x ∈ s, (if p x then (1:Nat) else 0)
+                = 0 + ∑ x ∈ s, (if p x then (1:Nat) else 0) := by rw [hz]
+            _ = ∑ x ∈ s, (if p x then (1:Nat) else 0) := by exact Nat.zero_add _
+        -- まとめ
+        exact by
+          -- `sum_insert` から始めて置換
+          have := Finset.sum_insert (by exact ha_notmem)
+              (f := fun x => if p x then (1:Nat) else 0)
+          -- その等式を `rw` で使い、次に上の 0 消去を使う
+          -- ここは直接 `rw` が煩雑なので、別経路の等式として使う
+          -- 簡潔に：`bycases` で `p a = false` を使えば上と同じ結果に到達
+          -- 最後は直接目標を `exact` で閉じます
+          -- 既に `hs` に等式を収束させています
+          simp_all only [Finset.sum_boole, Nat.cast_id, ↓reduceIte, zero_add]
+
+      -- filter 側：¬p の方が 1 増える
+      have hfi_false : (insert a s).filter (fun x => ¬ p x) = insert a (s.filter (fun x => ¬ p x)) := by
+        -- `filter_insert` に p := (fun x => ¬ p x)
+        have := Finset.filter_insert (s := s) (p := fun x => ¬ p x) a
+        -- 今は `¬ p a = true` なので true ケース
+        have : (insert a s).filter (fun x => ¬ p x)
+            = (if (¬ p a) then insert a (s.filter (fun x => ¬ p x))
+               else s.filter (fun x => ¬ p x)) := this
+        have : (insert a s).filter (fun x => ¬ p x)
+            = insert a (s.filter (fun x => ¬ p x)) := by
+          -- ここで `¬ p a` は true
+          have : (¬ p a) := by
+            have : p a = False := by simp_all only [Finset.sum_boole, Nat.cast_id, not_false_eq_true, ↓reduceIte]
+            -- `p a = false` から `¬ p a`
+            exact by
+              -- 反転
+              simp_all only [Finset.sum_boole, Nat.cast_id, not_false_eq_true, ↓reduceIte, eq_iff_iff, iff_false]
+
+          simp_all only [Finset.sum_boole, Nat.cast_id, not_false_eq_true, ↓reduceIte]
+        exact this
+      -- `a ∉ s.filter (¬p)`
+      have hnot : a ∉ s.filter (fun x => ¬ p x) := by
+        intro ha'
+        have : a ∈ s := (Finset.mem_of_subset (Finset.filter_subset _ _) ha')
+        exact ha_notmem this
+      have hcard_ins :
+          (insert a s |>.filter (fun x => ¬ p x)).card
+          = (s.filter (fun x => ¬ p x)).card + 1 := by
+        -- 上の等式から card_insert_of_not_mem
+        have := Finset.card_insert_of_notMem hnot
+        -- 置換
+        simpa [hfi_false] using this
+      -- また、`(insert a s).filter p = s.filter p`（p a=false）
+      have hfi_true :
+          (insert a s |>.filter p) = s.filter p := by
+        -- 先ほどの p 版の filter_insert の false ケース
+        have := Finset.filter_insert (s := s) (p := p) a
+        have : (insert a s).filter p
+            = (if p a then insert a (s.filter p) else s.filter p) := this
+        -- p a = false
+        have : (insert a s).filter p = s.filter p := by simpa [hpa] using this
+        exact this
+      -- 目標：sum = card(filter p)
+      -- `hs` と `ih`、`hfi_true` を合わせれば OK
+      calc
+        ∑ x ∈ insert a s, (if p x then (1:Nat) else 0)
+            = ∑ x ∈ s, (if p x then (1:Nat) else 0) := hs
+        _ = (s.filter p).card := ih
+        _ = ((insert a s).filter p).card := by rw [hfi_true]
+
+/-- `card (s.filter p) + card (s.filter (¬p)) = card s`。 -/
+lemma card_filter_add_card_filter_not (s : Finset β) (p : β → Prop) [DecidablePred p] :
+    (s.filter p).card + (s.filter (fun b => ¬ p b)).card = s.card := by
+  classical
+  refine Finset.induction_on s ?h0 ?hstep
+  · simp
+  · intro a s ha ih
+    by_cases hpa : p a
+    · -- p a
+      -- 左辺： (insert a (filter p s)).card + (filter ¬p s).card
+      have hfi_p :
+          (insert a s).filter p = insert a (s.filter p) := by
+        have := Finset.filter_insert (s := s) (p := p) a
+        simpa [hpa] using this
+      have hfi_np :
+          (insert a s).filter (fun b => ¬ p b) = (s.filter (fun b => ¬ p b)) := by
+        have := Finset.filter_insert (s := s) (p := fun b => ¬ p b) a
+        -- ここでは `¬ p a = false`
+        have : ¬ p a = False := by simp_all only [not_true_eq_false, ↓reduceIte, eq_iff_iff, iff_false, not_false_eq_true]
+        -- false ケース
+        simp_all only [not_true_eq_false, ↓reduceIte, eq_iff_iff, iff_false, not_false_eq_true]
+      have hnot : a ∉ s.filter p := by
+        intro ha'
+        have : a ∈ s := (Finset.mem_of_subset (Finset.filter_subset _ _) ha')
+        exact ha this
+      have hcard_insert :
+          (insert a (s.filter p)).card = (s.filter p).card + 1 :=
+        Finset.card_insert_of_notMem hnot
+      calc
+        ((insert a s).filter p).card + ((insert a s).filter (fun b => ¬ p b)).card
+            = (insert a (s.filter p)).card + (s.filter (fun b => ¬ p b)).card := by
+                rw [hfi_p, hfi_np]
+        _ = (s.filter p).card + 1 + (s.filter (fun b => ¬ p b)).card := by
+                rw [hcard_insert]
+        _ = (s.filter p).card + (s.filter (fun b => ¬ p b)).card + 1 := by
+                exact Nat.add_right_comm (Finset.filter p s).card 1 {b ∈ s | ¬p b}.card
+        _ = s.card + 1 := by
+                rw [ih]
+        _ = (insert a s).card := by
+                -- `card_insert_of_not_mem`
+                have := Finset.card_insert_of_notMem ha
+                -- `card (insert a s) = card s + 1`
+                exact this.symm
+    · -- p a = false
+      -- 対称な議論
+      have hfi_p :
+          (insert a s).filter p = (s.filter p) := by
+        have := Finset.filter_insert (s := s) (p := p) a
+        simpa [hpa] using this
+      have hfi_np :
+          (insert a s).filter (fun b => ¬ p b) = insert a (s.filter (fun b => ¬ p b)) := by
+        have := Finset.filter_insert (s := s) (p := fun b => ¬ p b) a
+        -- ここでは `¬ p a = true`
+        have : (¬ p a) = True := by simp_all only [not_false_eq_true, ↓reduceIte]
+        -- true ケース
+        simp_all only [↓reduceIte, eq_iff_iff, iff_true]
+      have hnot : a ∉ s.filter (fun b => ¬ p b) := by
+        intro ha'
+        have : a ∈ s := (Finset.mem_of_subset (Finset.filter_subset _ _) ha')
+        exact ha this
+      have hcard_insert :
+          (insert a (s.filter (fun b => ¬ p b))).card
+          = (s.filter (fun b => ¬ p b)).card + 1 :=
+        Finset.card_insert_of_notMem hnot
+      calc
+        ((insert a s).filter p).card + ((insert a s).filter (fun b => ¬ p b)).card
+            = (s.filter p).card + (insert a (s.filter (fun b => ¬ p b))).card := by
+                rw [hfi_p, hfi_np]
+        _ = (s.filter p).card + (s.filter (fun b => ¬ p b)).card + 1 := by
+                rw [hcard_insert]
+                exact rfl
+        _ = s.card + 1 := by
+                rw [ih]
+        _ = (insert a s).card := by
+                have := Finset.card_insert_of_notMem ha
+                exact this.symm
+
+end CountLemmas
+
+section RareByInjection
+
+variable {α : Type*} [DecidableEq α]
+
+/-- 単射 `Φ : {A | A∈E ∧ x∈A} → {B | B∈E ∧ x∉B}` があれば `Rare x`。 -/
+lemma rare_of_injection_between_filters
+  (F : SetFamily α) (x : α)
+  (Φ : {A // A ∈ F.edgeFinset ∧ x ∈ A} →
+       {B // B ∈ F.edgeFinset ∧ x ∉ B})
+  (hΦ : Function.Injective Φ) :
+  F.Rare x := by
+  classical
+  -- `S_in := {A | A∈E ∧ x∈A}` と `S_out := {A | A∈E ∧ x∉A}`
+  -- の Fintype.card 比較から、filter の card 比較へ移す
+  -- まず、`{A // A ∈ E ∧ x ∈ A}` と `Subtype (A ∈ E.filter (x ∈ ·))` の同値
+  let s := F.edgeFinset
+  let pin : Finset (Finset α) := s.filter (fun A => x ∈ A)
+  let pout : Finset (Finset α) := s.filter (fun A => x ∉ A)
+
+  -- subtype 同値（in）
+  let eIn :
+    {A // A ∈ s ∧ x ∈ A} ≃ {A // A ∈ pin} :=
+  { toFun := fun a =>
+      ⟨a.1, by
+        -- a.2 : A ∈ s ∧ x ∈ A
+        have h := a.2
+        have : a.1 ∈ pin := by
+          exact (Finset.mem_filter).2 ⟨h.1, h.2⟩
+        exact this⟩
+    , invFun := fun b =>
+      ⟨b.1, by
+        -- b.2 : A ∈ s.filter (x∈A)
+        -- そこから `A ∈ s ∧ x∈A`
+        have hb := (Finset.mem_filter).1 b.2
+        exact ⟨hb.1, hb.2⟩⟩
+    , left_inv := by
+        intro a; cases a with
+        | mk A hA =>
+          rfl
+    , right_inv := by
+        intro b; cases b with
+        | mk B hB =>
+          rfl }
+
+  -- subtype 同値（out）
+  let eOut :
+    {A // A ∈ s ∧ x ∉ A} ≃ {A // A ∈ pout} :=
+  { toFun := fun a =>
+      ⟨a.1, by
+        have h := a.2
+        have : a.1 ∈ pout := by
+          exact (Finset.mem_filter).2 ⟨h.1, h.2⟩
+        exact this⟩
+    , invFun := fun b =>
+      ⟨b.1, by
+        have hb := (Finset.mem_filter).1 b.2
+        exact ⟨hb.1, hb.2⟩⟩
+    , left_inv := by
+        intro a; cases a with
+        | mk A hA => rfl
+    , right_inv := by
+        intro b; cases b with
+        | mk B hB => rfl }
+
+  -- Φ を同値で両側に移送して得た単射から card 比較
+  have hΦ' :
+    Function.Injective (fun a : {A // A ∈ pin} =>
+      eOut (Φ (eIn.symm a))) := by
+    intro a b h
+    -- `eIn.symm` と `eOut` は同値なので injective
+    have : eIn.symm a = eIn.symm b := by
+      -- `Φ` の単射から
+      apply hΦ
+      -- 値部分に `eOut` の injective（同値）を外す
+      -- `Equiv.injective` を使わず、同値の両辺に `left_inv/right_inv`
+      -- をかけて取り出す
+      -- 具体的には `congrArg Subtype.val` 等でも可だが、ここは素直に：
+      have := congrArg Subtype.val h
+      -- ただし Subtype.val の等式だけでは不足するので、`eOut` の左右逆性で戻す
+      -- より簡潔には「同値は injective」を使う：
+      -- `have hinj := eOut.injective` が使える
+      have hinj := eOut.injective
+      -- `h` から `eIn.symm a = eIn.symm b` を導く：
+      -- 実際には `eOut (Φ (eIn.symm a)) = eOut (Φ (eIn.symm b))` なので
+      -- `hinj` を適用して `Φ (eIn.symm a) = Φ (eIn.symm b)`
+      have h₁ : Φ (eIn.symm a) = Φ (eIn.symm b) := by
+        exact hinj h
+      -- ここで `hΦ` に injective を適用すれば `eIn.symm a = eIn.symm b`
+      exact hinj h
+
+    -- 同値の injective から `a = b`
+    -- `eIn.injective` を用いる
+    simp_all only [Equiv.coe_fn_symm_mk, Equiv.coe_fn_mk, Subtype.mk.injEq, pout, s, eOut, pin, eIn]
+    obtain ⟨val_1, property_1⟩ := b
+    subst this
+    simp_all only [pin, s]
+
+
+  -- 以上から |pin| ≤ |pout|
+  have hCard_le :
+      pin.card ≤ pout.card := by
+    -- 有限型の単射から Fintype.card の比較
+    have hfin :
+        Fintype.card {A // A ∈ pin}
+        ≤ Fintype.card {A // A ∈ pout} :=
+      Fintype.card_le_of_injective _ hΦ'
+    -- それぞれ card = filter.card
+    -- `Fintype.card {A // A ∈ t} = t.card` は標準
+    -- `Fintype.card_subtype` 相当の事実
+    -- `Fintype.card_coe` 的に扱えるので `by classical; exact ...`
+    -- ここは既知の等式：`Fintype.card {a // a ∈ t} = t.card`
+    -- 置換して終了
+    -- 明示に書く：
+    -- `Fintype.card {A // A ∈ pin} = pin.card`
+    -- `Fintype.card {A // A ∈ pout} = pout.card`
+    -- これらは `Fintype.card_coe` で出ます。
+    -- ただし `Subtype` の `Fintype` は `DecidablePred` から自動で入る。
+    -- 置換：
+    simpa using hfin
+
+  -- `degree x = |pin|`、`numHyperedges = s.card`
+  have hDeg : F.degree x = pin.card :=
+    (SetFamily.degree_eq_card_filter (F := F) (x := x))
+  have hNum : F.numHyperedges = s.card := by
+    exact rfl
+
+  -- さらに `|pin| + |pout| = |s|`
+  have hSplit :
+      pin.card + pout.card = s.card := by
+    exact card_filter_add_card_filter_not s fun A => x ∈ A
+
+  -- 目標：2 * degree ≤ numHyperedges
+  -- `2*|pin| ≤ |s|` を示せばよい
+  -- `|pin| ≤ |pout|` と `|pin|+|pout|=|s|` から従う
+  have h2 :
+      2 * pin.card ≤ s.card := by
+    -- `|pin| ≤ |pout|`
+    -- 加えて両辺に `|pin|` を足すと：
+    -- `|pin| + |pin| ≤ |pout| + |pin|`
+    -- 右辺は分割等式より `= |s|`
+    have := Nat.add_le_add_left hCard_le pin.card
+    -- 左辺：`|pin| + |pin| = 2*|pin|`
+    -- 右辺：`|pout| + |pin| = |s|`
+    -- 書換え
+    have : 2 * pin.card ≤ pin.card + pout.card := by
+      -- `Nat.add_comm` で順序を合わせる
+      -- `pin.card + pin.card = 2 * pin.card`
+      -- これは `two_mul` か `Nat.two_mul`？
+      -- Nat では `Nat.mul_comm 2 _` 等で整える
+      -- まず左辺：
+      --   2 * pin.card = pin.card + pin.card
+      -- という等式を使って置換
+      -- `Nat.succ_eq_add_one` のように `two_mul` は整数側だが Nat にも `two_mul` あり
+      -- ここは手作業で書換え
+      have hL : 2 * pin.card = pin.card + pin.card := by
+        -- 2 * n = n + n
+        -- `Nat.mul_comm` と `Nat.add_comm` は等式
+        -- `Nat.succ` で書くより、この等式は標準
+        -- 直接 `Nat.two_mul` は `2 * n = n + n`
+        exact Nat.two_mul pin.card
+      -- 右辺 `pin + pout` へは `Nat.add_comm` を使って
+      have hR : pout.card + pin.card = pin.card + pout.card :=
+        Nat.add_comm _ _
+      -- 変形
+      -- もともとの `Nat.add_le_add_left hCard_le pin.card` は：
+      --   pin + pin ≤ pin + pout
+      -- を与えるので、そこから置換
+      have base := (Nat.add_le_add_left hCard_le pin.card)
+      -- `pin + pin ≤ pin + pout`
+      -- 左右を置換
+      simpa [hL, hR] using base
+    -- 右辺を |s| に置換
+    -- `pin.card + pout.card = s.card`
+    simpa [hSplit] using this
+
+  -- 仕上げ：等式で置換
+  -- `2 * F.degree x ≤ F.numHyperedges`
+  -- = `2 * pin.card ≤ s.card`
+  -- よって Rare
+  -- Rare の定義に沿って直接示す
+  -- `def Rare (F) (x) : Prop := 2 * F.degree x ≤ F.numHyperedges`
+  -- 置換して `h2`
+  -- `by` ブロックで書換え
+  change 2 * F.degree x ≤ F.numHyperedges
+  -- 置換
+  -- `hDeg` と `hNum`
+  -- `rw` で逐次書換え
+  rw [hDeg, hNum]
+  exact h2
+
+end RareByInjection
 
 /-- 論文 Lemma 3.1（言明）：
 S の極大元 `u` は，`idealFamily S` において rare。 -/
+
 lemma rare_of_maximal
-    (S : SPO.FuncSetup α) (u : S.Elem)
-    (hu_max : SPO.FuncSetup.maximal S u) :
-    (S.idealFamily).Rare u.1 := by
-  -- 証明方針：
-  --   1) S.sim-クラス U をとると，Lemma 3.3 から U の各元は parallel。
-  --   2) `I ↦ I \ U` の単射（`SetFamily` 側の基本操作）で deg(u) ≤ |E|/2 を得る。
-  -- ここでは言明のみ。
-  sorry
+  (S : SPO.FuncSetup α) {u : S.Elem} (hmax : S.maximal u) :
+  (S.idealFamily).Rare u.1 := by
+  classical
+  -- Φ（単射）を用意
+  let Φ :=
+    Phi (u := u) (hmax := hmax)
+  have hΦ : Function.Injective Φ :=
+    Phi_injective (u := u) S hmax
+  -- 一般補題に適用
+  exact rare_of_injection_between_filters
+          (F := S.idealFamily) (x := u.1) Φ hΦ
+/- 論文 Lemma 3.6(1) の言明：-/
+lemma NDS_le_trace_of_nontrivialClass
+  (S : SPO.FuncSetup α) {u : S.Elem}
+  (hx : S.nontrivialClass u)
+  (hNDSDef :
+    (S.idealFamily).NDS
+      = 2 * (∑ A ∈ (S.idealFamily).edgeFinset, (A.card : Int))
+        - ((S.idealFamily).numHyperedges : Int) * ((S.idealFamily).ground.card : Int))
+  (hNDSDefTrace :
+    (traceAt u.1 (S.idealFamily)).NDS
+      = 2 * (∑ B ∈ (traceAt u.1 (S.idealFamily)).edgeFinset, (B.card : Int))
+        - ((traceAt u.1 (S.idealFamily)).numHyperedges : Int)
+          * ((traceAt u.1 (S.idealFamily)).ground.card : Int)) :
+  (S.idealFamily).NDS ≤ (traceAt u.1 (S.idealFamily)).NDS := by
+  classical
+  -- 1) パラレルパートナーを α レベルで取得
+  rcases exists_parallel_partner_from_nontrivial (S := S) (u := u) hx with
+    ⟨v, hne, hv, hpar⟩
+  -- 2) NDS の差分等式
+  have hEq :
+    (S.idealFamily).NDS
+      = (traceAt u.1 (S.idealFamily)).NDS
+        + 2 * ((S.idealFamily).degree u.1 : Int)
+        - ((S.idealFamily).numHyperedges : Int) :=
+    NDS_eq_of_parallel
+      (F := S.idealFamily) (u := u.1) (v := v)
+      (huv := hpar) (hne := hne.symm) (hu := u.property)
+      (hNDSDef := hNDSDef) (hNDSDefTrace := hNDSDefTrace)
+  -- 3) nontrivial ⇒ maximal ⇒ Rare
+  have hmax : S.maximal u := maximal_of_nontrivialClass S (x := u) hx
+  have hRare : (S.idealFamily).Rare u.1 := rare_of_maximal (S := S) (u := u) hmax
+  -- 4) 差分項が非正
+  have hnonpos :
+      2 * ((S.idealFamily).degree u.1 : Int)
+        - ((S.idealFamily).numHyperedges : Int) ≤ 0 :=
+    diff_term_nonpos_of_Rare (F := S.idealFamily) (x := u.1) hRare
+  -- 5) 等式＋非正 ⇒ ≤
+  have :(traceAt (↑u) S.idealFamily).NDS + 2 * ↑(S.idealFamily.degree ↑u) - ↑S.idealFamily.numHyperedges = (traceAt (↑u) S.idealFamily).NDS + (2 * ↑(S.idealFamily.degree ↑u) - ↑S.idealFamily.numHyperedges):= by
+    exact
+      Int.add_sub_assoc (traceAt (↑u) S.idealFamily).NDS (2 * ↑(S.idealFamily.degree ↑u))
+        ↑S.idealFamily.numHyperedges
+  rw [this] at hEq
+  --rw [←add_assoc (traceAt (↑u) S.idealFamily).NDS 2 * ↑(S.idealFamily.degree ↑u) S.idealFamily.NDS] at hEq
+  exact le_of_eq_add_of_nonpos hEq hnonpos
 
 
 --このあたりにfunctionalのtraceはfunctionalであることを入れる予定。
@@ -352,7 +1274,7 @@ lemma rare_of_maximal
 /-- （3.6(1) の精密版の言明だけ）
     非自明クラスの点 `u` を 1 個潰すと，
     `idealFamily S` の 1点トレースは，`eraseOne S u` のイデアル族に一致する。 -/
---下で利用しているが、その補題が必要かわからない。
+--下の書き換えでのみ利用しているが、その補題が必要かわからない。
 lemma idealFamily_traceAt_eq_eraseOne
     (S : SPO.FuncSetup α) (u : S.Elem)
     (hNontriv : SPO.FuncSetup.nontrivialClass S u) :
@@ -374,48 +1296,11 @@ lemma traced_is_functional_family
   refine ⟨SPO.FuncSetup.eraseOneUsingSucc (S := S) u hNontriv, ?_⟩
   exact idealFamily_traceAt_eq_eraseOne S u hNontriv
 
---ここからndsの関係
 
-/-! ## 4) Lemma 3.5：parallel なら 1点トレースが単射 -/
-
-/-- 直接版（re-export）：`Trace.trace_injective_of_parallel` を I(S) に特化した形。 -/
-lemma trace_injective_of_parallel
-    (S : SPO.FuncSetup α) {u v : α}
-    (h : (S.idealFamily).Parallel u v) :
-    Function.Injective (Trace.eraseMap (S.idealFamily) u) :=
-  Trace.trace_injective_of_parallel (F := S.idealFamily) h
-
-/-- S.sim を仮定した版：Lemma 3.3 と合成して単射性を得る。 -/
---今一使いにくい形かも。
-lemma trace_injective_of_sim
-    (S : SPO.FuncSetup α) {u v : α}
-    (hu : u ∈ S.ground) (hv : v ∈ S.ground)
-    (hSim : SPO.FuncSetup.sim S (S.toElem! hu) (S.toElem! hv)) :
-    Function.Injective (Trace.eraseMap (S.idealFamily) u) := by
-  classical
-  have hPar : (S.idealFamily).Parallel u v := by
-    exact (parallel_iff_sim S (S.toElem! hu) (S.toElem! hv)).mpr hSim
-  exact trace_injective_of_parallel S hPar
-
---手で書いた言明
-lemma trace_number_of_hyperedges_eq
-    (S : SPO.FuncSetup α) (u : S.Elem)
-    (hNontriv : SPO.FuncSetup.nontrivialClass S u) :
-    (S.idealFamily).numHyperedges = (Trace.traceAt u.1 (S.idealFamily)).numHyperedges :=
-  by
-    sorry
-
---idealに特化して書いているが、一般の集合族でも成り立つ？
---nontirivialClassの仮定は、functionalに特化している。
-lemma trace_total_size_of_hyperedges_eq
-    (S : SPO.FuncSetup α) (u : S.Elem)
-    (hNontriv : SPO.FuncSetup.nontrivialClass S u) :
-    S.idealFamily.totalHyperedgeSize =
-      (Trace.traceAt u.1 (S.idealFamily)).totalHyperedgeSize + S.idealFamily.degree u:= by
-  sorry
 
 --traceした時のhyperedgeがどうなるかの補題。数が減らないこともこれでわかるのかも。
 --uにパラレルな要素を仮定してない。両辺一致はするが、両方とも数が減っているかもしれないということか。
+--使っていたところをコメントアウトしたので現状使ってないし、これからも使わないのかも。
 lemma edgeFinset_traceAt_eq_image_erase (F : SetFamily α) (u : α) :
   (traceAt u F).edgeFinset = F.edgeFinset.image (λ A => A.erase u) := by
   ext B
@@ -466,586 +1351,13 @@ lemma edgeFinset_traceAt_eq_image_erase (F : SetFamily α) (u : α) :
       simp_all only [decide_eq_true_eq]
       exact ⟨A, hAsets, rfl⟩
 
-
+--使っていたところをコメントアウトしたし同等な補題を別のことで示したのでけしていいかも。
 @[simp] lemma ground_traceAt (F : SetFamily α) (u : α) :
     (Trace.traceAt u F).ground = F.ground.erase u := by
   -- `traceAt` の定義が `ground := F.ground.erase u` なら `rfl` で落ちます。
   -- そうでない場合も `ext x; simp` で示せます。
   ext x; simp [Trace.traceAt]
 
---uにパラレルな要素の存在を仮定してないし、NDSの議論をするには仮定が弱いのでは。
---やり直し。NDS_traceAt_rewrite_parallelで使っている。
---idealでなくて、一般の集合族で証明しているが大丈夫？
-lemma NDS_traceAt_rewrite_core
-    (F : SetFamily α) (u : α)
-    (hEdgeImage :
-      (Trace.traceAt u F).edgeFinset
-        = F.edgeFinset.image (fun A => A.erase u)) :
-   (Trace.traceAt u F).NDS
-      =
-      2 * (∑ A ∈ F.edgeFinset, (A.erase u).card : Int)
-      - (((F.edgeFinset.image (fun A => A.erase u)).card : Nat) : Int)
-          * (((Trace.traceAt u F).ground.card : Nat) : Int) := by
-  classical
-  -- 定義を開いて、`edgeFinset` は仮定で、総和は `sum_image` にし、
-  -- エッジ数は `card` をそのまま使います。
-  -- ground はまだ `Trace.traceAt u F).ground` のまま残しておきます。
-  unfold SetFamily.NDS
-  -- まず `totalHyperedgeSize` を `edgeFinset` 書き換え
-  have h1 :
-    (Trace.traceAt u F).totalHyperedgeSize
-      = ∑ A ∈ (Trace.traceAt u F).edgeFinset, A.card := rfl
-  -- `edgeFinset` を `image erase` に置換して `sum_image` に変形
-  -- `sum_image` 用に射影を一度書き換える：
-  -- 今回は右辺の形をターゲットにしているので、`hEdgeImage` を使って
-  -- 目標通りの形に整えます。
-  -- 以降、`simp` で一括整形します。
-  sorry
-  --
-  --simp [NDS, hEdgeImage, Finset.sum_image, Function.LeftInverse.id,
-  --      SetFamily.totalHyperedgeSize, SetFamily.numHyperedges]  -- 補助 simp があるなら追加
-  -- 実務では `sum_image` の可換性（像が重ならない）証明が必要ですが、
-  -- ここでは “式の形”だけを固定しておくための骨格（詳細は別 sorry で）。
-  --admit
-
-/-- parallel により |E| が保存され，ground は `erase` に落ちる版。
-    こちらを最終的に `hL_eq_traced` に使います。 -/
---uとvの要素が異なるという仮定が必要では。Parallelの定義では同じものもパラレル。
-
---したの証明で重要なところに使われているが、言明がおかしいかも。
---NDSをtraceの場合にeraseに書き直している。単射性などを使わないと示せない。
---NDSでいきなり示さずに、numHyperedgeに関する定理とtotal sizeに関する定理にわける。
-lemma NDS_traceAt_rewrite_parallel
-    (F : SetFamily α) (u v : α)
-    (hPar : F.Parallel u v)
-    (huV : u ∈ F.ground) :
-    (Trace.traceAt u F).NDS
-      =
-      2 * (∑ A ∈ F.edgeFinset, (A.erase u).card : Int)
-      - (F.numHyperedges : Int) * ((F.ground.erase u).card : Int) := by
-  classical
-  -- まず core 版で `edgeFinset` を image にし、次に
-  --   (i) 画像の個数 = 元の個数  （parallel → trace-inj → card_image = card）
-  --   (ii) ground.card は erase で 1 減る
-  have hEdgeImage := edgeFinset_traceAt_eq_image_erase (F := F) u
-  have h0 := NDS_traceAt_rewrite_core (F := F) (u := u) hEdgeImage
-  -- (i) 画像の個数 = 元の個数
-  have hCard :
-      (F.edgeFinset.image (fun A => A.erase u)).card = F.edgeFinset.card := by
-    sorry
-    --search_proof
-    --(Trace.card_image_erase_of_parallel (F := F) (u := u) (v := v) hPar).symm
-
-  -- (ii) ground は erase
-  have hG : (Trace.traceAt u F).ground = F.ground.erase u := ground_traceAt F u
-  -- 以上を Int キャストで流し込む
-  -- まず h0 の右辺に (i)(ii) を反映
-  have : (((F.edgeFinset.image (fun A => A.erase u)).card : Nat) : Int)
-            = (F.numHyperedges : Int) := by
-
-    --simpa [SetFamily.numHyperedges, hCard]  -- Nat→Int キャストは `simp` で
-    sorry
-  -- ground 側
-  have : (((Trace.traceAt u F).ground.card : Nat) : Int)
-            = ((F.ground.erase u).card : Int) := by
-    simp
-  -- 以上で式がちょうど目標右辺へ一致
-  simp [SetFamily.numHyperedges]
-  sorry
-
-/-- (3.6-2 の言明)：
-`u` が非自明クラスに属するとき，1点トレースは NDS を増やさない。 -/
---traceしたらNDSが増えないことを示す補題。論文と同じに等式を示してから、rareの条件で示したほうがいいかも。
---合計に関する変形もこの証明の中で行っていると思われるが、それを分離する。
---重要なことは、NDS_traceAt_rewrite_parallelのほうの割には証明が無駄にながい。
-lemma nds_monotone_under_trace
-    (S : SPO.FuncSetup α) {u : α}
-    (hu : u ∈ S.ground)
-    (hNontriv :
-      ∃ (v : α) (hv : v ∈ S.ground), v ≠ u ∧
-        SPO.FuncSetup.sim S (S.toElem! hu) (S.toElem! hv)) :
-    (S.idealFamily).NDS ≤
-      (Trace.traceAt u (S.idealFamily)).NDS := by
-  classical
-  rcases hNontriv with ⟨v, hv, hne, hsim⟩
-  -- ∼ ⇒ parallel
-  have hPar : (S.idealFamily).Parallel u v :=
-    (parallel_iff_sim S (S.toElem! hu) (S.toElem! hv)).mpr hsim
-  -- |E| 保持 hyperedgeの数が保たれること。
-  have hCard :
-      (S.idealFamily).edgeFinset.card
-        = ((S.idealFamily).edgeFinset.image (fun A => A.erase u)).card :=
-    (Trace.card_image_erase_of_parallel (F := S.idealFamily) hPar).symm
-  -- NDS 差分式 hyperedgeのトータルサイズの等式がない。
-  have hdiff :=
-    AvgRare.Counting.nds_difference_by_trace
-      (F := S.idealFamily) (x := u) hCard
-
-  set uElem : S.Elem := ⟨u, hu⟩ with uElem_def
-  have hNontrivElem : SPO.FuncSetup.nontrivialClass S uElem := by
-    dsimp [SPO.FuncSetup.toElem!]
-    dsimp [SPO.FuncSetup.nontrivialClass]
-    use ⟨v, hv⟩
-    constructor
-    · exact Subtype.coe_ne_coe.mp hne
-    · exact hsim
-
-  have hMax : SPO.FuncSetup.maximal S uElem := by
-    exact maximal_of_parallel_nontrivial S hu hv hPar hne.symm
-
-  have hRareNat : (S.idealFamily).Rare u := by
-    -- rare_of_maximal は `S.Elem` を引数に取るので uElem を渡す
-    -- 結論は `Rare (idealFamily S) uElem.1` になるが、`uElem.1 = u` なので
-    -- それで書き換えておしまい
-    have hR := rare_of_maximal (S := S) (u := uElem) hMax
-    -- `uElem.1 = u` は構成から明らか（`uElem : ⟨u, hu⟩`）
-    change (S.idealFamily).Rare u
-    -- `rfl` で `uElem.1` を `u` に置換
-    simpa [uElem_def]
-
-    --rare_of_maximal (S := S) (u := uElem) hMax
-  -- 2 * deg(u) ≤ |E|（Nat）を Int に持ち上げて a - b ≤ 0 を作る
-  have hRareInt :
-      (2 : Int) * ((S.idealFamily).degree u : Int)
-        ≤ (S.idealFamily).numHyperedges := by
-    have hNat : 2 * (S.idealFamily).degree u ≤ (S.idealFamily).numHyperedges := hRareNat
-    have hCast :
-        ((2 * (S.idealFamily).degree u : Nat) : Int)
-          ≤ (S.idealFamily).numHyperedges := by
-      exact_mod_cast hNat
-    calc
-      (2 : Int) * ((S.idealFamily).degree u : Int)
-          = ((2 * (S.idealFamily).degree u : Nat) : Int) := by
-            simp [Nat.cast_mul, Nat.cast_ofNat]
-      _ ≤ (S.idealFamily).numHyperedges := hCast
-    -- rare から (2*deg - |E|) ≤ 0 を “直に” 作る（omega 不要）
-  have hExtraLe :
-      ((2 : Int) * ((S.idealFamily).degree u : Int)
-        - (S.idealFamily).numHyperedges) ≤ 0 := by
-    simp_all only [ne_eq, SPO.FuncSetup.maximal_iff, Subtype.forall]
-    obtain ⟨val, property⟩ := uElem
-    omega
-
-  -- “余分” ≤ 0 を L に足して NDS ≤ L
-  have hNDS_le_L :
-      (S.idealFamily).NDS
-        ≤ (2 * (∑ A ∈ (S.idealFamily).edgeFinset, (A.erase u).card : Int)
-            - ((S.idealFamily).numHyperedges : Int) * ((S.idealFamily).ground.card : Int)) := by
-    -- L を短名に
-    set L :
-      Int := 2 * (∑ A ∈ (S.idealFamily).edgeFinset, (A.erase u).card : Int)
-              - ((S.idealFamily).numHyperedges : Int) * ((S.idealFamily).ground.card : Int) with hLdef
-    -- ここも simpa を避けて rw → exact
-    have htmp := hdiff
-    -- htmp : NDS = (2*Σ|A\{u}| - |E||V|) + (2deg - |E|)
-    -- 右辺の最初の括弧を L に置換
-    -- (等式の右側だけを書き換えるため、等式に対しての書換を使います)
-    have : (S.idealFamily).NDS
-        = L + ((2 : Int) * ((S.idealFamily).degree u : Int)
-                 - (S.idealFamily).numHyperedges) := by
-      -- htmp を L の定義で置換
-      simpa [hLdef] using htmp
-    -- 以上の等式と hExtraLe から NDS ≤ L
-    calc
-      (S.idealFamily).NDS
-          = L + ((2 : Int) * ((S.idealFamily).degree u : Int)
-                   - (S.idealFamily).numHyperedges) := this
-      _ ≤ L + 0 := add_le_add_left hExtraLe L
-      _ = L := by simp
-
-  /- ここから L ≤ NDS(traceAt)。
-     核心は ground の単調性：|V'| = |V.erase u| ≤ |V| と |E| ≥ 0。 -/
-
-  -- ground の大きさは必ず減らない（Int 版）
-  have hGround_le :
-      (((S.idealFamily).ground.erase u).card : Int)
-        ≤ ((S.idealFamily).ground.card : Int) := by
-    simp_all only [ne_eq, SPO.FuncSetup.maximal_iff, Subtype.forall,
-    add_le_iff_nonpos_right, Int.ofNat_le, uElem]
-    obtain ⟨val, property⟩ := uElem
-    rw [Finset.card_erase_of_mem]
-    · simp_all only [Nat.sub_le]
-    · exact hu
-
-  -- |E| は Int で非負
-  have hE_nonneg : (0 : Int) ≤ ((S.idealFamily).numHyperedges : Int) := by
-    exact_mod_cast (Nat.zero_le (S.idealFamily.numHyperedges))
-
-  -- これで  -|E||V| ≤ -|E||V'|  が出る
-  have hNegMul :
-      - ((S.idealFamily).numHyperedges : Int) * ((S.idealFamily).ground.card : Int)
-        ≤ - ((S.idealFamily).numHyperedges : Int) * (((S.idealFamily).ground.erase u).card : Int) := by
-    -- まず |E||V'| ≤ |E||V|
-    simp_all only [ne_eq, SPO.FuncSetup.maximal_iff, Subtype.forall,
-      add_le_iff_nonpos_right, Int.ofNat_le, Int.ofNat_zero_le, neg_mul, Int.neg_le_neg_iff, uElem]
-    obtain ⟨val, property⟩ := uElem
-    norm_cast
-    gcongr
-
-  -- さらに 2*Σ|A\{u}| を両辺に足して、L ≤ 2*Σ|A\{u}| - |E||V'|
-  --もともとの和とtraceの大きさの和を比べている部分。
-  have hL_le_basic :
-      (2 * (∑ A ∈ (S.idealFamily).edgeFinset, (A.erase u).card : Int)
-        - ((S.idealFamily).numHyperedges : Int) * ((S.idealFamily).ground.card : Int))
-      ≤
-      (2 * (∑ A ∈ (S.idealFamily).edgeFinset, (A.erase u).card : Int)
-        - ((S.idealFamily).numHyperedges : Int) * (((S.idealFamily).ground.erase u).card : Int)) := by
-    simp_all only [ne_eq, SPO.FuncSetup.maximal_iff, Subtype.forall,
-      add_le_iff_nonpos_right, Int.ofNat_le, Int.ofNat_zero_le, neg_mul, Int.neg_le_neg_iff,
-      Int.sub_le_sub_left_iff, uElem]
-  -- NDS(traceAt) の書き換え（既に用意されている rewrite 補題）
-  have hTraceRew :
-      (Trace.traceAt u (S.idealFamily)).NDS
-        =
-        2 * (∑ A ∈ (S.idealFamily).edgeFinset, (A.erase u).card : Int)
-          - ((S.idealFamily).numHyperedges : Int) * (((S.idealFamily).ground.erase u).card : Int) := by
-    exact NDS_traceAt_rewrite_parallel (S.idealFamily) u v hPar hu
-
-  -- 以上より L ≤ NDS(traceAt)
-  have hL_le_trace :
-      (2 * (∑ A ∈ (S.idealFamily).edgeFinset, (A.erase u).card : Int)
-        - ((S.idealFamily).numHyperedges : Int) * ((S.idealFamily).ground.card : Int))
-      ≤ (Trace.traceAt u (S.idealFamily)).NDS :=
-    hL_le_basic.trans (le_of_eq (hTraceRew).symm)
-
-  -- まとめ： NDS ≤ L ≤ NDS(traceAt)
-  exact le_trans hNDS_le_L hL_le_trace
 
 end PaperSync
 end AvgRare
-
-/-
---traceしてもnumberHyperedgeが等しいことやtotalsizeの関係を直接使わずに証明する方向なので、論文の方向性と違うかも。
-使ってないようなのでコメントアウト
-lemma NDS_traceAt_rewrite_mem {α : Type*} [DecidableEq α]
-  (F : SetFamily α) (u : α) :
-  (traceAt u F).NDS =
-    2 * ∑ A ∈ F.edgeFinset, (A.erase u).card
-      - F.numHyperedges * (F.ground.erase u).card := by
-  unfold SetFamily.NDS
-  simp only [traceAt, SetFamily.totalHyperedgeSize, SetFamily.numHyperedges]
-  -- edgeFinset 部分を image に書き換え
-  sorry
-
-  --rw [edgeFinset_traceAt]
-  -- sum over image を「元の和」に直す
-  --simp_rw [Finset.mem_image]
-  --rfl
--/
-
-/-
---使ってない。何を目指したものか不明。
-lemma idealFamily_traceErase_agrees
-    (S : SPO.FuncSetup α) (u : α) (hu : u ∈ S.ground) :
-    ∃ S' : SPO.FuncSetup α,
-      True ∧
-      -- 族の一致（必要なら ground の Equiv を通す）
-      True := by
-  -- 後で（`isOrderIdealOn_reindex` 相当を噛ませて）証明
-  exact ⟨S, True.intro, True.intro⟩
--/
-/-
-import Mathlib.Data.Finset.Basic
-import AvgRare.Basics.SetFamily
-import AvgRare.Basics.Trace.Common
-import AvgRare.SPO.FuncSetup
-import AvgRare.Basics.Ideals
-
-universe u
-
-namespace AvgRare
-namespace PaperSync
-
-open Classical
-open Basics SetFamily Trace
-open FuncSetup
-
-variable {α : Type u} [DecidableEq α]
-
-/-! ### 前提メモ
-`SetFamily α` は構造体版：
-  * `ground : Finset α`
-  * `sets : Finset α → Prop`
-  * `inc_ground : sets A → A ⊆ ground`
-`↘` は Common 側で `restrict : SetFamily α → Finset α → SetFamily α` として定義済みとする。
--/
-
-/-- サブタイプ化（`Elem S = {x // x ∈ S.V}`）。他所にあるなら import に切替可。 -/
-abbrev Elem (S : FuncSetup α) := {x : α // x ∈ S.V}
-
-/-- `proj : S.Elem → Quot S.ker`（SCC 商への射影） -/
-@[simp] def proj (S : FuncSetup α) (x : Elem S) : Quot S.ker :=
-  Quot.mk _ x
-
-/-- Finset 版の商像。Common の `imageQuot` をそのまま使う別名。 -/
-noncomputable def imQuot (S : FuncSetup α)
-    (A : Finset (Elem S)) : Finset (Quot S.ker) :=
-  AvgRare.Basics.Trace.imageQuot (S.ker) A
-
-
-/-- 商像の単調性：`A ⊆ B → imQuot A ⊆ imQuot B` -/
-lemma imQuot_mono (S : FuncSetup α)
-    {A B : Finset (Elem S)} (hAB : A ⊆ B) :
-    imQuot S A ⊆ imQuot S B := by
-  classical
-  -- Common 側の一般補題を流用
-  simpa [imQuot] using
-    (AvgRare.Basics.Trace.imageQuot_mono (E:=S.ker) (A:=A) (B:=B) hAB)
-
-/-- 集合族の SCC 商への像：各 `A ∈ 𝓕` を `imQuot S A` に写す。 -/
-noncomputable def mapFamilyToQuot (S : FuncSetup α)
-    (𝓕 : SetFamily (Elem S)) : SetFamily (Quot S.ker) :=
-{ ground := 𝓕.ground.image (fun a => proj S a)
-, sets  := fun B : Finset (Quot S.ker) =>
-    ∃ A : Finset (Elem S), 𝓕.sets A ∧ B ⊆ imQuot S A
-, decSets := by infer_instance
-, inc_ground := by
-    intro B hB
-    rcases hB with ⟨A, hA, hBsub⟩
-    -- `A ⊆ ground` を像に押す
-    have hAsub : A ⊆ 𝓕.ground := 𝓕.inc_ground hA
-    have hImg : imQuot S A ⊆ 𝓕.ground.image (fun a => proj S a) := by
-      intro q hq
-      rcases Finset.mem_image.mp (by
-        -- `imQuot S A = A.image (proj S)` と同値
-        change q ∈ (A.image (fun a => proj S a)) at hq
-        exact hq) with ⟨a, haA, rfl⟩
-      exact Finset.mem_image.mpr ⟨a, hAsub haA, rfl⟩
-    exact hBsub.trans hImg }
-
-@[simp] lemma imQuot_def (S : FuncSetup α) (A : Finset (Elem S)) :
-  imQuot S A = A.image (fun a => proj S a) := rfl
-
-@[simp] lemma mem_imQuot_iff (S : FuncSetup α) {A : Finset (Elem S)} {q : Quot S.ker} :
-  q ∈ imQuot S A ↔ ∃ a ∈ A, proj S a = q := by
-  classical
-  simp [imQuot_def, proj, Finset.mem_image]
-
--- 画像の単調性、`simp` で使いたいので `@[simp]` にもしておく（任意）
-@[simp] lemma imQuot_mono' (S : FuncSetup α)
-    {A B : Finset (Elem S)} (hAB : A ⊆ B) :
-    imQuot S A ⊆ imQuot S B :=
-  imQuot_mono (S:=S) hAB
-
-/-- `mapFamilyToQuot` の単調性（述語の含意として記述） -/
-lemma mapFamilyToQuot_mono (S : FuncSetup α)
-  {𝓕 𝓖 : SetFamily (Elem S)}
-  (hFG : ∀ {A : Finset (Elem S)}, 𝓕.sets A → 𝓖.sets A) :
-  ∀ {B : Finset (Quot S.ker)},
-    (mapFamilyToQuot S 𝓕).sets B → (mapFamilyToQuot S 𝓖).sets B := by
-  intro B hB
-  rcases hB with ⟨A, hA, hBsub⟩
-  exact ⟨A, hFG hA, hBsub⟩
-
-
-
-/-- idealFamily の像（商側の family）。 -/
-noncomputable def idealFamilyQuot (S : FuncSetup α) :
-    SetFamily (Quot S.ker) :=
-  mapFamilyToQuot S (idealFamily S)
-
-lemma trace_map_commute_subset (S : FuncSetup α)
-    (𝓕 : SetFamily (Elem S)) (U : Finset (Elem S)) :
-    ∀ {B : Finset (Quot S.ker)},
-      (mapFamilyToQuot S (𝓕 ↘ U)).sets B →
-      ∃ C : Finset (Quot S.ker),
-        (mapFamilyToQuot S 𝓕).sets C ∧ B ⊆ imQuot S U := by
-  classical
-  intro B hB
-  rcases hB with ⟨A', hA'rest, hBsub⟩
-  rcases hA'rest with ⟨C, hCmem, hA'subC, hA'subU⟩
-  refine ⟨imQuot S C, ?_, ?_⟩
-  · exact ⟨C, hCmem, by intro q hq; exact hq⟩
-  · exact fun q hq =>
-      (imQuot_mono (S:=S) hA'subU) (hBsub hq)
-
-/-- 橋渡し（包含版）。 -/
-lemma ideal_trace_bridge_subset_ideal (S : FuncSetup α)
-    (U : Finset (Elem S)) :
-    ∀ {B : Finset (Quot S.ker)},
-      (mapFamilyToQuot S ((idealFamily S) ↘ U)).sets B →
-      ∃ C : Finset (Quot S.ker), (idealFamilyQuot S).sets C ∧ B ⊆ imQuot S U := by
-  classical
-  intro B hB
-  rcases trace_map_commute_subset (S:=S) (𝓕:=(idealFamily S)) (U:=U) (B:=B) hB with ⟨C, hC, hsub⟩
-  exact ⟨C, hC, hsub⟩
-
-lemma ideal_trace_bridge_subset (S : FuncSetup α)
-    (U : Finset (Elem S)) :
-    ∀ {B : Finset (Quot S.ker)},
-      (mapFamilyToQuot S ((idealFamily S) ↘ U)).sets B →
-      ∃ C : Finset (Quot S.ker), (idealFamilyQuot S).sets C ∧ B ⊆ imQuot S U := by
-  classical
-  intro B hB
-  rcases trace_map_commute_subset (S:=S) (𝓕:=idealFamily S) (U:=U) (B:=B) hB with ⟨C, hC, hsub⟩
-  exact ⟨C, hC, hsub⟩
-
-/-- 安定性: U が f に関して閉じている -/
-def stable (S : FuncSetup α) (U : Finset (Elem S)) : Prop :=
-  ∀ x ∈ U, S.fV x ∈ U
-
-/-- Ideal 的性質（構造体版 SetFamily 用の簡易定義） -/
-def IsIdeal {β} [DecidableEq β] (F : SetFamily β) : Prop :=
-  ∀ ⦃A B⦄, F.sets B → A ⊆ B → F.sets A
-
-/-- U が S(Elem) に関して安定（例：f-前像で閉、など望ましい条件へ差し替え） -/
--- 主定理の証明には関係ない？
-def StableUnder (S : FuncSetup α) (U : Finset (Elem S)) : Prop :=
-  ∀ {x}, x ∈ U → S.fV x ∈ U
-
-/-- 逆向き：商側で `B ⊆ C` かつ `B ⊆ imQuot S U` が言え、かつ 𝓕 の元が
-`ker` に関して **飽和（saturated）** しているなら、`B ∈ mapFamilyToQuot S (𝓕 ↘ U)`。
-ここで飽和とは `x ~ y` かつ `x ∈ A` なら `y ∈ A` が成り立つこと。 -/
-lemma trace_map_commute_superset_of_ker_saturated (S : FuncSetup α)
-    (𝓕 : SetFamily (Elem S))
-    (U : Finset (Elem S))
-    (hSat : ∀ {A : Finset (Elem S)}, 𝓕.sets A →
-              ∀ {x y : Elem S}, S.ker.r x y → x ∈ A → y ∈ A) :
-    ∀ {B : Finset (Quot S.ker)},
-      (∃ C : Finset (Quot S.ker), (mapFamilyToQuot S 𝓕).sets C ∧ B ⊆ C ∧ B ⊆ imQuot S U) →
-      (mapFamilyToQuot S (𝓕 ↘ U)).sets B := by
-  classical
-  intro B h
-  rcases h with ⟨C, hCsets, hBC, hBU⟩
-  rcases hCsets with ⟨A, hAmem, hCsub⟩
-  -- 各 q ∈ B について U 内代表を選ぶ
-  have h1 : ∀ q, q ∈ B → ∃ x : Elem S, x ∈ U ∧ proj S x = q := by
-    intro q hq
-    exact (mem_imQuot_iff (S:=S)).1 (hBU hq)
-  choose rep hrepU hrepProj using h1
-  -- A' を B の各要素の代表の集合として作る
-  let A' : Finset (Elem S) := B.attach.image (fun q => rep q.1 q.2)
-  have hA'subU : A' ⊆ U := by
-    intro x hx
-    rcases Finset.mem_image.mp hx with ⟨q, hqB, rfl⟩
-    exact hrepU q.1 q.2
-  -- A' が A に含まれることを示す（飽和性を使う）
-  have hA'subA : A' ⊆ A := by
-    intro x hx
-    rcases Finset.mem_image.mp hx with ⟨q, hqB, rfl⟩
-    -- `q.1 ∈ B` かつ `B ⊆ C` より `q.1 ∈ C`
-    have hqC : q.1 ∈ C := hBC q.2
-    -- `C ⊆ imQuot S A` より、`q.1 ∈ imQuot S A`
-    have hq_imA : q.1 ∈ imQuot S A := hCsub hqC
-    -- ある y ∈ A で proj y = q.1
-    rcases (mem_imQuot_iff (S:=S)).1 hq_imA with ⟨y, hyA, hyProj⟩
-    -- 代表の等値から kernel 関係を得る
-    have hEq : Quot.mk (S.ker) (rep q.1 q.2) = Quot.mk (S.ker) y := by
-      have : proj S (rep q.1 q.2) = proj S y := by
-        have : proj S (rep q.1 q.2) = q.1 := hrepProj q.1 q.2
-        exact this.trans (by simp_all only [Subtype.forall, imQuot_def, proj, Finset.mem_attach, Finset.mem_image, true_and, exists_apply_eq_apply,
-    Subtype.exists, A'])
-      simpa [proj] using this
-    have hRel0 : S.ker.r (rep q.1 q.2) y := Quotient.eq''.mp hEq
-    -- 飽和性は向きを `y → rep` に使う
-    have hRel1 : S.ker.r y (rep q.1 q.2) := (S.ker.iseqv.symm) hRel0
-    exact hSat hAmem hRel1 hyA
-  -- B ⊆ imQuot S A'
-  have hBsubA' : B ⊆ imQuot S A' := by
-    intro q hq
-    -- `⟨q,hq⟩ : {q // q ∈ B}` は `B.attach` の元
-    have hqa : ⟨q, hq⟩ ∈ B.attach := by exact Finset.mem_attach _ _
-    have hx_mem : rep q hq ∈ A' := by
-      exact Finset.mem_image.mpr ⟨⟨q, hq⟩, hqa, rfl⟩
-    have hproj : proj S (rep q hq) = q := hrepProj q hq
-    exact (mem_imQuot_iff (S:=S)).2 ⟨_, hx_mem, hproj⟩
-  -- まとめ：`A' ⊆ A` かつ `A' ⊆ U`、そして `B ⊆ imQuot S A'`
-  exact ⟨A', ⟨A, hAmem, hA'subA, hA'subU⟩, hBsubA'⟩
-
-
-/-- `trace`（制限）と商への像の交換：包含版（restrict 風）。
-`B ∈ mapFamilyToQuot S (𝓕 ↘ U)` なら、ある `C ∈ mapFamilyToQuot S 𝓕` があり、
-`B ⊆ C` かつ `B ⊆ imQuot S U` が成り立つ。 -/
-lemma trace_map_commute_subset_restrict (S : FuncSetup α)
-    (𝓕 : SetFamily (Elem S)) (U : Finset (Elem S)) :
-    ∀ {B : Finset (Quot S.ker)},
-      (mapFamilyToQuot S (𝓕 ↘ U)).sets B →
-      ∃ C : Finset (Quot S.ker),
-        (mapFamilyToQuot S 𝓕).sets C ∧ B ⊆ C ∧ B ⊆ imQuot S U := by
-  classical
-  intro B hB
-  rcases hB with ⟨A', hA'rest, hBsub⟩
-  rcases hA'rest with ⟨C, hCmem, hA'subC, hA'subU⟩
-  refine ⟨imQuot S C, ?_, ?_, ?_⟩
-  · exact ⟨C, hCmem, by intro q hq; exact hq⟩
-  · exact fun q hq => (imQuot_mono (S:=S) hA'subC) (hBsub hq)
-  · exact fun q hq => (imQuot_mono (S:=S) hA'subU) (hBsub hq)
-
-@[simp] lemma idealFamily_sets_iff (S : FuncSetup α)
-  {A : Finset (Elem S)} :
-  (idealFamily S).sets A ↔ S.isOrderIdeal A := Iff.rfl
-
-/-- 等式版（核に関する飽和性から）。
-`I.carrier` の各元が kernel に関して飽和（=順序イデアル）であるとき、
-`trace` と商像は制限レベルで可換。 -/
-lemma ideal_trace_bridge_eq_of_ker_saturated
-  (S : FuncSetup α) (U : Finset (Elem S)) :
-  ∀ {B : Finset (Quot S.ker)},
-    (mapFamilyToQuot S ((idealFamily S) ↘ U)).sets B ↔
-    (∃ C : Finset (Quot S.ker), (idealFamilyQuot S).sets C ∧ B ⊆ C ∧ B ⊆ imQuot S U) := by
-  classical
-  intro B; constructor
-  · -- → 方向：制限→商像への包含をそのまま使う
-    intro h
-    rcases trace_map_commute_subset_restrict
-            (S:=S) (𝓕:=(idealFamily S)) (U:=U) (B:=B) h with
-      ⟨C, hC, hBC, hBU⟩
-    exact ⟨C, hC, hBC, hBU⟩
-  · -- ← 方向：kernel 飽和性を使って元へ戻す
-    intro h
-    -- idealFamily の各元は isOrderIdeal なので ker 飽和
-    have hSat :
-      ∀ {A : Finset (Elem S)}, (idealFamily S).sets A →
-        ∀ {x y : Elem S}, S.ker.r x y → x ∈ A → y ∈ A := by
-      intro A hA x y hxy hx
-      -- `ideal_saturated_under_ker` を適用
-      exact (FuncSetup.ideal_saturated_under_ker
-              (S:=S) (hA := (idealFamily_sets_iff (S:=S)).1 hA)) hxy hx
-    -- 逆向き補題で終了
-    exact trace_map_commute_superset_of_ker_saturated
-            (S:=S) (𝓕:=(idealFamily S)) (U:=U) (hSat:=hSat) (B:=B) h
-
-lemma ideal_trace_bridge_eq_of_ker_saturated_ideal (S : FuncSetup α)
-    (U : Finset (Elem S)) :
-    ∀ {B : Finset (Quot S.ker)},
-      (mapFamilyToQuot S ((idealFamily S) ↘ U)).sets B ↔
-      (∃ C : Finset (Quot S.ker), (idealFamilyQuot S).sets C ∧ B ⊆ C ∧ B ⊆ imQuot S U) := by
-  classical
-  intro B; constructor
-  · intro h
-    rcases trace_map_commute_subset_restrict (S:=S) (𝓕:=(idealFamily S)) (U:=U) (B:=B) h with
-      ⟨C, hC, hBC, hBU⟩
-    exact ⟨C, hC, hBC, hBU⟩
-  · intro h
-    -- idealFamily の各元は isOrderIdeal なので ker 飽和
-    have hSat : ∀ {A : Finset (Elem S)}, (idealFamily S).sets A →
-        ∀ {x y : Elem S}, S.ker.r x y → x ∈ A → y ∈ A := by
-      intro A hA x y hxy hx
-      exact (FuncSetup.ideal_saturated_under_ker (S:=S)
-              (hA := (idealFamily_sets_iff (S:=S)).1 hA)) hxy hx
-    exact trace_map_commute_superset_of_ker_saturated (S:=S)
-      (𝓕:=(idealFamily S)) (U:=U) (hSat:=hSat) (B:=B) h
-
-lemma ideal_trace_bridge_eq (S : FuncSetup α)
-    (U : Finset (Elem S)) :
-    (mapFamilyToQuot S ((idealFamily S) ↘ U)).sets =
-    (fun B : Finset (Quot S.ker) =>
-      ∃ C : Finset (Quot S.ker),
-        (idealFamilyQuot S).sets C ∧ B ⊆ C ∧ B ⊆ imQuot S U) := by
-  -- すでにこの等式の両向きを証明した補題があり，それは「述語の同値」です。
-  -- ここでは述語の等式にしたいので，点ごとの `propext` で仕上げます。
-  funext B
-  exact propext
-    (ideal_trace_bridge_eq_of_ker_saturated_ideal (S:=S) (U:=U) (B:=B))
-
-lemma idealFamily_sets_to_isOrderIdeal (S : FuncSetup α)
-  {A : Finset (Elem S)} (h : (idealFamily S).sets A) :
-  S.isOrderIdeal A := by simp_all only [idealFamily_sets_iff]
-
-lemma isOrderIdeal_to_idealFamily_sets (S : FuncSetup α)
-  {A : Finset (Elem S)} (h : S.isOrderIdeal A) :
-  (idealFamily S).sets A := by simp_all only [idealFamily_sets_iff]
-
-end PaperSync
-end AvgRare
--/

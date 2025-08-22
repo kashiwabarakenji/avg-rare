@@ -15,8 +15,8 @@ lean_lib AvgRare where
     -- Basics
     `AvgRare.Basics.SetFamily,         --集合族とIdealに関する基本
     `AvgRare.Basics.Trace.Common,      --Traceに関する基本
-    `AvgRare.Basics.Trace.TraceErase, --Traceの単調性
-    `AvgRare.Basics.Ideals,            --イデアルに関する基本
+    --`AvgRare.Basics.Trace.TraceErase, --Traceの単調性
+    `AvgRare.Basics.Ideals,            --イデアルに関する基本。廃止の可能性
 
     -- 2) SPO（functional preorder）
     `AvgRare.SPO.FuncSetup,           --前順序に関すること
@@ -27,7 +27,7 @@ lean_lib AvgRare where
     `AvgRare.Forests.DirectProduct,   --半順序のunion product
 
     -- 4) PaperSync（論文と同期する高レベル補題・主定理）
-    `AvgRare.PaperSync.IdealsTrace,   -- ← trace×FuncSetup の結合レイヤ
+    `AvgRare.PaperSync.IdealsTrace,   -- ← trace×FuncSetup の結合レイヤ。名前を変えるかも。PaperLemmaとか。
     `AvgRare.PaperSync.MainStatement  -- ← 主定理
   ]
   srcDir := "."

@@ -165,11 +165,14 @@ def simSetoid : Setoid S.Elem where
   r := S.sim
   iseqv := ⟨S.sim_refl, S.sim_symm, S.sim_trans⟩
 
+
+
 /-- 「同値類が非自明（別の点がある）」の実用形。 -/
 def nontrivialClass (x : S.Elem) : Prop :=
   ∃ y : S.Elem, y ≠ x ∧ S.sim x y
 
 /-- **復活版**：非自明同値類に属する `u` は自己固定点ではない（`f u ≠ u`）。 -/
+--2箇所で使っている。
 lemma f_ne_of_nontrivialClass {u : S.Elem}
     (h : S.nontrivialClass u) : S.f u ≠ u := by
   /- 方針：もし `S.f u = u` なら，`u` から到達できる点は `u` のみ。
@@ -203,7 +206,7 @@ private lemma ne_val_of_ne {x y : {a // a ∈ S.ground}} (h : x ≠ y) : x.1 ≠
 
 
 --このあたりからfunctionalのtraceはfunctionalであることを示す部分か？
-
+--今の所使ってない。ほぼ定義そのままなのでいらないかも。
 lemma exists_partner_on_ground
     {u : S.Elem} (h : S.nontrivialClass u) :
      ∃ (v : α) (hv : v ∈ S.ground), v ≠ u.1 ∧ S.sim u ⟨v, hv⟩ := by
@@ -384,10 +387,86 @@ noncomputable def liftFinset
      by
        intro u v h; cases u; cases v; cases h; rfl⟩
 
---FuncSetupに移動して良い。
 @[simp] lemma sets_iff_isOrderIdeal
     (S : SPO.FuncSetup α) {I : Finset α} :
     (S.idealFamily).sets I ↔ isOrderIdealOn (S.leOn) S.ground I := Iff.rfl
+
+/-- ground 上の要素型 `S.Elem` における `u` の同値類（Finset 版）。 -/
+noncomputable def simClassElem (S : SPO.FuncSetup α) (u : S.Elem) : Finset S.Elem :=
+  S.ground.attach.filter (fun v => S.sim v u)
+
+/-- `α` 側へ戻した同値類（`idealFamily : SetFamily α` が扱うのはこちら）。 -/
+noncomputable def simClass (S : SPO.FuncSetup α) (u : S.Elem) : Finset α :=
+  (S.simClassElem u).image (Subtype.val)
+
+/-- `v ∈ simClassElem u` の判定は「ちょうど `S.sim v u`」。 -/
+@[simp] lemma mem_simClassElem
+    (S : SPO.FuncSetup α) (u : S.Elem) (v : S.Elem) :
+    v ∈ S.simClassElem u ↔ S.sim v u := by
+  classical
+  unfold simClassElem
+  constructor
+  · intro hv
+    have hv' := Finset.mem_filter.mp hv
+    exact hv'.2
+  · intro hsim
+    have hvattach : v ∈ S.ground.attach := by
+      -- `attach` の要素は（証明部分はどうであれ）常に自分自身が所属します
+      -- `simp` だけで出ます
+      simp_all only [Finset.mem_attach]
+    exact Finset.mem_filter.mpr ⟨hvattach, hsim⟩
+
+/-- `a ∈ simClass u` の判定。 -/
+lemma mem_simClass_iff
+    (S : SPO.FuncSetup α) (u : S.Elem) {a : α} :
+    a ∈ S.simClass u ↔ ∃ (ha : a ∈ S.ground), S.sim ⟨a, ha⟩ u := by
+  classical
+  unfold simClass
+  constructor
+  · intro haimg
+    rcases Finset.mem_image.mp haimg with ⟨v, hv, rfl⟩
+
+    have hsim : S.sim v u := (S.mem_simClassElem u v).1 hv
+    exact ⟨v.property, hsim⟩
+  · intro h
+    rcases h with ⟨ha, hsim⟩
+    let v : S.Elem := ⟨a, ha⟩
+    have hv : v ∈ S.simClassElem u := (S.mem_simClassElem u v).2 hsim
+    exact Finset.mem_image.mpr ⟨v, hv, rfl⟩
+
+/- ===================================================
+   1)  u を含む理想 I は同値類 U を丸ごと含む
+   =================================================== -/
+
+lemma simClass_subset_of_contains
+    (S : SPO.FuncSetup α) {u : S.Elem} {I : Finset α}
+    (hI : (S.idealFamily).sets I) (huI : u.1 ∈ I) :
+    S.simClass u ⊆ I := by
+  classical
+  -- isOrderIdealOn に展開
+  have hIdeal : isOrderIdealOn (S.leOn) S.ground I := by
+    -- `[simp] lemma sets_iff_isOrderIdeal` が `Iff.rfl` なので書換えだけで OK
+    -- `rw` で潰す（`simpa using` は使わない）
+    change isOrderIdealOn (S.leOn) S.ground I
+    exact (S.sets_iff_isOrderIdeal).1 hI
+  -- 以降：U の元 a を任意に取り、I に属することを示す
+  intro a haU
+  rcases (S.mem_simClass_iff u).1 haU with ⟨ha, hsim⟩
+  -- `a ≤ u` を取り出す
+  have h_le : S.le ⟨a, ha⟩ u := hsim.1
+  -- `leOn a u.1` に持ち上げ
+  have h_leOn : S.leOn a u.1 := by
+    -- `leOn_iff_subtype` を使う
+    have : S.leOn a u.1 ↔ S.le ⟨a, ha⟩ u :=
+      S.leOn_iff_subtype (a := a) (b := u.1) ha u.property
+    exact this.mpr h_le
+  -- isOrderIdealOn の下方閉により `a ∈ I`
+  have hI_sub : I ⊆ S.ground := hIdeal.1
+  have hxI : u.1 ∈ I := huI
+  have hxV : u.1 ∈ S.ground := hI_sub hxI
+  -- 下方閉：`x∈I, y∈V, leOn y x → y∈I`
+  have := hIdeal.2 (x := u.1) hxI (y := a) (by exact ha) h_leOn
+  exact this
 
 /- ground 上の比較を subtype に引き上げる便利関数。 -/
 --def toElem! (S : SPO.FuncSetup α) {x : α} (hx : x ∈ S.ground) : S.Elem := ⟨x, hx⟩
@@ -404,7 +483,6 @@ lemma parallel_of_sim
   sorry
 -/
 
---FuncSetupに移して良い。
 @[simp] lemma mem_coeFinset_val_iff
     (S : FuncSetup α) {I : Finset S.Elem} {a : α} :
     a ∈ S.coeFinset I ↔ ∃ z : S.Elem, z ∈ I ∧ (z : α) = a := by
@@ -415,7 +493,6 @@ lemma parallel_of_sim
   · rintro ⟨z, hzI, rfl⟩
     exact Finset.mem_image.mpr ⟨z, hzI, rfl⟩
 
---FuncSetupに移して良い。
 @[simp] lemma mem_coeFinset_iff
     (S : FuncSetup α) {I : Finset S.Elem} {a : α} (ha : a ∈ S.ground) :
     a ∈ S.coeFinset I ↔ ⟨a, ha⟩ ∈ I := by
@@ -430,7 +507,6 @@ lemma parallel_of_sim
     -- 逆向きは像の定義そのもの
     exact Finset.mem_image.mpr ⟨⟨a, ha⟩, hz, rfl⟩
 
---FuncSetupに移して良い。
 @[simp] lemma mem_liftFinset_iff
   (S : FuncSetup α) {J : Finset α} {hJ : J ⊆ S.ground} {z : S.Elem} :
   z ∈ S.liftFinset J hJ ↔ (z : α) ∈ J := by
@@ -449,7 +525,6 @@ lemma parallel_of_sim
     · exact Finset.mem_attach _ _
     · cases z; rfl
 
---FuncSetupに移して良い。
 /-- 目的の補題：`coeFinset ∘ liftFinset = id` （`J ⊆ ground` が前提） -/
 @[simp] lemma coeFinset_liftFinset
   (S : FuncSetup α) (J : Finset α) (hJ : J ⊆ S.ground) :
@@ -474,7 +549,6 @@ lemma parallel_of_sim
       (mem_liftFinset_iff S).2 haJ
     exact (mem_coeFinset_val_iff S).2 ⟨⟨a, hJ haJ⟩, hz, rfl⟩
 
-----FuncSetupに移して良い。
 lemma mem_of_le_of_mem_inIdeal
   (S : FuncSetup α) {I : Finset S.Elem}
   (hIdeal : isOrderIdealOn S.leOn S.ground (S.coeFinset I))
@@ -526,7 +600,6 @@ lemma mem_of_le_of_mem_inIdeal
   -- これで `x ∈ I`
   exact this ▸ hzI
 
---FuncSetupに移してもいい。
 lemma FuncSetup.leOn_iff (S : FuncSetup α)
   {a b : α} (hb : b ∈ S.ground) (ha : a ∈ S.ground) :
   S.leOn b a ↔ S.le ⟨b, hb⟩ ⟨a, ha⟩ := by

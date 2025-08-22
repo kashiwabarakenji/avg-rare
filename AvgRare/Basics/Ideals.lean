@@ -4,17 +4,17 @@ import AvgRare.Basics.SetFamily
 import LeanCopilot
 
 /-
-Ideals.lean — イデアル族と NDS（論文 §1 の土台）
+Ideals.lean — イデアル族
 
 このファイルでは：
 * 有限集合 V と二項関係 `le : α → α → Prop` に対する
   「V 上の順序イデアル」の述語 `isOrderIdealOn le V I`
 * その全体を `SetFamily` として束ねる `orderIdealFamily le V`
 
-FuncSetupを使わないものを集めているが、FuncSetup前提でなく、SetFamily前提のidealの議論そもそもあんまりないのかも。
+FuncSetupを使わないものでIdealが関係して、traceが関係しないものを集めているが、
+FuncSetup前提でなく、SetFamily前提のidealの議論そもそもあんまりないのかも。
 結果的にほとんど使われない可能性あり。
-コメントアウトされているほうに--パラレルであることと、preorderで同値なことが、等しい。など、
-FuncSetupを使ったものがあるので、将来的に復活するかも。
+commonのNDSを移動してきてもいいが、あっちもそれほど行数はない。500行以下。それにTrace関係なのであっちのほうがいいかも。
 
 注意：
 - ここでは `le` に可判定性や型クラス（`Preorder` 等）は**要求しません**。
@@ -83,10 +83,9 @@ variable (le : α → α → Prop) (V : Finset α)
 
 end Ideals
 /-
-以下，後続の Trace/Forest 側で頻繁に用いる“計数系の等式”の
-**言明だけ**を置いておきます（証明は後で埋める）。
+以下，後続の Trace/Forest 側で頻繁に用いる“計数系の等式”が置いてあったが、別のところで証明。
 -/
-
+/-
 namespace Counting
 
 variable (F : SetFamily α)
@@ -118,6 +117,7 @@ lemma nds_difference_by_trace
   sorry
 
 end Counting
+-/
 end AvgRare
 
 /-
