@@ -479,7 +479,8 @@ lemma ideal_diff_simClass_is_ideal
     (S : SPO.FuncSetup α)
     {u : S.Elem} {I : Finset α}
     (hmax : S.maximal u)
-    (hI : (S.idealFamily).sets I) (huI : u.1 ∈ I) :
+    (hI : (S.idealFamily).sets I) --(huI : u.1 ∈ I)
+    :
     (S.idealFamily).sets (I \ S.simClass u) ∧ u.1 ∉ (I \ S.simClass u) := by
   classical
   -- isOrderIdealOn に展開
@@ -561,10 +562,10 @@ noncomputable def Phi
     (S : SPO.FuncSetup α) (u : S.Elem) (hmax : S.maximal u) :
     {I // I ∈ (S.idealFamily).edgeFinset ∧ u.1 ∈ I} →
     {J // J ∈ (S.idealFamily).edgeFinset ∧ u.1 ∉ J} :=
-  fun ⟨I, hIedge, huI⟩ =>
+  fun ⟨I, hIedge, _⟩ =>
     let hI_sets : (S.idealFamily).sets I :=
       (SetFamily.mem_edgeFinset_iff_sets (F := S.idealFamily) (A := I)).1 hIedge
-    let h := ideal_diff_simClass_is_ideal (S := S) (u := u) hmax hI_sets huI
+    let h := ideal_diff_simClass_is_ideal (S := S) (u := u) hmax hI_sets
     let hJedge : (I \ S.simClass u) ∈ (S.idealFamily).edgeFinset :=
       (SetFamily.mem_edgeFinset_iff_sets (F := S.idealFamily) (A := I \ S.simClass u)).2 h.1
     ⟨ I \ S.simClass u, hJedge, h.2 ⟩
@@ -859,16 +860,7 @@ lemma rare_of_maximal
 /- 論文 Lemma 3.6(1) の言明：-/
 lemma NDS_le_trace_of_nontrivialClass
   (S : SPO.FuncSetup α) {u : S.Elem}
-  (hx : S.nontrivialClass u)
-  (hNDSDef :
-    (S.idealFamily).NDS
-      = 2 * (∑ A ∈ (S.idealFamily).edgeFinset, (A.card : Int))
-        - ((S.idealFamily).numHyperedges : Int) * ((S.idealFamily).ground.card : Int))
-  (hNDSDefTrace :
-    (traceAt u.1 (S.idealFamily)).NDS
-      = 2 * (∑ B ∈ (traceAt u.1 (S.idealFamily)).edgeFinset, (B.card : Int))
-        - ((traceAt u.1 (S.idealFamily)).numHyperedges : Int)
-          * ((traceAt u.1 (S.idealFamily)).ground.card : Int)) :
+  (hx : S.nontrivialClass u) :
   (S.idealFamily).NDS ≤ (traceAt u.1 (S.idealFamily)).NDS := by
   classical
   -- 1) パラレルパートナーを α レベルで取得
@@ -883,7 +875,7 @@ lemma NDS_le_trace_of_nontrivialClass
     NDS_eq_of_parallel
       (F := S.idealFamily) (u := u.1) (v := v)
       (huv := hpar) (hne := hne.symm) (hu := u.property)
-      (hNDSDef := hNDSDef) (hNDSDefTrace := hNDSDefTrace)
+
   -- 3) nontrivial ⇒ maximal ⇒ Rare
   have hmax : S.maximal u := maximal_of_nontrivialClass S (x := u) hx
   have hRare : (S.idealFamily).Rare u.1 := rare_of_maximal (S := S) (u := u) hmax
