@@ -21,6 +21,7 @@ lean_lib AvgRare where
     -- 2) SPO（functional preorder）
     `AvgRare.SPO.FuncSetup,           --前順序に関すること
     `AvgRare.SPO.Forest,              -- 半順序に関すること
+    `AvgRare.SPO.TraceFunctional,     -- FunctionalのTraceがFunctional
 
     -- 3) Forests（アルゴリズム／帰納用の補題群）
     `AvgRare.Forests.Induction,       --半順序と帰納法

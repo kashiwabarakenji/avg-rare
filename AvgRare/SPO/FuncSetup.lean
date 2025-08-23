@@ -224,39 +224,9 @@ lemma exists_partner_on_ground
   · change S.sim u y
     exact hy_sim
 
-/-- `S.ground.erase u` 上の像を作るための“付け替え写像”（本体）。
-    `x` はすでに `S.ground.erase u` 上の点（部分型）として与えられる。 -/
-def eraseOneMap
-    (u v : {a // a ∈ S.ground}) (hvne : v ≠ u) :
-    {x // x ∈ S.ground.erase u.1} → {y // y ∈ S.ground.erase u.1} :=
-  fun x => by
-    classical
-    -- x : {x // x ∈ S.ground.erase u} から ground への包含をほどく
-    have hx_in_ground : x.1 ∈ S.ground := (Finset.mem_erase.mp x.2).2
-    -- 元の写像で 1 歩進める
-    let y : {a // a ∈ S.ground} := S.f ⟨x.1, hx_in_ground⟩
-    -- 場合分け：y = u なら v に付け替え，そうでなければ y のまま
-    by_cases hyu : y = u
-    · -- 出力は v。v が `ground.erase u` に入ることを示す。
-      have hv_val_ne : v.1 ≠ u.1 := by
-        intro hval
-        apply hvne
-        apply Subtype.ext
-        exact hval
-      have hv_in_erase : v.1 ∈ S.ground.erase u.1 := by
-        -- mem_erase ↔ (≠ ∧ ∈)
-        exact Finset.mem_erase.mpr ⟨hv_val_ne, v.2⟩
-      exact ⟨v.1, hv_in_erase⟩
-    · -- 出力は y。y が `ground.erase u` に入ることを示す。
-      have hy_val_ne : y.1 ≠ u.1 := by
-        intro hval
-        apply hyu
-        apply Subtype.ext
-        exact hval
-      have hy_in_erase : y.1 ∈ S.ground.erase u.1 := by
-        exact Finset.mem_erase.mpr ⟨hy_val_ne, y.2⟩
-      exact ⟨y.1, hy_in_erase⟩
 
+
+/-TraceFunctionalで行うことにした。
 /-- ground を `ground.erase u` に差し替え，`f` を上の付け替え写像に。 -/
 def eraseOne (u v : {a // a ∈ S.ground}) (hvne : v ≠ u) : FuncSetup α :=
 { ground := S.ground.erase u.1
@@ -266,6 +236,7 @@ def eraseOneUsingSucc (u : S.Elem)
     (hNontriv : S.nontrivialClass u) : FuncSetup α :=
   FuncSetup.eraseOne S u (S.f u)
     (FuncSetup.f_ne_of_nontrivialClass (S := S) hNontriv)
+-/
 
 -- 便利記法：S の台集合上の要素
 --abbrev Elem := S.Elem
@@ -600,7 +571,7 @@ lemma mem_of_le_of_mem_inIdeal
   -- これで `x ∈ I`
   exact this ▸ hzI
 
-lemma FuncSetup.leOn_iff (S : FuncSetup α)
+lemma leOn_iff (S : FuncSetup α)
   {a b : α} (hb : b ∈ S.ground) (ha : a ∈ S.ground) :
   S.leOn b a ↔ S.le ⟨b, hb⟩ ⟨a, ha⟩ := by
   -- ここは S の定義に合わせて既存の補題名を使うか、`rfl` 展開で書いてください。

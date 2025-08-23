@@ -81,6 +81,8 @@ variable (le : α → α → Prop) (V : Finset α)
   simp [sets_iff_isOrderIdeal]
 
 
+
+
 end Ideals
 /-
 以下，後続の Trace/Forest 側で頻繁に用いる“計数系の等式”が置いてあったが、別のところで証明。

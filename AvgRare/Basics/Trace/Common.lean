@@ -61,6 +61,404 @@ def eraseMap (F : SetFamily α) (u : α) :
 @[simp] lemma eraseMap_apply (F : SetFamily α) (u : α) (A : {A // F.sets A}) :
     eraseMap F u A = (A.val).erase u := rfl
 
+
+--traceした時のhyperedgeがどうなるかの補題。数が減らないこともこれでわかるのかも。
+--uにパラレルな要素を仮定してない。両辺一致はするが、両方とも数が減っているかもしれないということか。
+--使っていたところをコメントアウトしたので現状使ってない。
+--traceしても同値類の大きさが変わらないというところに使うので、Common.leanに移動。
+lemma edgeFinset_traceAt_eq_image_erase (F : SetFamily α) (u : α) :
+  (traceAt u F).edgeFinset = F.edgeFinset.image (λ A => A.erase u) := by
+  ext B
+  constructor
+  · -- (→) traceAt の edgeFinset にある集合は元エッジの erase
+    intro hB
+    simp only [SetFamily.edgeFinset, traceAt, Finset.mem_filter,
+               Finset.mem_powerset] at hB
+    obtain ⟨hBsub, hSets⟩ := hB
+    match decide (∃ A, F.sets A ∧ B = A.erase u) with
+    | true =>
+      simp only [decide_eq_true_eq] at hSets
+      rcases hSets with ⟨A, hAsets, rfl⟩
+      rw [Finset.mem_image]
+      refine ⟨A, ?_, rfl⟩
+      simp only [SetFamily.edgeFinset, Finset.mem_filter,
+                 Finset.mem_powerset]
+      constructor
+      · exact F.inc_ground hAsets
+      · exact decide_eq_true hAsets
+    | false =>
+      simp only [decide_eq_true_eq] at hSets
+      rw [Finset.mem_image]
+      obtain ⟨A, hAin, rfl⟩ := hSets
+      use A
+      constructor
+      · exact (SetFamily.mem_edgeFinset_iff_sets F).mpr hAin
+      · exact rfl
+
+  · -- (←) 元エッジ A の erase は traceAt のエッジ
+    intro hB
+    simp only [Finset.mem_image] at hB
+    rcases hB with ⟨A, hAin, rfl⟩
+    simp only [SetFamily.edgeFinset, traceAt,
+      Finset.mem_filter, Finset.mem_powerset]
+    simp only [SetFamily.edgeFinset, Finset.mem_filter,
+      Finset.mem_powerset] at hAin
+    obtain ⟨hAsub, hAsets⟩ := hAin
+    constructor
+    · -- erase ⊆ ground.erase
+      intro x hx
+      rw [Finset.mem_erase] at hx
+      rw [Finset.mem_erase]
+      constructor
+      · exact hx.1
+      · exact hAsub hx.2
+    · -- sets 部分は match で強制する
+      simp_all only [decide_eq_true_eq]
+      exact ⟨A, hAsets, rfl⟩
+
+/-- `F.sets A` は `A ∈ F.edgeFinset` と同値。
+    `edgeFinset = ground.powerset.filter (decide ∘ F.sets)` なので自動化できます。 -/
+lemma sets_iff_mem_edge (F : SetFamily α) {A : Finset α} :
+  F.sets A ↔ A ∈ F.edgeFinset := by
+  -- A が ground に含まれることと `filter (decide ∘ F.sets)` の会員判定を往復
+  have : A ⊆ F.ground ↔ A ∈ F.ground.powerset := by
+    exact Iff.symm Finset.mem_powerset
+  constructor
+  · intro hA
+    have hAsub : A ⊆ F.ground := F.inc_ground hA
+    -- powerset ∧ filter
+    simp [edgeFinset, this.mp hAsub, hA]
+
+  · intro hA
+    -- filter に入っているなら `F.sets A` が真
+    have : A ∈ F.ground.powerset ∧ decide (F.sets A) := by
+      simpa [edgeFinset] using (Finset.mem_filter.mp hA)
+    have hsets : F.sets A := by
+     simp_all only [iff_true, mem_edgeFinset, true_and, Finset.mem_powerset, decide_true, and_self]
+
+    exact hsets
+
+/-- （計算しやすい）parallel の定義：`edgeFinset` を `u∈` で filter した Finset が一致。 -/
+def Parallel_edge (F : SetFamily α) (u v : α) : Prop :=
+  F.edgeFinset.filter (fun A => u ∈ A) =
+  F.edgeFinset.filter (fun A => v ∈ A)
+
+/-- あなたの `Parallel`（集合内包での等式）と `Parallel_edge` は同値。 -/
+lemma Parallel_edge_iff_Parallel (F : SetFamily α) (u v : α) :
+  Parallel_edge F u v ↔ Parallel F u v := by
+  -- どちらも「`F.sets A` かつ `u∈A`（/`v∈A`）」という同じ性質を
+  -- Finset の filter か Set の内包かの違いで述べているだけ。
+  -- `sets_iff_mem_edge` で橋渡しして、`Finset.ext`/`Set.ext` で決着します。
+  constructor
+  · intro h
+    -- filter の等式→ 内包集合の等式
+    ext A
+    constructor <;> intro hA <;>
+    · rcases hA with ⟨hsets, hx⟩
+
+      --have : A ∈ F.edgeFinset := (sets_iff_mem_edge F).mp hsets
+      -- filter の等式で左右へ移すだけ
+      all_goals
+        have := congrArg (fun (s : Finset (Finset α)) => A ∈ s) h
+        rw [@Set.mem_setOf_eq]
+        constructor
+        · exact hsets
+        · simp at this
+          have incg:A ⊆ F.ground := F.inc_ground hsets
+          specialize this incg hsets
+          simp_all only [iff_true]
+
+  · intro h
+    -- 内包集合の等式→ filter の等式
+    -- `Finset.ext` で会員判定を `sets_iff_mem_edge` に落として一致
+    apply Finset.ext
+    intro A
+    have h' := congrArg (fun (S : Set (Finset α)) => A ∈ S) h
+    -- 2つの filter の会員判定と内包の会員判定を対応付ける
+    constructor
+    · intro hu
+      rw [@Finset.mem_filter]
+      rw [@Finset.mem_filter] at hu
+      simp at h'
+      simp_all only [Parallel, mem_edgeFinset, true_iff, forall_const, and_self]
+    · intro hv
+      rw [@Finset.mem_filter]
+      rw [@Finset.mem_filter] at hv
+      simp at h'
+      simp_all only [Parallel, mem_edgeFinset, forall_const, and_self]
+
+lemma trace_filter_eq_image_filter_of_ne
+  (F : SetFamily α) (u w : α) (hwu : w ≠ u) :
+  (traceAt u F).edgeFinset.filter (fun B => w ∈ B)
+  =
+  (F.edgeFinset.filter (fun A => w ∈ A)).image (fun A => A.erase u) := by
+  classical
+  -- まず全体が image という事実を filter にかける
+  have H := edgeFinset_traceAt_eq_image_erase (F := F) (u := u)
+  -- `w ≠ u` なら `w ∈ A.erase u ↔ w ∈ A`
+  -- これで「filter 後の像 = 像後の filter」が素直に言えます（injective は不要）。
+  apply Finset.ext
+  intro B
+  constructor
+  · intro hB
+    rcases Finset.mem_filter.mp hB with ⟨hBmem, hBw⟩
+    have : B ∈ (F.edgeFinset.image fun A => A.erase u) := by simpa [H] using hBmem
+    rcases Finset.mem_image.mp this with ⟨A, hA, rfl⟩
+    -- `w ∈ A.erase u` から `w ∈ A`（w ≠ u を使用）
+    have : w ∈ A := by
+      -- Finset.mem_erase: w ∈ A.erase u ↔ (w ≠ u ∧ w ∈ A)
+      simpa [Finset.mem_erase, hwu] using hBw
+    exact Finset.mem_image.mpr ⟨A, (Finset.mem_filter.mpr ⟨hA, this⟩), rfl⟩
+  · intro hB
+    rcases Finset.mem_image.mp hB with ⟨A, hA, rfl⟩
+    rcases Finset.mem_filter.mp hA with ⟨hAedge, hAw⟩
+    -- 右から左へ：A.erase u がトレース側の edge で、かつ w を含む
+    refine Finset.mem_filter.mpr ?_
+    constructor
+    · simpa [H]
+      using (Finset.mem_image.mpr ⟨A, hAedge, rfl⟩ :
+        A.erase u ∈ (F.edgeFinset.image fun A => A.erase u))
+    · -- `w ∈ A.erase u`（w ≠ u を使用）
+      -- again: mem_erase ↔ (w ≠ u ∧ w ∈ A)
+      simpa [Finset.mem_erase, hwu] using hAw
+
+-- 補助：S.filter p = S.filter q ↔ ∀ x∈S, p x ↔ q x
+lemma filter_eq_iff_on {β} [DecidableEq β]
+  {S : Finset β} {p q : β → Prop}
+  [DecidablePred p] [DecidablePred q] :
+  S.filter p = S.filter q ↔ (∀ x ∈ S, p x ↔ q x) := by
+  constructor
+  · intro h x hx
+    -- 等式の両辺で x の帰属が同値
+    have := congrArg (fun (T : Finset β) => x ∈ T) h
+    -- x∈S を仮定して filter の展開
+    simpa [Finset.mem_filter, hx] using this
+  · intro h
+    ext x; constructor <;> intro hx
+    · rcases (Finset.mem_filter).1 hx with ⟨hxS, hpx⟩
+      have : q x := (h x hxS).1 hpx
+      exact (Finset.mem_filter).2 ⟨hxS, this⟩
+    · rcases (Finset.mem_filter).1 hx with ⟨hxS, hqx⟩
+      have : p x := (h x hxS).2 hqx
+      exact (Finset.mem_filter).2 ⟨hxS, this⟩
+
+--パラレルパートナーの存在は必要なかった。
+lemma parallel_off_u_preserved_by_trace
+  {α : Type*}
+  [DecidableEq α]
+  (F : SetFamily α) (u w z : α)
+  (hw : w ≠ u) (hz : z ≠ u) :
+  Parallel_edge (traceAt u F) w z ↔ Parallel_edge F w z := by
+  -- 既知：エッジ集合は erase の像
+  have himg :
+      (traceAt u F).edgeFinset
+        = F.edgeFinset.image (fun A : Finset α => A.erase u) :=
+    edgeFinset_traceAt_eq_image_erase F u
+
+  -- （→）方向
+  constructor
+  · intro htr
+    -- trace 側のフィルタ等式を、像集合上の述語同値に言い換え
+    have h_on_image :
+      ∀ B ∈ (F.edgeFinset.image (fun A => A.erase u)),
+        (w ∈ B) ↔ (z ∈ B) := by
+      -- filter_eq_iff_on を使うために書き換え
+      have := (filter_eq_iff_on
+        (S := (traceAt u F).edgeFinset)
+        (p := fun B => w ∈ B) (q := fun B => z ∈ B)).1
+        (by simp [himg]
+            dsimp [Parallel_edge] at htr
+            simp [himg] at htr
+            exact htr
+        )
+
+      -- いまの this は (trace 側の) 外側集合＝像集合の上での同値
+      simpa [himg] using this
+    -- これを元集合側に引き戻す（画像の元は A.erase u）
+    -- A∈F.edgeFinset に対し、B := A.erase u と置けば B は像集合の元
+    have h_on_domain :
+      ∀ A ∈ F.edgeFinset, (w ∈ A) ↔ (z ∈ A) := by
+      intro A hA
+      have : (w ∈ A.erase u) ↔ (z ∈ A.erase u) := by
+        exact h_on_image (A.erase u)
+          (by exact Finset.mem_image.mpr ⟨A, hA, rfl⟩)
+      -- w,z ≠ u なので erase を通してもメンバーシップは不変
+      -- x ∈ A.erase u ↔ (x ≠ u ∧ x ∈ A)
+      have hw' : (w ∈ A.erase u) ↔ (w ∈ A) := by
+        simp [Finset.mem_erase, hw]  -- hw で簡約
+      have hz' : (z ∈ A.erase u) ↔ (z ∈ A) := by
+        simp [Finset.mem_erase, hz]
+      -- 置換して結論
+      simpa [hw', hz'] using this
+    -- ドメイン側の述語同値から filter の等式へ戻す
+    exact
+      (filter_eq_iff_on (S := F.edgeFinset)
+        (p := fun A => w ∈ A) (q := fun A => z ∈ A)).2 h_on_domain
+
+  -- （←）方向も同じ理屈を逆にたどる
+  · intro hdom
+    have h_on_domain :
+      ∀ A ∈ F.edgeFinset, (w ∈ A) ↔ (z ∈ A) :=
+      (filter_eq_iff_on
+        (S := F.edgeFinset)
+        (p := fun A => w ∈ A) (q := fun A => z ∈ A)).1 hdom
+    -- 画像側での同値（A.erase u を介して移すだけ）
+    have h_on_image :
+      ∀ B ∈ (F.edgeFinset.image (fun A => A.erase u)),
+        (w ∈ B) ↔ (z ∈ B) := by
+      intro B hB
+      rcases (Finset.mem_image).1 hB with ⟨A, hA, rfl⟩
+      have hw' : (w ∈ A.erase u) ↔ (w ∈ A) := by
+        simp [Finset.mem_erase, hw]
+      have hz' : (z ∈ A.erase u) ↔ (z ∈ A) := by
+        simp [Finset.mem_erase, hz]
+      simpa [hw', hz'] using (h_on_domain A hA)
+    -- 画像側の述語同値から trace 側の filter 等式へ
+    have : (traceAt u F).edgeFinset.filter (fun B => w ∈ B)
+           = (traceAt u F).edgeFinset.filter (fun B => z ∈ B) := by
+      -- いったん像集合に書き換え
+      have := (filter_eq_iff_on
+        (S := F.edgeFinset.image (fun A => A.erase u))
+        (p := fun B => w ∈ B) (q := fun B => z ∈ B)).2 h_on_image
+      simpa [himg] using this
+    exact this
+
+lemma parallel_off_u_preserved_by_trace2
+  [DecidableEq α] (F : SetFamily α) (u w z : α)
+  (hw : w ≠ u) (hz : z ≠ u) :
+  Parallel (traceAt u F) w z ↔ Parallel F w z := by
+  let pe := parallel_off_u_preserved_by_trace F u w z hw hz
+  rw [Parallel_edge_iff_Parallel ] at pe
+  rw [Parallel_edge_iff_Parallel ] at pe
+  exact pe
+
+/-
+--条件が弱いかも。uは大きさ2以上の同値類に含まれないといけない。
+--上で別の補題を証明できたので消す。
+lemma parallel_off_u_preserved_by_trace
+  (F : SetFamily α) (u w z : α) (hw : w ≠ u) (hz : z ≠ u) :
+  Parallel_edge (traceAt u F) w z ↔ Parallel_edge F w z := by
+  classical
+  -- どちら側も `trace_filter_eq_image_filter_of_ne` による像の等式に還元
+  have Hw :=
+    trace_filter_eq_image_filter_of_ne (F := F) (u := u) (w := w) hw
+  have Hz :=
+    trace_filter_eq_image_filter_of_ne (F := F) (u := u) (w := z) hz
+  -- すると、両辺が「同じ像（erase u）」になっているので、
+  -- 元のフィルタが等しいことと同値です（Finset.image の両辺へ congrArg）。
+  constructor <;> intro h
+  · -- → 方向
+    -- filter(trace,w) = filter(trace,z) を、両辺を上の補題で書き換え
+    -- → image(filter(F,w)) = image(filter(F,z)) → filter(F,w) = filter(F,z)
+    --   （`Finset.image` での等式から source が一致することは一般には要りませんが、
+    --    ここは両辺とも全く同じ `image (erase u)` への像なので `by cases Hw; cases Hz; simpa` で済みます）
+    -- 下は “同じものに書き換えてから等式の両辺を見比べる” だけにしています
+    -- （`simp [Parallel_edge]` でも通るはず）
+    have := by simpa [Parallel_edge] using h
+    -- 書き換え
+    simp [Parallel_edge, Hw, Hz]
+    ext A
+    --ここでAがuを含むかで場合分けしても良いかも。
+    rw [Finset.ext_iff] at this
+    specialize this A
+    simp at this
+    constructor
+    · intro hA
+      rw [@Finset.mem_filter] at hA
+      rw [@Finset.mem_filter]
+      simp at hA
+      have :A ⊆ F.ground.erase u := by exact?
+      constructor
+      · simp_all only [ne_eq, mem_edgeFinset, and_self]
+      ·
+
+      exact hA
+    · intro hA
+      rw [@Finset.mem_filter] at hA
+      rw [@Finset.mem_filter] at hA
+      simp at hA
+      exact hA
+  · -- ← 方向（同様）
+    have := by simpa [Parallel_edge] using h
+    simpa [Parallel_edge, Hw, Hz] using this
+
+-/
+/- excessの方向転換によりコメントアウト
+lemma Parallel_trace_iff_of_ne
+  {α : Type*} [DecidableEq α]
+  (F : SetFamily α) {u a b : α}
+  (ha : a ≠ u) (hb : b ≠ u) :
+  Parallel (traceAt u F) a b ↔ Parallel F a b := by
+  classical
+  -- 既存補題を使用
+  have himg := edgeFinset_traceAt_eq_image_erase F u
+  -- Parallel = sets での集合族一致
+  constructor
+  · intro h
+    ext A
+    constructor
+    · intro ⟨hAF, haA⟩
+      -- trace 側での条件に持ち込むため A.erase を利用
+      have : A.erase u ∈ (traceAt u F).edgeFinset := by
+        have : A ∈ F.edgeFinset := by
+          dsimp [SetFamily.edgeFinset]
+          rw [@Finset.mem_filter]
+          constructor
+          · rw [Finset.mem_powerset]
+            exact F.inc_ground hAF
+          · exact decide_eq_true hAF
+
+        let fm := Finset.mem_image_of_mem (fun B => B.erase u) this
+        simp_all only [ne_eq, Parallel, fm]
+      -- Parallel on trace で a↔b が保存
+      have := congrArg (fun S => A ∈ S) h
+      simp only [Set.mem_setOf_eq] at this
+      -- ここを整理して A 側に戻す
+      sorry
+    · intro ⟨hBF, hbB⟩
+      sorry
+  · intro h
+    -- 逆向きも同様
+    sorry
+
+noncomputable def ParallelClass (F : SetFamily α) (a : α) : Finset α :=
+  F.ground.filter (fun b => Parallel F a b)
+
+@[simp] lemma mem_ParallelClass
+  {α} [DecidableEq α] (F : SetFamily α) (a b : α) :
+  b ∈ ParallelClass F a ↔ b ∈ F.ground ∧ Parallel F a b := by
+  classical
+  -- filter の基本事実
+  simp [ParallelClass]
+
+lemma ParallelClass_trace_eq_erase
+  {α : Type*} [DecidableEq α]
+  (F : SetFamily α) {u a : α} (ha : a ≠ u) :
+  ParallelClass (traceAt u F) a = (ParallelClass F a).erase u := by
+  classical
+  ext b
+  constructor
+  · intro hb
+    rcases Finset.mem_filter.mp hb with ⟨hbG, hpar⟩
+    -- ground: traceAt の ground は erase
+    have hbIn : b ∈ F.ground.erase u := by simpa [traceAt] using hbG
+    rcases Finset.mem_erase.mp hbIn with ⟨hbne, hbG'⟩
+    -- 並行性を元の F へ
+    have hparF : Parallel F a b :=
+      (Parallel_trace_iff_of_ne F ha hbne).1 hpar
+    exact Finset.mem_erase.mpr ⟨hbne, Finset.mem_filter.mpr ⟨hbG', hparF⟩⟩
+  · intro hb
+    rcases Finset.mem_erase.mp hb with ⟨hbne, hbIn⟩
+    rcases Finset.mem_filter.mp hbIn with ⟨hbG, hparF⟩
+    -- trace 側の ground
+    have hbG' : b ∈ (traceAt u F).ground := by
+      simpa [traceAt] using Finset.mem_erase.mpr ⟨hbne, hbG⟩
+    -- 並行性を trace 側へ
+    have hparT : Parallel (traceAt u F) a b :=
+      (Parallel_trace_iff_of_ne F ha hbne).2 hparF
+    exact Finset.mem_filter.mpr ⟨hbG', hparT⟩
+-/
+
 -- 以下の部分は、idealsTraceと融合する必要があり。多分、全部コメントアウト
 /-
 --FuncSetupを使わない部分

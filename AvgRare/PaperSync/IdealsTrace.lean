@@ -4,6 +4,7 @@ import Mathlib.Algebra.Order.GroupWithZero.Unbundled.Defs
 import AvgRare.Basics.SetFamily
 import AvgRare.Basics.Ideals
 import AvgRare.SPO.FuncSetup
+import AvgRare.SPO.TraceFunctional
 import AvgRare.Basics.Trace.Common   -- Trace.traceAt / Trace.Parallel / Trace.eraseMap
 import LeanCopilot
 
@@ -41,6 +42,7 @@ noncomputable def Iy (S : FuncSetup α) (y : S.Elem) : Finset S.Elem :=
 -- 目標： hb : b ∈ S.ground, hleOn : S.leOn b a, haGround : a ∈ S.coeFinset Iy
 --       から b ∈ S.coeFinset Iy を出す
 --xとyに大小関係があれば、yを含むidealは、xも含む。重要補題。
+--基礎補題を集めたファイルを作って分離してもよい。
 lemma le_iff_forall_ideal_mem
   (S : FuncSetup α) (x y : S.Elem) :
   S.le x y ↔
@@ -133,8 +135,9 @@ lemma le_iff_forall_ideal_mem
     exact hxLe
 
 
-/-- 論文 Lemma 3.3（言明）：
+/-- 論文 Lemma 3.3：
 `u, v` が同じ同値類（S.sim）であることと，`idealFamily S` における parallel が同値。 -/
+--この関係はfunctionalでなくても成り立つはずであるがここではfunctionalなものに対して証明している。
 lemma parallel_iff_sim
   (S : FuncSetup α) (u v : S.Elem) :
   (S.idealFamily).Parallel u v ↔ FuncSetup.sim S u v := by
@@ -229,6 +232,7 @@ lemma parallel_iff_sim
 --極大性は使ってない。parallel_iff_simは使う立場。
 --nontrivialClassの仮定を使って書き換えられそう。
 --nds_monotone_under_traceで利用されている。
+--この言明には、functionalという仮定が必要。
 lemma maximal_of_parallel_nontrivial
     (S : SPO.FuncSetup α) {u v : α}
     (hu : u ∈ S.ground) (hv : v ∈ S.ground)
@@ -289,68 +293,9 @@ lemma maximal_of_parallel_nontrivial
   intro x hx
   exact hmax x hx
 ------------------------
-/- ================================
-   0) サブタイプの小手先
-   ================================ -/
 
--- toElem! の往復（既存なら @[simp] を付けると後の書き換えが楽）
-@[simp] lemma toElem!_coe (S : FuncSetup α) (x : S.Elem) :
-    S.toElem! x.property = x := by
-  cases x with
-  | mk x hx => rfl
 
--- S.Elem の不等号から underlying へ
-lemma coe_ne_of_ne {S : FuncSetup α} {x y : S.Elem} (h : x ≠ y) :
-    (x : α) ≠ (y : α) := by
-  intro hxy
-  apply h
-  apply Subtype.ext
-  exact hxy
 
-/- ==========================================
-   1) 反射推移閉包 (RTG) と iterate の橋渡し
-   ========================================== -/
-
--- 「k 回反復＝到達可能」の片向き（必要最小限）
-lemma rtg_of_iter (S : FuncSetup α) (x : S.Elem) (k : ℕ) :
-    Relation.ReflTransGen (stepRel S.f) x (S.iter k x) := by
-  -- 既存: IterateRTG の
-  --   reflTransGen_iff_exists_iterate (f : β → β)
-  -- を β := S.Elem, f := (fun z => S.iter 1 z) に相当する定義で使えるように
-  -- 定義が一致している前提で次の 1 行が通ります：
-  -- （もし名前や定義が少し違っていたら、手元の IterateRTG 節に合わせて置換してください）
-  have h : Relation.ReflTransGen (stepRel S.f) x (S.iter k x) :=
-    (reflTransGen_iff_exists_iterate (S.f)).2 ⟨k, rfl⟩
-  exact h
-
--- le ↔ ∃k.iter の既存補題を使って、le → RTG にするだけの最小版
---なぜか{α}が必要。ないとle_iff_exists_iter S x zでエラー。
-lemma rtg_of_le {α} (S : FuncSetup α) {x z : S.Elem} (hxz : S.le x z) :
-    Relation.ReflTransGen (stepRel S.f) x z := by
-  --#check le_iff_exists_iter S x z-- hxz
-  rcases (le_iff_exists_iter S x z).1 hxz with ⟨k, hk⟩
-  -- x ⟶* iter k x かつ iter k x = z
-  have hxiter : Relation.ReflTransGen (stepRel S.f) x (S.iter k x) :=
-    rtg_of_iter S x k
-  -- 置換で z へ
-  have := congrArg (fun t => Relation.ReflTransGen (stepRel S.f) x t) hk
-  -- 上の `congrArg` は命題の等式には直接使えないので、ここは書き直し。
-  -- `hk` による単純な書き換えで十分です：
-  -- （Mathlib の `simp [hk]` でも可ですが、明示の書換えにします）
-  cases hk
-  exact hxiter
-
--- 逆向き RTG → le は、今回のゴールでは「最後に le を回収」する時に使います。
-/-
-lemma le_of_rtg (S : FuncSetup α) {x z : S.Elem}
-    (h : Relation.ReflTransGen (stepRel S.f) x z) : S.le z x → False := by
-  -- この形では使いづらいので、下の補題を使うのが自然です。
-  -- 最小限に留めるため、この補題は用意せず、
-  -- 本命で `le_iff_exists_iter` を直接使って回収する方針にします。
-  admit
--- ↑ 本当に最小限にしたいので、この補題は削って構いません。
---  （以降の本命では使わずに進めます）
--/
 
 /- =====================================================
    2) sim ↔ Parallel（既存）を α レベルに渡すための型合わせ
@@ -386,7 +331,7 @@ lemma maximal_of_nontrivialClass
       (u := (x : α)) (v := (y : α))
       (hu := x.property) (hv := y.property)
       (hpar := hpar)
-      (hneq := coe_ne_of_ne (S := S) hneq.symm)
+      (hneq := Subtype.coe_ne_coe.mpr (id (Ne.symm hneq)))
   -- H :
   --   ∀ z : S.Elem,
   --     RTG (stepRel S.f) (S.toElem! x.property) z →
@@ -440,6 +385,9 @@ lemma maximal_of_nontrivialClass
 
   exact this
 
+------
+
+--NDSの証明で使っている。
 lemma exists_parallel_partner_from_nontrivial
     (S : SPO.FuncSetup α) {u : S.Elem}
     (hx : S.nontrivialClass u) :
@@ -455,6 +403,7 @@ lemma exists_parallel_partner_from_nontrivial
   · -- sim ⇒ parallel
     exact parallel_of_sim_coe (S := S) hsim
 
+--すぐ下で使っている。
 lemma two_deg_le_num_int_of_Rare
     (F : SetFamily α) (x : α) (hR : F.Rare x) :
     (2 * (F.degree x : Int) ≤ (F.numHyperedges : Int)) := by
@@ -465,6 +414,7 @@ lemma two_deg_le_num_int_of_Rare
   -- 表記を (· : Int) に戻す
   exact this
 
+--NDSの証明で使っている。
 lemma diff_term_nonpos_of_Rare
     (F : SetFamily α) (x : α) (hR : F.Rare x) :
     2 * (F.degree x : Int) - (F.numHyperedges : Int) ≤ 0 := by
@@ -474,10 +424,9 @@ lemma diff_term_nonpos_of_Rare
   -- `sub_nonpos.mpr` は「a ≤ b」を「a - b ≤ 0」にする
   exact Int.sub_nonpos_of_le hx
 
-/- -------------------------------------------------
-   C) 等式＋非正 ⇒ 片側の ≤ へ
-   ------------------------------------------------- -/
+--   C) 等式＋非正 ⇒ 片側の ≤ へ
 
+--一般的な補題なので移動してもいい。TraceFunctionalとか。
 lemma le_of_eq_add_of_nonpos {a b t : Int}
     (h : a = b + t) (ht : t ≤ 0) : a ≤ b := by
   -- 目標を h で書き換え
@@ -507,31 +456,7 @@ lemma le_of_eq_add_of_nonpos {a b t : Int}
     exact (add_le_iff_nonpos_right b).mpr ht
 
   exact this
-------------------------
 
-
-
-/- principal idealがIdealであること？ -/
---FuncSetupに移動するのも、ideal関係だしへん。principal Idealの話は、後半に使うがIdealsに移動かも？
-lemma idealFamily_mem_principal
-  (S : FuncSetup α) (x : S.Elem) :
-  isOrderIdealOn (le := S.leOn) (V := S.ground) (S.principalIdeal x.1 x.2)  := by
-  dsimp [FuncSetup.principalIdeal]
-  simp
-  dsimp [isOrderIdealOn]
-  simp
-  constructor
-  · obtain ⟨val, property⟩ := x
-    intro x hx
-    simp_all only [Finset.mem_map, Finset.mem_filter, Finset.mem_attach, true_and, Function.Embedding.coeFn_mk,
-      Subtype.exists, exists_and_right, exists_eq_right]
-    obtain ⟨w, h⟩ := hx
-    simp_all only
-
-  · intro xx hx lexy y hy leyx
-    constructor
-    · exact FuncSetup.leOn_trans S leyx hx
-    · exact hy
 
 -------------------------------------
 /-! ## 3) Lemma 3.1：maximal ⇒ rare -/
@@ -721,299 +646,7 @@ lemma Phi_injective
           apply Subtype.ext
           exact hIJ_eq
 
-section CountLemmas
 
-variable {β : Type*}
-
-/-- 和 `∑ a∈s, (if p a then 1 else 0)` は `s.filter p` の個数に一致。 -/
-lemma sum_indicator_card_filter (s : Finset β) (p : β → Prop) [DecidablePred p] :
-    ∑ a ∈ s, (if p a then (1 : Nat) else 0) = (s.filter p).card := by
-  classical
-  refine Finset.induction_on s ?h0 ?hstep
-  · -- 空集合
-    simp
-  · intro a s ha_notmem ih
-    by_cases hpa : p a
-    · -- p a = true
-      have : (s.filter p).card.succ
-            = (insert a s |>.filter p).card := by
-        -- filter_insert（p a=true）→ a が 1 個増える（a∉sなので重複なし）
-        have hfi : (insert a s).filter p = insert a ((s.filter p)) := by
-          -- `Finset.filter_insert` と `hpa`、`ha_notmem`
-          -- `simp` を避け、等式で書換え
-          -- 既知：`filter p (insert a s) = if p a then insert a (filter p s) else filter p s`
-          -- ここでは `p a = true`
-          have := Finset.filter_insert (s := s) (p := p) a
-          -- 書き換え
-          have : (insert a s).filter p
-              = (if p a then insert a (s.filter p) else s.filter p) := this
-          -- true ケースに潰す
-          have : (insert a s).filter p = insert a (s.filter p) := by
-            simpa [hpa]
-          exact this
-        -- いまの等式から card をとる
-        -- `a ∉ s.filter p`（a∉s なので当然）
-        have hnot : a ∉ s.filter p := by
-          intro ha'
-          have : a ∈ s := (Finset.mem_of_subset (Finset.filter_subset _ _) ha')
-          exact ha_notmem this
-        -- `card (insert a t) = card t + 1` （a∉t）
-        have hcard := Finset.card_insert_of_notMem hnot
-        -- 目的の向きに整形
-        -- `card (insert a (s.filter p)) = (s.filter p).card + 1`
-        -- 逆向きに書いておく
-        have : (insert a ((s.filter p))).card = (s.filter p).card + 1 := hcard
-        -- succ = +1
-        -- `Nat.succ n = n + 1`
-        have : (s.filter p).card.succ = (insert a (s.filter p)).card := by
-          -- `Nat.succ` の定義で置換
-          -- `Nat.succ n = n + 1`
-          -- ここでは `rw [Nat.succ_eq_add_one]`
-          -- ただし simpa 禁止のため段階的に
-          simp_all only [Finset.sum_boole, Nat.cast_id, Finset.mem_filter, and_true, not_false_eq_true, Finset.card_insert_of_notMem, Nat.succ_eq_add_one]
-        simp_all only [Finset.sum_boole, Nat.cast_id, Finset.mem_filter, and_true, not_false_eq_true, Finset.card_insert_of_notMem, Nat.succ_eq_add_one]
-        -- これで完了
-
-      -- 和の側：挿入で 1 足し
-      -- sum over insert = sum over s + (if p a then 1 else 0) = ih + 1
-      have hs : ∑ x ∈ insert a s, (if p x then (1:Nat) else 0)
-              = (if p a then 1 else 0) + ∑ x ∈ s, (if p x then 1 else 0) := by
-        -- `sum_insert`（a∉s）
-        have := Finset.sum_insert (by exact ha_notmem) (f := fun x => if p x then (1:Nat) else 0)
-        -- `sum_insert` は `f a + sum_s` の形。型を合わせて使う
-        exact this
-      -- まとめ
-      -- 左辺：hs、右辺：ih と上の card 等式
-      -- （`Nat.succ` を `+1` に戻す）
-      -- `Nat.succ_eq_add_one`
-      have : ∑ x ∈ insert a s, (if p x then (1:Nat) else 0)
-             = (s.filter p).card + 1 := by
-        -- 書き換え
-        -- hs と ih、hpa を使う
-        -- 先に hs を適用
-        calc
-          _ = (if p a then 1 else 0) + ∑ x ∈ s, (if p x then (1:Nat) else 0) := hs
-          _ = 1 + (∑ x ∈ s, (if p x then (1:Nat) else 0)) := by
-                -- p a = true
-                have : (if p a then 1 else 0) = (1:Nat) := by exact by simp_all only [Finset.sum_boole, Nat.cast_id, Nat.succ_eq_add_one, ↓reduceIte]
-                rw [this]
-          _ = 1 + (s.filter p).card := by rw [ih]
-          _ = (s.filter p).card + 1 := Nat.add_comm 1 _
-      -- 右辺：filter のカード
-      -- 先に `Nat.succ_eq_add_one` と上で得た `succ = card(insert ...)`
-      have hcard_ins :
-        (insert a s |>.filter p).card = (s.filter p).card + 1 := by
-        -- すでに上の `this` が `succ = card(insert ...)` の対称形
-        -- 直上で作った等式 `this` は sum 側、紛らわしいので別名に
-        -- ここは `Nat.succ` の等式を使った `this` (hfi/hcard 組) から
-        -- `card (filter (insert ...)) = (s.filter p).card + 1` が出ています
-        -- 上で `this` として `∑ = ...` を付けたので名称が被るため書き直し:
-        -- 再構築は冗長なので、簡潔にもう一度：
-        have hfi : (insert a s).filter p = insert a (s.filter p) := by
-          have := Finset.filter_insert (s := s) (p := p) a
-          have : (insert a s).filter p
-              = (if p a then insert a (s.filter p) else s.filter p) := this
-          -- true ケース
-          exact by simpa [hpa] using this
-        -- すると `card(filter insert) = card(insert ...) = ... + 1`
-        have hnot : a ∉ s.filter p := by
-          intro ha'
-          have : a ∈ s := (Finset.mem_of_subset (Finset.filter_subset _ _) ha')
-          exact ha_notmem this
-        have : (insert a (s.filter p)).card = (s.filter p).card + 1 :=
-          Finset.card_insert_of_notMem hnot
-        -- 置換
-        simpa [hfi]
-      -- 以上で両辺一致
-      -- まとめる：
-      -- 目標：sum(insert) = card(filter(insert))
-      -- 左辺は上の `this`、右辺は `hcard_ins`
-      -- （記号衝突を避け、ここでは `hs_sum` と `hs_card` に分けて再利用）
-      -- 既に左辺 `this` を作ったので、置換して終了
-      -- 実際にはこのブロックで十分
-      -- 目標を書き換えて終了
-      -- （`exact` で置ける）
-      -- ここでは、先ほどの `this` は sum 側だったので、再度命名してから `exact` します。
-      exact by
-        -- sum(insert) = (s.filter p).card + 1 かつ
-        -- card(filter(insert)) = (s.filter p).card + 1
-        -- よって等しい
-        have hsum : ∑ x ∈ insert a s, (if p x then (1:Nat) else 0)
-                  = (s.filter p).card + 1 := by
-          -- 直上で作った sum 等式
-          -- 再掲
-          -- （すでに `this` 名が使われているので再作成）
-          -- 同内容をもう一度書くのは冗長ですが、明示で安全にします。
-          calc
-            _ = (if p a then 1 else 0) + ∑ x ∈ s, (if p x then (1:Nat) else 0) := by
-                  exact hs
-            _ = 1 + (∑ x ∈ s, (if p x then (1:Nat) else 0)) := by
-                  have : (if p a then 1 else 0) = (1:Nat) := by
-                    simp_all only [Finset.sum_boole, Nat.cast_id, Nat.succ_eq_add_one, ↓reduceIte, Nat.cast_add, Nat.cast_one]
-                  rw [this]
-            _ = 1 + (s.filter p).card := by rw [ih]
-            _ = (s.filter p).card + 1 := Nat.add_comm 1 _
-        -- これと hcard_ins を合わせて
-        exact by
-          -- 目標：sum(insert) = card(filter(insert))
-          -- 置換
-          rw [hsum, hcard_ins]
-    · -- p a = false
-      -- 挿入後の和は ih のまま
-      have hs : ∑ x ∈ insert a s, (if p x then (1:Nat) else 0)
-              = ∑ x ∈ s, (if p x then (1:Nat) else 0) := by
-        have := Finset.sum_insert (by exact ha_notmem) (f := fun x => if p x then (1:Nat) else 0)
-        -- 左辺の先頭項は 0
-        -- `if p a then 1 else 0 = 0`
-        have hz : (if p a then (1:Nat) else 0) = 0 := by simp_all only [Finset.sum_boole, Nat.cast_id, ↓reduceIte, zero_add]
-        -- 上の sum_insert: `f a + sum_s`
-        -- ゆえに `0 + sum_s = sum_s`
-        -- 置換
-        have := by
-          calc
-            (if p a then (1:Nat) else 0) + ∑ x ∈ s, (if p x then (1:Nat) else 0)
-                = 0 + ∑ x ∈ s, (if p x then (1:Nat) else 0) := by rw [hz]
-            _ = ∑ x ∈ s, (if p x then (1:Nat) else 0) := by exact Nat.zero_add _
-        -- まとめ
-        exact by
-          -- `sum_insert` から始めて置換
-          have := Finset.sum_insert (by exact ha_notmem)
-              (f := fun x => if p x then (1:Nat) else 0)
-          -- その等式を `rw` で使い、次に上の 0 消去を使う
-          -- ここは直接 `rw` が煩雑なので、別経路の等式として使う
-          -- 簡潔に：`bycases` で `p a = false` を使えば上と同じ結果に到達
-          -- 最後は直接目標を `exact` で閉じます
-          -- 既に `hs` に等式を収束させています
-          simp_all only [Finset.sum_boole, Nat.cast_id, ↓reduceIte, zero_add]
-
-      -- filter 側：¬p の方が 1 増える
-      have hfi_false : (insert a s).filter (fun x => ¬ p x) = insert a (s.filter (fun x => ¬ p x)) := by
-        -- `filter_insert` に p := (fun x => ¬ p x)
-        have := Finset.filter_insert (s := s) (p := fun x => ¬ p x) a
-        -- 今は `¬ p a = true` なので true ケース
-        have : (insert a s).filter (fun x => ¬ p x)
-            = (if (¬ p a) then insert a (s.filter (fun x => ¬ p x))
-               else s.filter (fun x => ¬ p x)) := this
-        have : (insert a s).filter (fun x => ¬ p x)
-            = insert a (s.filter (fun x => ¬ p x)) := by
-          -- ここで `¬ p a` は true
-          have : (¬ p a) := by
-            have : p a = False := by simp_all only [Finset.sum_boole, Nat.cast_id, not_false_eq_true, ↓reduceIte]
-            -- `p a = false` から `¬ p a`
-            exact by
-              -- 反転
-              simp_all only [Finset.sum_boole, Nat.cast_id, not_false_eq_true, ↓reduceIte, eq_iff_iff, iff_false]
-
-          simp_all only [Finset.sum_boole, Nat.cast_id, not_false_eq_true, ↓reduceIte]
-        exact this
-      -- `a ∉ s.filter (¬p)`
-      have hnot : a ∉ s.filter (fun x => ¬ p x) := by
-        intro ha'
-        have : a ∈ s := (Finset.mem_of_subset (Finset.filter_subset _ _) ha')
-        exact ha_notmem this
-      have hcard_ins :
-          (insert a s |>.filter (fun x => ¬ p x)).card
-          = (s.filter (fun x => ¬ p x)).card + 1 := by
-        -- 上の等式から card_insert_of_not_mem
-        have := Finset.card_insert_of_notMem hnot
-        -- 置換
-        simpa [hfi_false] using this
-      -- また、`(insert a s).filter p = s.filter p`（p a=false）
-      have hfi_true :
-          (insert a s |>.filter p) = s.filter p := by
-        -- 先ほどの p 版の filter_insert の false ケース
-        have := Finset.filter_insert (s := s) (p := p) a
-        have : (insert a s).filter p
-            = (if p a then insert a (s.filter p) else s.filter p) := this
-        -- p a = false
-        have : (insert a s).filter p = s.filter p := by simpa [hpa] using this
-        exact this
-      -- 目標：sum = card(filter p)
-      -- `hs` と `ih`、`hfi_true` を合わせれば OK
-      calc
-        ∑ x ∈ insert a s, (if p x then (1:Nat) else 0)
-            = ∑ x ∈ s, (if p x then (1:Nat) else 0) := hs
-        _ = (s.filter p).card := ih
-        _ = ((insert a s).filter p).card := by rw [hfi_true]
-
-/-- `card (s.filter p) + card (s.filter (¬p)) = card s`。 -/
-lemma card_filter_add_card_filter_not (s : Finset β) (p : β → Prop) [DecidablePred p] :
-    (s.filter p).card + (s.filter (fun b => ¬ p b)).card = s.card := by
-  classical
-  refine Finset.induction_on s ?h0 ?hstep
-  · simp
-  · intro a s ha ih
-    by_cases hpa : p a
-    · -- p a
-      -- 左辺： (insert a (filter p s)).card + (filter ¬p s).card
-      have hfi_p :
-          (insert a s).filter p = insert a (s.filter p) := by
-        have := Finset.filter_insert (s := s) (p := p) a
-        simpa [hpa] using this
-      have hfi_np :
-          (insert a s).filter (fun b => ¬ p b) = (s.filter (fun b => ¬ p b)) := by
-        have := Finset.filter_insert (s := s) (p := fun b => ¬ p b) a
-        -- ここでは `¬ p a = false`
-        have : ¬ p a = False := by simp_all only [not_true_eq_false, ↓reduceIte, eq_iff_iff, iff_false, not_false_eq_true]
-        -- false ケース
-        simp_all only [not_true_eq_false, ↓reduceIte, eq_iff_iff, iff_false, not_false_eq_true]
-      have hnot : a ∉ s.filter p := by
-        intro ha'
-        have : a ∈ s := (Finset.mem_of_subset (Finset.filter_subset _ _) ha')
-        exact ha this
-      have hcard_insert :
-          (insert a (s.filter p)).card = (s.filter p).card + 1 :=
-        Finset.card_insert_of_notMem hnot
-      calc
-        ((insert a s).filter p).card + ((insert a s).filter (fun b => ¬ p b)).card
-            = (insert a (s.filter p)).card + (s.filter (fun b => ¬ p b)).card := by
-                rw [hfi_p, hfi_np]
-        _ = (s.filter p).card + 1 + (s.filter (fun b => ¬ p b)).card := by
-                rw [hcard_insert]
-        _ = (s.filter p).card + (s.filter (fun b => ¬ p b)).card + 1 := by
-                exact Nat.add_right_comm (Finset.filter p s).card 1 {b ∈ s | ¬p b}.card
-        _ = s.card + 1 := by
-                rw [ih]
-        _ = (insert a s).card := by
-                -- `card_insert_of_not_mem`
-                have := Finset.card_insert_of_notMem ha
-                -- `card (insert a s) = card s + 1`
-                exact this.symm
-    · -- p a = false
-      -- 対称な議論
-      have hfi_p :
-          (insert a s).filter p = (s.filter p) := by
-        have := Finset.filter_insert (s := s) (p := p) a
-        simpa [hpa] using this
-      have hfi_np :
-          (insert a s).filter (fun b => ¬ p b) = insert a (s.filter (fun b => ¬ p b)) := by
-        have := Finset.filter_insert (s := s) (p := fun b => ¬ p b) a
-        -- ここでは `¬ p a = true`
-        have : (¬ p a) = True := by simp_all only [not_false_eq_true, ↓reduceIte]
-        -- true ケース
-        simp_all only [↓reduceIte, eq_iff_iff, iff_true]
-      have hnot : a ∉ s.filter (fun b => ¬ p b) := by
-        intro ha'
-        have : a ∈ s := (Finset.mem_of_subset (Finset.filter_subset _ _) ha')
-        exact ha this
-      have hcard_insert :
-          (insert a (s.filter (fun b => ¬ p b))).card
-          = (s.filter (fun b => ¬ p b)).card + 1 :=
-        Finset.card_insert_of_notMem hnot
-      calc
-        ((insert a s).filter p).card + ((insert a s).filter (fun b => ¬ p b)).card
-            = (s.filter p).card + (insert a (s.filter (fun b => ¬ p b))).card := by
-                rw [hfi_p, hfi_np]
-        _ = (s.filter p).card + (s.filter (fun b => ¬ p b)).card + 1 := by
-                rw [hcard_insert]
-                exact rfl
-        _ = s.card + 1 := by
-                rw [ih]
-        _ = (insert a s).card := by
-                have := Finset.card_insert_of_notMem ha
-                exact this.symm
-
-end CountLemmas
 
 section RareByInjection
 
@@ -1144,7 +777,7 @@ lemma rare_of_injection_between_filters
   -- さらに `|pin| + |pout| = |s|`
   have hSplit :
       pin.card + pout.card = s.card := by
-    exact card_filter_add_card_filter_not s fun A => x ∈ A
+    exact SetFamily.card_filter_add_card_filter_not s fun A => x ∈ A
 
   -- 目標：2 * degree ≤ numHyperedges
   -- `2*|pin| ≤ |s|` を示せばよい
@@ -1222,6 +855,7 @@ lemma rare_of_maximal
   -- 一般補題に適用
   exact rare_of_injection_between_filters
           (F := S.idealFamily) (x := u.1) Φ hΦ
+
 /- 論文 Lemma 3.6(1) の言明：-/
 lemma NDS_le_trace_of_nontrivialClass
   (S : SPO.FuncSetup α) {u : S.Elem}
@@ -1268,95 +902,41 @@ lemma NDS_le_trace_of_nontrivialClass
   exact le_of_eq_add_of_nonpos hEq hnonpos
 
 
---このあたりにfunctionalのtraceはfunctionalであることを入れる予定。
+------------------------
 
-
-/-- （3.6(1) の精密版の言明だけ）
-    非自明クラスの点 `u` を 1 個潰すと，
-    `idealFamily S` の 1点トレースは，`eraseOne S u` のイデアル族に一致する。 -/
---下の書き換えでのみ利用しているが、その補題が必要かわからない。
-lemma idealFamily_traceAt_eq_eraseOne
-    (S : SPO.FuncSetup α) (u : S.Elem)
-    (hNontriv : SPO.FuncSetup.nontrivialClass S u) :
-    (SPO.FuncSetup.eraseOne S u (S.f u)
-                  (SPO.FuncSetup.f_ne_of_nontrivialClass (S := S) hNontriv)).idealFamily
-      = Trace.traceAt u.1 (S.idealFamily) := by
-  classical
-  -- （ここは従来どおり `sets` 同値の証明を進めればOK）
-  sorry
-
---上の補題の書き換え。
-/-- 使い勝手の良い “存在形” の再掲（既存の `traced_is_functional_family` を置換）。 -/
---定理名に反して、functionalまで示せてなくて、traceが単にidealFamilyであることを示している。
-lemma traced_is_functional_family
-    (S : SPO.FuncSetup α) (u : S.Elem)
-    (hNontriv : SPO.FuncSetup.nontrivialClass S u) :
-    ∃ S' : SPO.FuncSetup α,
-      S'.idealFamily = Trace.traceAt u.1 (S.idealFamily) := by
-  refine ⟨SPO.FuncSetup.eraseOneUsingSucc (S := S) u hNontriv, ?_⟩
-  exact idealFamily_traceAt_eq_eraseOne S u hNontriv
-
-
-
---traceした時のhyperedgeがどうなるかの補題。数が減らないこともこれでわかるのかも。
---uにパラレルな要素を仮定してない。両辺一致はするが、両方とも数が減っているかもしれないということか。
---使っていたところをコメントアウトしたので現状使ってないし、これからも使わないのかも。
-lemma edgeFinset_traceAt_eq_image_erase (F : SetFamily α) (u : α) :
-  (traceAt u F).edgeFinset = F.edgeFinset.image (λ A => A.erase u) := by
-  ext B
+/- principal idealがIdealであること？ -/
+--現状ではどこからも使ってないが、後半使うかも。
+--FuncSetupに移動するのも、ideal関係だしへん。principal Idealの話は、IdealsかForestに移動かも？
+lemma idealFamily_mem_principal
+  (S : FuncSetup α) (x : S.Elem) :
+  isOrderIdealOn (le := S.leOn) (V := S.ground) (S.principalIdeal x.1 x.2)  := by
+  dsimp [FuncSetup.principalIdeal]
+  simp
+  dsimp [isOrderIdealOn]
+  simp
   constructor
-  · -- (→) traceAt の edgeFinset にある集合は元エッジの erase
-    intro hB
-    simp only [SetFamily.edgeFinset, traceAt, Finset.mem_filter,
-               Finset.mem_powerset] at hB
-    obtain ⟨hBsub, hSets⟩ := hB
-    match decide (∃ A, F.sets A ∧ B = A.erase u) with
-    | true =>
-      simp only [decide_eq_true_eq] at hSets
-      rcases hSets with ⟨A, hAsets, rfl⟩
-      rw [Finset.mem_image]
-      refine ⟨A, ?_, rfl⟩
-      simp only [SetFamily.edgeFinset, Finset.mem_filter,
-                 Finset.mem_powerset]
-      constructor
-      · exact F.inc_ground hAsets
-      · exact decide_eq_true hAsets
-    | false =>
-      simp only [decide_eq_true_eq] at hSets
-      rw [Finset.mem_image]
-      obtain ⟨A, hAin, rfl⟩ := hSets
-      use A
-      constructor
-      · exact (SetFamily.mem_edgeFinset_iff_sets F).mpr hAin
-      · exact rfl
+  · obtain ⟨val, property⟩ := x
+    intro x hx
+    simp_all only [Finset.mem_map, Finset.mem_filter, Finset.mem_attach, true_and, Function.Embedding.coeFn_mk,
+      Subtype.exists, exists_and_right, exists_eq_right]
+    obtain ⟨w, h⟩ := hx
+    simp_all only
 
-  · -- (←) 元エッジ A の erase は traceAt のエッジ
-    intro hB
-    simp only [Finset.mem_image] at hB
-    rcases hB with ⟨A, hAin, rfl⟩
-    simp only [SetFamily.edgeFinset, traceAt,
-      Finset.mem_filter, Finset.mem_powerset]
-    simp only [SetFamily.edgeFinset, Finset.mem_filter,
-      Finset.mem_powerset] at hAin
-    obtain ⟨hAsub, hAsets⟩ := hAin
+  · intro xx hx lexy y hy leyx
     constructor
-    · -- erase ⊆ ground.erase
-      intro x hx
-      rw [Finset.mem_erase] at hx
-      rw [Finset.mem_erase]
-      constructor
-      · exact hx.1
-      · exact hAsub hx.2
-    · -- sets 部分は match で強制する
-      simp_all only [decide_eq_true_eq]
-      exact ⟨A, hAsets, rfl⟩
+    · exact FuncSetup.leOn_trans S leyx hx
+    · exact hy
 
+
+
+/-
 --使っていたところをコメントアウトしたし同等な補題を別のことで示したのでけしていいかも。
 @[simp] lemma ground_traceAt (F : SetFamily α) (u : α) :
     (Trace.traceAt u F).ground = F.ground.erase u := by
   -- `traceAt` の定義が `ground := F.ground.erase u` なら `rfl` で落ちます。
   -- そうでない場合も `ext x; simp` で示せます。
   ext x; simp [Trace.traceAt]
+-/
 
 
 end PaperSync
