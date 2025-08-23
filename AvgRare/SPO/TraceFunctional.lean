@@ -130,7 +130,7 @@ lemma eraseOneMap_spec
   (S : FuncSetup α) (u v : S.Elem) (hvne : v ≠ u)
   (x : {x // x ∈ S.ground.erase u.1}) :
   let y := S.f (inclErase S u x)
-  if h : y = u
+  if _ : y = u
   then (eraseOneMap S u v hvne x).1 = v.1
   else (eraseOneMap S u v hvne x).1 = y.1 := by
   classical
@@ -284,7 +284,7 @@ by
 lemma inclErase_foldMap
   (S : FuncSetup α) (u : S.Elem) (hvne : S.f u ≠ u) (z : S.Elem) :
   (inclErase S u (foldMap (S := S) (u := u) (hvne := hvne) z))
-    = (if h : z = u then S.f u else z) := by
+    = (if  z = u then S.f u else z) := by
   classical
   by_cases hz : z = u
   · -- then
@@ -325,7 +325,8 @@ lemma inclErase_foldMap
     -- else なので右辺は z
     -- 目標は `= z` と同じ
     -- そのまま使える
-    simp_all only [ne_eq, ↓reduceDIte]
+    simp_all only [ne_eq]
+    exact rfl
   -- `inclErase` が単射（Subtype.ext with 値 rfl）：
   -- 具体的には値が等しいのでサブタイプも等しい
   apply Subtype.ext
@@ -383,7 +384,8 @@ lemma step_map_S_to_S'_usingSucc
         have := inclErase_foldMap (S := S) (u := u) (hvne := hvne) (z := p)
         -- if_false → 右辺 = p
         -- そのまま使う
-        simp_all only [↓reduceDIte]
+        simp_all only
+        exact rfl
     -- `S.f p = q`
     have hfp : S.f p = q := hpq
     -- `eraseOneMap` の値を計算して q に一致することを示す

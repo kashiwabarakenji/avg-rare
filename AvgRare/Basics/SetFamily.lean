@@ -158,16 +158,274 @@ noncomputable def restrict (U : Finset α) : SetFamily α := by
   · intro h; have : A ⊆ F.ground := F.inc_ground h
     exact (F.mem_edgeFinset (A := A)).2 ⟨this, h⟩
 
+/- `F.sets A` は `A ∈ F.edgeFinset` と同値。
+    `edgeFinset = ground.powerset.filter (decide ∘ F.sets)` なので自動化できます。 -/
+/-
+@[simp] --上と同じだった。
+lemma sets_iff_mem_edge (F : SetFamily α) {A : Finset α} :
+  F.sets A ↔ A ∈ F.edgeFinset := by
+  -- A が ground に含まれることと `filter (decide ∘ F.sets)` の会員判定を往復
+  have : A ⊆ F.ground ↔ A ∈ F.ground.powerset := by
+    exact Iff.symm Finset.mem_powerset
+  constructor
+  · intro hA
+    have hAsub : A ⊆ F.ground := F.inc_ground hA
+    -- powerset ∧ filter
+    simp [edgeFinset, this.mp hAsub, hA]
+
+  · intro hA
+    -- filter に入っているなら `F.sets A` が真
+    have : A ∈ F.ground.powerset ∧ decide (F.sets A) := by
+      simpa [edgeFinset] using (Finset.mem_filter.mp hA)
+    have hsets : F.sets A := by
+     simp_all only [iff_true, mem_edgeFinset, true_and, Finset.mem_powerset, decide_true, and_self]
+
+    exact hsets
+-/
+
 /-- 並行性：族 `F` において「`u` を含むエッジの集合」と
 「`v` を含むエッジの集合」が一致する。 -/
+--uやvが、F.ground外のときにはパラレルになってしまう。
+--1. u、vをサブタイプにする。
+--2. u in F.ground,v in F.groundという条件をつける。
+--3. SetFamilyに全体集合をもつことを要求する。
 @[simp] def Parallel (F : SetFamily α) (u v : α) : Prop :=
   {A : Finset α | F.sets A ∧ u ∈ A} = {A : Finset α | F.sets A ∧ v ∈ A}
 
 lemma parallel_refl (F : SetFamily α) (u : α) : Parallel F u u := rfl
+
 lemma parallel_symm {F : SetFamily α} {u v : α} :
     Parallel F u v → Parallel F v u := fun h => h.symm
 
+--lemma parallel_symm' {F : SetFamily α} {a b : α}
+--  (hab : Parallel F a b) : Parallel F b a :=
+--  Eq.symm hab
 
+/-- `Parallel` は同値関係：推移律（集合等式の推移） -/
+lemma parallel_trans {F : SetFamily α} {a b c : α}
+  (hab : Parallel F a b) (hbc : Parallel F b c) :
+  Parallel F a c := by
+  exact hab.trans hbc
+
+/-- （計算しやすい）parallel の定義：`edgeFinset` を `u∈` で filter した Finset が一致。 -/
+def Parallel_edge (F : SetFamily α) (u v : α) : Prop :=
+  F.edgeFinset.filter (fun A => u ∈ A) =
+  F.edgeFinset.filter (fun A => v ∈ A)
+
+/-- あなたの `Parallel`（集合内包での等式）と `Parallel_edge` は同値。 -/
+lemma Parallel_edge_iff_Parallel (F : SetFamily α) (u v : α) :
+  Parallel_edge F u v ↔ Parallel F u v := by
+  -- どちらも「`F.sets A` かつ `u∈A`（/`v∈A`）」という同じ性質を
+  -- Finset の filter か Set の内包かの違いで述べているだけ。
+  -- `sets_iff_mem_edge` で橋渡しして、`Finset.ext`/`Set.ext` で決着します。
+  constructor
+  · intro h
+    -- filter の等式→ 内包集合の等式
+    ext A
+    constructor <;> intro hA <;>
+    · rcases hA with ⟨hsets, hx⟩
+
+      --have : A ∈ F.edgeFinset := (sets_iff_mem_edge F).mp hsets
+      -- filter の等式で左右へ移すだけ
+      all_goals
+        have := congrArg (fun (s : Finset (Finset α)) => A ∈ s) h
+        rw [@Set.mem_setOf_eq]
+        constructor
+        · exact hsets
+        · simp at this
+          have incg:A ⊆ F.ground := F.inc_ground hsets
+          specialize this incg hsets
+          simp_all only [iff_true]
+
+  · intro h
+    -- 内包集合の等式→ filter の等式
+    -- `Finset.ext` で会員判定を `sets_iff_mem_edge` に落として一致
+    apply Finset.ext
+    intro A
+    have h' := congrArg (fun (S : Set (Finset α)) => A ∈ S) h
+    -- 2つの filter の会員判定と内包の会員判定を対応付ける
+    constructor
+    · intro hu
+      rw [@Finset.mem_filter]
+      rw [@Finset.mem_filter] at hu
+      simp at h'
+      simp_all only [Parallel, mem_edgeFinset, true_iff, forall_const, and_self]
+    · intro hv
+      rw [@Finset.mem_filter]
+      rw [@Finset.mem_filter] at hv
+      simp at h'
+      simp_all only [Parallel, mem_edgeFinset, forall_const, and_self]
+
+noncomputable def ParallelClass (F : SetFamily α) (a : α) : Finset α :=
+  -- ground 上の同値類（decidable は classical で供給）
+  by
+    classical
+    exact F.ground.filter (fun b => Parallel F a b)
+
+noncomputable def classSet (F : SetFamily α) : Finset (Finset α) :=
+  -- 「同値類の集合」を代表元写像の像で実装
+  by
+    classical
+    exact F.ground.image (fun a => ParallelClass F a)
+
+noncomputable def numClasses (F : SetFamily α) : ℕ :=
+  (classSet F).card
+
+/-- `ParallelClass` の代表を取り替えても同一。 -/
+lemma ParallelClass_eq_of_parallel
+  (F : SetFamily α) {a b : α}
+  (hab : Parallel F a b) :
+  ParallelClass F a = ParallelClass F b := by
+  classical
+  -- いずれも `ground.filter` の形なので，会員判定を同値に落とす
+  apply Finset.ext
+  intro x
+  constructor
+  · intro hx
+    -- x ∈ ground ∧ Parallel F a x から Parallel F b x へ
+    rcases (Finset.mem_filter.mp hx) with ⟨hxg, hax⟩
+    have hbx : Parallel F b x := by
+      -- hab : S(a)=S(b) なので S(a)=S(x) ↔ S(b)=S(x)
+      -- hax : Parallel F a x すなわち S(a)=S(x)
+      -- よって S(b)=S(x)
+      have hba : Parallel F b a := (parallel_symm (F := F) hab)
+      exact parallel_trans (F := F) hba hax
+    exact Finset.mem_filter.mpr ⟨hxg, hbx⟩
+  · intro hx
+    rcases (Finset.mem_filter.mp hx) with ⟨hxg, hbx⟩
+    have hax : Parallel F a x := by
+      have hab' : Parallel F b a := (parallel_symm (F := F) hab)
+      exact parallel_trans hab hbx
+    exact Finset.mem_filter.mpr ⟨hxg, hax⟩
+
+-- 「w を含むエッジの集合」を Finset で：
+def withElem (E : Finset (Finset α)) (w : α) : Finset (Finset α) :=
+  E.filter (fun A => w ∈ A)
+
+lemma Parallel_iff_filter_edge (F : SetFamily α) (w z : α) :
+  Parallel F w z
+  ↔ withElem F.edgeFinset w = withElem F.edgeFinset z := by
+  -- sets での定義と edgeFinset = ground.powerset.filter(sets) をつなぐだけ
+  -- `Finset.ext` と `mem_filter` の往復で出せます
+  dsimp [Parallel]
+  dsimp [withElem]
+  rw [Finset.ext_iff]
+  simp
+  constructor
+  · intro h
+    rw [Set.ext_iff] at h
+    intro a a_1 a_2
+    simp_all only [Set.mem_setOf_eq, and_congr_right_iff]
+  · intro h
+    rw [Set.ext_iff]
+    intro A
+    simp_all
+    intro hA
+    specialize h A
+    specialize h (F.inc_ground hA)
+    exact h hA
+
+  /-- 会員判定の基本形：`x ∈ ParallelClass F a` を「台集合所属＋平行」へ展開。 -/
+@[simp] lemma mem_ParallelClass_iff
+  (F : SetFamily α) (a x : α) :
+  x ∈ ParallelClass F a ↔ (x ∈ F.ground ∧ Parallel F a x) := by
+  classical
+  unfold ParallelClass
+  -- ground.filter _
+  have : x ∈ F.ground.filter (fun b => Parallel F a b)
+       ↔ (x ∈ F.ground ∧ Parallel F a x) :=
+    by
+      constructor
+      · intro hx
+        exact Finset.mem_filter.mp hx
+      · intro hx
+        exact Finset.mem_filter.mpr hx
+  exact this
+
+/-- `u‖v` なら、任意のクラス `C` で `u ∈ C ↔ v ∈ C`。 -/
+--全体集合を持たないと証明がうまくいかない。
+lemma mem_u_iff_mem_v_of_class
+  (F : SetFamily α) (hasU: F.sets F.ground){u v : α} (hp : Parallel F u v)
+  {C : Finset α} (hC : C ∈ classSet F) :
+  (u ∈ C ↔ v ∈ C) := by
+  classical
+  -- `C = ParallelClass F a` を取り出す
+  obtain ⟨a, ha, hCdef⟩ :
+      ∃ a, a ∈ F.ground ∧ C = ParallelClass F a := by
+    -- classSet F = ground.image (ParallelClass F)
+    -- より、像の元はその形
+    -- hC : C ∈ classSet F
+    -- Finset.mem_image の型に合わせて取り出す
+    have h := (Finset.mem_image.mp hC)
+    -- h : ∃ a, a ∈ F.ground ∧ C = ParallelClass F a
+    simp_all only [Parallel]
+    obtain ⟨w, h⟩ := h
+    obtain ⟨left, right⟩ := h
+    subst right
+    exact ⟨w, left, rfl⟩
+  -- 以後、`C = ParallelClass F a` に書き換える
+  -- 会員判定を補題で展開して、平行の推移で往復を作る
+  have h1 : (u ∈ ParallelClass F a) → (v ∈ ParallelClass F a) := by
+    intro huC
+    have huC' : (u ∈ F.ground ∧ Parallel F a u) :=
+      (mem_ParallelClass_iff F a u).1 huC
+    have hav : Parallel F a v :=
+      parallel_trans (F := F) huC'.2 hp
+    have hvC' : (v ∈ F.ground ∧ Parallel F a v) := by
+      constructor
+      · dsimp [SetFamily.Parallel] at hp
+        have : F.ground ∈ {A | F.sets A ∧ u ∈ A}:= by
+          rw [@Set.mem_setOf_eq]
+          subst hCdef
+          simp_all only [mem_ParallelClass_iff, Parallel, true_and, and_true, and_self]
+        subst hCdef
+        simp_all only [mem_ParallelClass_iff, Parallel, true_and, and_true, Set.mem_setOf_eq]
+      · exact hav
+
+    exact (mem_ParallelClass_iff F a v).2 hvC'
+  have h2 : (v ∈ ParallelClass F a) → (u ∈ ParallelClass F a) := by
+    intro hvC
+    have hvC' : (v ∈ F.ground ∧ Parallel F a v) :=
+      (mem_ParallelClass_iff F a v).1 hvC
+    have hpu : Parallel F v u := parallel_symm (F := F) hp
+    have hau : Parallel F a u :=
+      parallel_trans (F := F) hvC'.2 hpu
+    have huC' : (u ∈ F.ground ∧ Parallel F a u) := by
+      constructor
+      · dsimp [SetFamily.Parallel] at hp
+        have : F.ground ∈ {A | F.sets A ∧ v ∈ A}:= by
+          rw [@Set.mem_setOf_eq]
+          subst hCdef
+          simp_all only [mem_ParallelClass_iff, Parallel, true_and, and_true, and_self]
+        rw [←hp] at this
+        simp at this
+        exact this.2
+      · exact hau
+    exact (mem_ParallelClass_iff F a u).2 huC'
+  -- 最後に `C = class a` に戻して両向きの同値を組む
+  constructor
+  · intro huC
+    have : u ∈ ParallelClass F a := by
+      -- 置換を「書き換え」で行う
+      -- `hCdef : C = ParallelClass F a`
+      -- huC : u ∈ C
+      -- 書き換え：u ∈ C ↔ u ∈ ParallelClass F a
+      have := huC
+      have : u ∈ ParallelClass F a := by
+        -- rw [hCdef] at huC は tactic だが、明示書換を使わずに等式置換
+        exact cast (by rw [hCdef]) huC
+      exact this
+    have : v ∈ ParallelClass F a := h1 this
+    -- 逆方向への置換
+    apply cast
+    exact rfl
+    subst hCdef
+    simp_all only [Parallel, imp_self, mem_ParallelClass_iff, and_true, and_self]
+  · intro hvC
+    have : v ∈ ParallelClass F a := cast (by rw [hCdef]) hvC
+    have : u ∈ ParallelClass F a := h2 this
+    subst hCdef
+    simp_all only [Parallel, imp_self, mem_ParallelClass_iff, and_true, and_self]
 
 section CountLemmas
 

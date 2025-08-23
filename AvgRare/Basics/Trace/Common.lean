@@ -52,14 +52,15 @@ noncomputable def traceAt (x : α) (F : SetFamily α) : SetFamily α := by
 @[simp] lemma traceAt_ground (x : α) (F : SetFamily α) :
     (traceAt x F).ground = F.ground.erase x := rfl
 
-
---ここからは使わないかも。
+/-
+--ここからは使わないかも。今のところ使うかどうか不明なのでコメントアウト。
 /-- `Subtype` のエッジを `erase u` に写す自然な射。 -/
 def eraseMap (F : SetFamily α) (u : α) :
     {A // F.sets A} → Finset α := fun A => (Subtype.val A).erase u
 
 @[simp] lemma eraseMap_apply (F : SetFamily α) (u : α) (A : {A // F.sets A}) :
     eraseMap F u A = (A.val).erase u := rfl
+-/
 
 
 --traceした時のhyperedgeがどうなるかの補題。数が減らないこともこれでわかるのかも。
@@ -116,76 +117,8 @@ lemma edgeFinset_traceAt_eq_image_erase (F : SetFamily α) (u : α) :
       simp_all only [decide_eq_true_eq]
       exact ⟨A, hAsets, rfl⟩
 
-/-- `F.sets A` は `A ∈ F.edgeFinset` と同値。
-    `edgeFinset = ground.powerset.filter (decide ∘ F.sets)` なので自動化できます。 -/
-lemma sets_iff_mem_edge (F : SetFamily α) {A : Finset α} :
-  F.sets A ↔ A ∈ F.edgeFinset := by
-  -- A が ground に含まれることと `filter (decide ∘ F.sets)` の会員判定を往復
-  have : A ⊆ F.ground ↔ A ∈ F.ground.powerset := by
-    exact Iff.symm Finset.mem_powerset
-  constructor
-  · intro hA
-    have hAsub : A ⊆ F.ground := F.inc_ground hA
-    -- powerset ∧ filter
-    simp [edgeFinset, this.mp hAsub, hA]
 
-  · intro hA
-    -- filter に入っているなら `F.sets A` が真
-    have : A ∈ F.ground.powerset ∧ decide (F.sets A) := by
-      simpa [edgeFinset] using (Finset.mem_filter.mp hA)
-    have hsets : F.sets A := by
-     simp_all only [iff_true, mem_edgeFinset, true_and, Finset.mem_powerset, decide_true, and_self]
 
-    exact hsets
-
-/-- （計算しやすい）parallel の定義：`edgeFinset` を `u∈` で filter した Finset が一致。 -/
-def Parallel_edge (F : SetFamily α) (u v : α) : Prop :=
-  F.edgeFinset.filter (fun A => u ∈ A) =
-  F.edgeFinset.filter (fun A => v ∈ A)
-
-/-- あなたの `Parallel`（集合内包での等式）と `Parallel_edge` は同値。 -/
-lemma Parallel_edge_iff_Parallel (F : SetFamily α) (u v : α) :
-  Parallel_edge F u v ↔ Parallel F u v := by
-  -- どちらも「`F.sets A` かつ `u∈A`（/`v∈A`）」という同じ性質を
-  -- Finset の filter か Set の内包かの違いで述べているだけ。
-  -- `sets_iff_mem_edge` で橋渡しして、`Finset.ext`/`Set.ext` で決着します。
-  constructor
-  · intro h
-    -- filter の等式→ 内包集合の等式
-    ext A
-    constructor <;> intro hA <;>
-    · rcases hA with ⟨hsets, hx⟩
-
-      --have : A ∈ F.edgeFinset := (sets_iff_mem_edge F).mp hsets
-      -- filter の等式で左右へ移すだけ
-      all_goals
-        have := congrArg (fun (s : Finset (Finset α)) => A ∈ s) h
-        rw [@Set.mem_setOf_eq]
-        constructor
-        · exact hsets
-        · simp at this
-          have incg:A ⊆ F.ground := F.inc_ground hsets
-          specialize this incg hsets
-          simp_all only [iff_true]
-
-  · intro h
-    -- 内包集合の等式→ filter の等式
-    -- `Finset.ext` で会員判定を `sets_iff_mem_edge` に落として一致
-    apply Finset.ext
-    intro A
-    have h' := congrArg (fun (S : Set (Finset α)) => A ∈ S) h
-    -- 2つの filter の会員判定と内包の会員判定を対応付ける
-    constructor
-    · intro hu
-      rw [@Finset.mem_filter]
-      rw [@Finset.mem_filter] at hu
-      simp at h'
-      simp_all only [Parallel, mem_edgeFinset, true_iff, forall_const, and_self]
-    · intro hv
-      rw [@Finset.mem_filter]
-      rw [@Finset.mem_filter] at hv
-      simp at h'
-      simp_all only [Parallel, mem_edgeFinset, forall_const, and_self]
 
 lemma trace_filter_eq_image_filter_of_ne
   (F : SetFamily α) (u w : α) (hwu : w ≠ u) :
@@ -323,6 +256,7 @@ lemma parallel_off_u_preserved_by_trace
       simpa [himg] using this
     exact this
 
+omit [DecidableEq α] in
 lemma parallel_off_u_preserved_by_trace2
   [DecidableEq α] (F : SetFamily α) (u w z : α)
   (hw : w ≠ u) (hz : z ≠ u) :
@@ -331,6 +265,490 @@ lemma parallel_off_u_preserved_by_trace2
   rw [Parallel_edge_iff_Parallel ] at pe
   rw [Parallel_edge_iff_Parallel ] at pe
   exact pe
+
+noncomputable def excess (F : SetFamily α) : ℕ :=
+  F.ground.card - numClasses F
+
+lemma ParallelClass_trace_eq_erase
+  (F : SetFamily α) (u a : α)
+  (ha : a ∈ F.ground.erase u) :
+  ParallelClass (traceAt u F) a = (ParallelClass F a).erase u := by
+  classical
+  -- 述語レベルで会員判定を対応付ける
+  apply Finset.ext
+  intro b
+  -- 左→右
+  have LtoR : b ∈ ParallelClass (traceAt u F) a →
+              b ∈ (ParallelClass F a).erase u := by
+    intro hb
+    -- b ∈ ground.erase u かつ Parallel(trace) a b
+    have hb' :
+      (b ∈ (traceAt u F).ground ∧ Parallel (traceAt u F) a b) :=
+      (mem_ParallelClass_iff (traceAt u F) a b).1 hb
+    -- b ≠ u は ground.erase u から
+    have hb_ne_u : b ≠ u := (Finset.mem_erase.mp hb'.1).1
+    -- Parallel(trace) a b ↔ Parallel F a b （b ≠ u だから保存）
+    have hiff :=
+      parallel_off_u_preserved_by_trace2
+        (F := F) (u := u) (w := a) (z := b)
+        (hw := (Finset.mem_erase.mp ha).1) (hz := hb_ne_u)
+    -- Parallel F a b を得る
+    have hab : Parallel F a b := by
+      exact (Iff.mp hiff) hb'.2
+    -- b ∈ ground は ground.erase u から
+    have hbg : b ∈ F.ground := (Finset.mem_erase.mp hb'.1).2
+    -- 右辺の会員判定
+    have hbC : b ∈ ParallelClass F a :=
+      (mem_ParallelClass_iff F a b).2 (And.intro hbg hab)
+    -- さらに erase u の会員（b ≠ u）へ
+    exact Finset.mem_erase.mpr (And.intro hb_ne_u hbC)
+  -- 右→左
+  have RtoL : b ∈ (ParallelClass F a).erase u →
+              b ∈ ParallelClass (traceAt u F) a := by
+    intro hb
+    have hb_ne_u : b ≠ u := (Finset.mem_erase.mp hb).1
+    have hbC     : b ∈ ParallelClass F a := (Finset.mem_erase.mp hb).2
+    have hbC' :
+      (b ∈ F.ground ∧ Parallel F a b) :=
+      (mem_ParallelClass_iff F a b).1 hbC
+    -- Parallel F a b ↔ Parallel(trace) a b（保存）
+    have hiff :=
+      parallel_off_u_preserved_by_trace2
+        (F := F) (u := u) (w := a) (z := b)
+        (hw := (Finset.mem_erase.mp ha).1) (hz := hb_ne_u)
+    have hab_t : Parallel (traceAt u F) a b := by
+      simp_all only [Finset.mem_erase, ne_eq, mem_ParallelClass_iff, traceAt_ground, not_false_eq_true, and_self, Parallel,
+        true_and, implies_true, and_true, iff_true]
+    -- ground.erase u での所属
+    have hbg_t : b ∈ (traceAt u F).ground := by
+      have : b ∈ F.ground.erase u :=
+        Finset.mem_erase.mpr (And.intro hb_ne_u hbC'.1)
+      -- 定義展開で置換
+      -- (traceAt u F).ground = F.ground.erase u
+      have : b ∈ (traceAt u F).ground := by
+        -- 直接 rfl なので cast で十分
+        exact cast (by rfl) this
+      exact this
+    exact (mem_ParallelClass_iff (traceAt u F) a b).2
+           (And.intro hbg_t hab_t)
+  constructor
+  · intro h; exact LtoR h
+  · intro h; exact RtoL h
+
+/-- `classSet (traceAt u F)` は `classSet F` を `erase u` した像。
+    代表が `u` の場合は `v` に差し替えて扱う（`u‖v` を使用）。 -/
+lemma classSet_trace_eq_image_erase_of_parallel
+  (F : SetFamily α) {u v : α}
+  (hu : u ∈ F.ground) (hv : v ∈ F.ground)
+  (hne : u ≠ v) (hp : Parallel F u v) :
+  classSet (traceAt u F) = (classSet F).image (fun C => C.erase u) := by
+  classical
+  -- 左⊆右
+  apply Finset.ext
+  intro D
+  constructor
+  · intro hD
+    -- D = class(trace) a（a ∈ ground.erase u）から構成
+    obtain ⟨a, ha, hDdef⟩ :
+        ∃ a, a ∈ F.ground.erase u ∧
+              D = ParallelClass (traceAt u F) a := by
+      -- classSet(trace) = (ground.erase u).image (class(trace))
+      -- なので mem_image から取り出す
+      have h := (Finset.mem_image.mp hD)
+      -- h : ∃ a, a ∈ ground.erase u ∧ D = class(trace) a
+      obtain ⟨a, ha, hDdef⟩ := h
+      exact ⟨a, ha, hDdef.symm⟩
+    -- D = (ParallelClass F a).erase u
+    have hD' :
+        D = (ParallelClass F a).erase u :=
+      by
+        -- ParallelClass_trace_eq_erase の対称形で書換
+        have h := ParallelClass_trace_eq_erase (F := F) (u := u) (a := a) ha
+        -- h : class(trace) a = (class F a).erase u
+        -- D = class(trace) a を左へ
+        -- Eq の書き換えは `rw` ではなく明示 `cast` で行う
+        -- ここでは最終的に `D = ...` を示したいので、直接等式計算
+        exact Eq.trans hDdef h
+    -- 以上から D は右辺像の元
+    have hsrc : ParallelClass F a ∈ classSet F := by
+      -- classSet F = ground.image (class F)
+      -- a ∈ ground.erase u なので a ∈ ground
+      have ha_g : a ∈ F.ground := (Finset.mem_erase.mp ha).2
+      exact Finset.mem_image.mpr (Exists.intro a (And.intro ha_g rfl))
+    apply Finset.mem_image.mpr (Exists.intro (ParallelClass F a)
+           (And.intro hsrc hD'.symm))
+  · intro hD
+    -- 右→左：D = C.erase u, C ∈ classSet F
+    obtain ⟨C, hC, hDdef⟩ :
+        ∃ C, C ∈ classSet F ∧  C.erase u = D :=
+      Finset.mem_image.mp hD
+    -- C = class F a
+    obtain ⟨a, ha, hCdef⟩ :
+        ∃ a, a ∈ F.ground ∧ ParallelClass F a = C:=
+      Finset.mem_image.mp hC
+    -- 場合分け a = u / a ≠ u
+    by_cases hau : a = u
+    · -- a = u の場合：`u‖v` なので `class(trace) v = (class F u).erase u`
+      -- D = C.erase u = (class F u).erase u = (class F v).erase u
+      have hCv : C = ParallelClass F v := by
+        -- C = class F a = class F u = class F v
+        have h1 : C = ParallelClass F u := by
+          exact Eq.trans hCdef.symm (by exact congrArg F.ParallelClass hau)  -- 安定化：型合わせだけ
+        have h2 : ParallelClass F u = ParallelClass F v :=
+          by
+            -- u‖v よりクラス同一
+            --have := parallel_trans (F := F)-- (parallel_symm' (F := F) hp) hp
+            -- 直接クラス等式
+            -- （簡潔に）クラスの定義から `ParallelClass_eq_of_parallel` 相当
+            -- ここでは `Finset.ext` を使う：
+            apply Finset.ext
+            intro x
+            -- 左右の会員判定を `mem_ParallelClass_iff` で開いてから、平行の推移
+            have L : x ∈ ParallelClass F u ↔ (x ∈ F.ground ∧ Parallel F u x) :=
+              (mem_ParallelClass_iff F u x)
+            have R : x ∈ ParallelClass F v ↔ (x ∈ F.ground ∧ Parallel F v x) :=
+              (mem_ParallelClass_iff F v x)
+            constructor
+            · intro hx
+              have hx' := (Iff.mp L) hx
+              -- Parallel F v x は u‖v から
+              have hvx : Parallel F v x := by
+                subst h1 hau hDdef
+                simp_all only [mem_ParallelClass_iff, Parallel, true_and, ne_eq, true_iff, and_self, and_true, Finset.mem_image]
+              exact (Iff.mpr R) (And.intro hx'.1 hvx)
+            · intro hx
+              have hx' := (Iff.mp R) hx
+              have hux : Parallel F u x :=
+                parallel_trans (F := F) hp hx'.2
+              exact (Iff.mpr L) (And.intro hx'.1 hux)
+        -- h1 : C = class F u, h2 : class F u = class F v
+        exact Eq.trans h1 h2
+      -- v は ground.erase u に入る
+      have hv' : v ∈ F.ground.erase u :=
+        Finset.mem_erase.mpr (And.intro (ne_comm.mp hne) hv)
+      -- したがって D は左辺の元：D = class(trace) v
+      have : D = ParallelClass (traceAt u F) v := by
+        -- D = C.erase u = (ParallelClass F v).erase u = class(trace) v
+        have h3 : D = (ParallelClass F v).erase u :=
+          Eq.trans hDdef.symm (by exact congrArg (fun t => t) (congrFun (congrArg Finset.erase hCv) u))
+        -- 対称形にしてから `ParallelClass_trace_eq_erase`
+        have h4 :=
+          ParallelClass_trace_eq_erase (F := F) (u := u) (a := v) hv'
+        -- h4 : class(trace) v = (class F v).erase u
+        -- よって (class F v).erase u = class(trace) v
+        have h4' : (ParallelClass F v).erase u = ParallelClass (traceAt u F) v :=
+          Eq.symm h4
+        exact Eq.trans h3 h4'
+      -- membership に戻す
+      apply Finset.mem_image.mpr
+      apply Exists.intro v
+      · constructor
+        · exact hv'
+        · exact id (Eq.symm this)
+
+    · -- a ≠ u の場合は、`a` を代表にしてそのまま戻す
+      -- D = (class F a).erase u = class(trace) a
+      have : D = ParallelClass (traceAt u F) a := by
+        -- ParallelClass_trace_eq_erase の逆向き
+        have h := ParallelClass_trace_eq_erase
+                   (F := F) (u := u) (a := a)
+                   (Finset.mem_erase.mpr (And.intro hau ha))
+        -- h : class(trace) a = (class F a).erase u
+        -- 逆向きにする
+        have h' : (ParallelClass F a).erase u = ParallelClass (traceAt u F) a :=
+          Eq.symm h
+        -- D = C.erase u = (class F a).erase u = class(trace) a
+        exact Eq.trans hDdef.symm (Eq.trans (by rw [hCdef]) h')
+      -- membership
+      apply Finset.mem_image.mpr
+      apply Exists.intro a
+      · constructor
+        · subst this hCdef
+          simp_all only [ne_eq, Parallel, Finset.mem_image, traceAt_ground, Finset.mem_erase, not_false_eq_true, and_self]
+        · exact id (Eq.symm this)
+
+/-- `erase u` は `classSet F` 上で単射（`u‖v` のとき）。 -/
+lemma erase_on_classSet_injective_of_parallel
+  (F : SetFamily α) (hasU: F.sets F.ground) {u v : α}
+  (hu : u ∈ F.ground) --(hv : v ∈ F.ground)
+  (hne : u ≠ v) (hp : Parallel F u v) :
+  Function.Injective
+    (fun (C : {C // C ∈ classSet F}) => (C.1).erase u) := by
+  classical
+  intro C D hEq
+  -- `C.1` と `D.1` をそれぞれ `Cset`, `Dset` と名付けて扱う
+  let Cset := C.1
+  let Dset := D.1
+  have hCmem : Cset ∈ classSet F := C.2
+  have hDmem : Dset ∈ classSet F := D.2
+  -- 目標：Cset = Dset
+  -- Finset.ext で任意の x に対して同値を示す
+  apply Subtype.ext
+  apply Finset.ext
+  intro x
+  by_cases hx : x = u
+  · -- x = u：`u ∈ Cset ↔ v ∈ Cset ↔ v ∈ Dset ↔ u ∈ Dset`
+    -- v ≠ u
+    have hvne : v ≠ u := ne_comm.mp hne
+    -- `v ∈ Cset.erase u ↔ v ∈ Dset.erase u` は hEq から
+    have hveq : (v ∈ Cset.erase u) ↔ (v ∈ Dset.erase u) := by
+      -- 等式の両辺でメンバ判定を移す
+      -- `congrArg` を使わず、明示に両方向を与える
+      constructor
+      · intro hvC
+        -- hEq : Cset.erase u = Dset.erase u
+        -- 置換
+        have : v ∈ Dset.erase u := by
+          -- cast を用いた置換（安定）
+          subst hx
+          simp_all only [Finset.coe_mem, ne_eq, Parallel, Finset.mem_erase, not_false_eq_true, true_and, and_self, Cset, Dset]
+
+        exact this
+      · intro hvD
+        have : v ∈ Cset.erase u := by
+          subst hx
+          simp_all only [Finset.coe_mem, ne_eq, Parallel, Finset.mem_erase, not_false_eq_true, true_and, and_self, Cset, Dset]
+
+
+        exact this
+    -- `v ≠ u` なので、`v ∈ S.erase u ↔ v ∈ S`
+    have hvC_iff : (v ∈ Cset.erase u) ↔ (v ∈ Cset) := by
+      constructor
+      · intro hvC
+        exact (Finset.mem_erase.mp hvC).2
+      · intro hvC
+        exact Finset.mem_erase.mpr (And.intro hvne hvC)
+    have hvD_iff : (v ∈ Dset.erase u) ↔ (v ∈ Dset) := by
+      constructor
+      · intro hvD
+        exact (Finset.mem_erase.mp hvD).2
+      · intro hvD
+        exact Finset.mem_erase.mpr (And.intro hvne hvD)
+    -- 連結：u∈Cset ↔ v∈Cset（同値）↔ v∈Dset ↔ u∈Dset
+    have h1 : (u ∈ Cset) ↔ (v ∈ Cset) := by
+      apply mem_u_iff_mem_v_of_class F
+      subst hx
+      simp_all only [Finset.coe_mem, ne_eq, Parallel, Finset.mem_erase, not_false_eq_true, true_and, Cset, Dset]
+      exact hp
+      exact hCmem
+    have h2 : (u ∈ Dset) ↔ (v ∈ Dset) := by
+      apply mem_u_iff_mem_v_of_class F hasU hp hDmem
+    -- まとめ
+    constructor
+    · intro huC
+      have hvC : v ∈ Cset := by
+        subst hx
+        simp_all only [Finset.coe_mem, ne_eq, Parallel, Finset.mem_erase, not_false_eq_true,
+          true_and, iff_true, Cset, Dset]
+
+      have hvD : v ∈ Dset := by
+        have : v ∈ Cset.erase u := (Iff.mpr hvC_iff) hvC
+        have : v ∈ Dset.erase u := (Iff.mp hveq) this
+        exact (Iff.mp hvD_iff) this
+      subst hx
+      simp_all only [Finset.coe_mem, ne_eq, Parallel, Finset.mem_erase, not_false_eq_true, and_self, iff_true, Cset, Dset]
+
+    · intro huD
+      have hvD : v ∈ Dset := by
+        subst hx
+        simp_all only [Finset.coe_mem, ne_eq, Parallel, Finset.mem_erase, not_false_eq_true, true_and, true_iff, Cset, Dset]
+
+      have hvC : v ∈ Cset := by
+        have : v ∈ Dset.erase u := (Iff.mpr hvD_iff) hvD
+        have : v ∈ Cset.erase u := (Iff.mpr hveq) this
+        exact (Iff.mp hvC_iff) this
+      subst hx
+      simp_all only [Finset.coe_mem, ne_eq, Parallel, Finset.mem_erase, not_false_eq_true, and_self, iff_true, Cset, Dset]
+
+  · -- x ≠ u：`x ∈ S` ↔ `x ∈ S.erase u` で両辺の等式から移す
+    have hxC_iff : (x ∈ Cset) ↔ (x ∈ Cset.erase u) := by
+      constructor
+      · intro hxC; exact Finset.mem_erase.mpr (And.intro hx hxC)
+      · intro hxC; exact (Finset.mem_erase.mp hxC).2
+    have hxD_iff : (x ∈ Dset) ↔ (x ∈ Dset.erase u) := by
+      constructor
+      · intro hxD; exact Finset.mem_erase.mpr (And.intro hx hxD)
+      · intro hxD; exact (Finset.mem_erase.mp hxD).2
+    -- 等式 hEq を介して `x ∈ Cset.erase u ↔ x ∈ Dset.erase u`
+    have heq_x :
+        (x ∈ Cset.erase u) ↔ (x ∈ Dset.erase u) := by
+      constructor
+      · intro hxC
+        simp [Dset]
+        constructor
+        · exact hx
+        · simp_all [Cset]
+      · intro hxD
+        simp_all only [ne_eq, Parallel, Finset.coe_mem, Finset.mem_erase, not_false_eq_true, and_self, Cset, Dset]
+
+    -- まとめ
+    constructor
+    · intro hxC
+      have : x ∈ Cset.erase u := (Iff.mp hxC_iff) hxC
+      have : x ∈ Dset.erase u := (Iff.mp heq_x) this
+      exact Finset.mem_of_mem_erase this
+    · intro hxD
+      have : x ∈ Dset.erase u := (Iff.mp hxD_iff) hxD
+      have : x ∈ Cset.erase u := (Iff.mpr heq_x) this
+      exact Finset.mem_of_mem_erase this
+
+
+@[simp] lemma ground_card_trace_of_mem
+    (F : SetFamily α) {u : α} (hu : u ∈ F.ground) :
+    (traceAt u F).ground.card = F.ground.card - 1 := by
+  classical
+  -- `traceAt` の ground 定義が `F.ground.erase u` であることを使用
+  simp [traceAt, hu]
+
+/-- ★ 最終目標：`excess` は 1 減る。 -/
+lemma excess_trace
+  (F : SetFamily α) (hasU: F.sets F.ground)(Nonemp:F.ground.card ≥ 1) (u v : α)
+  (hu : u ∈ F.ground) (hv : v ∈ F.ground)
+  (huv : u ≠ v) (hp : Parallel F u v) :
+  excess (traceAt u F) = excess F - 1 := by
+  classical
+  -- 台集合サイズは 1 減る
+  have hground :
+      (traceAt u F).ground.card = F.ground.card - 1 := by
+    apply ground_card_trace_of_mem (F := F) (hu := hu)
+  -- クラス集合は `erase u` の像と一致
+  have hclassSet :
+      classSet (traceAt u F) = (classSet F).image (fun C => C.erase u) :=
+    classSet_trace_eq_image_erase_of_parallel
+      (F := F) (hu := hu) (hv := hv) (hne := huv) (hp := hp)
+  -- 像の濃度 = 元集合の濃度（単射）
+  have hinj :
+      Function.Injective
+        (fun (C : {C // C ∈ classSet F}) => (C.1).erase u) := by
+    apply erase_on_classSet_injective_of_parallel hasU
+      (F := F) (hu := hu) (hne := huv) (hp := hp)
+  -- `card (image f S) = card S` を得る
+  have hcard_image :
+      ((classSet F).image (fun C => C.erase u)).card
+      = (classSet F).card := by
+    -- Finset.card_image は「≤」しか出さないので、単射版を組み立て
+    -- 付随する Subtype 版の injective から結論
+    -- 既存補題：card_image_iff.mpr 形式がない場合は、標準の `card_image` + `le_antisymm`
+    -- だがここは inj を供給できるので、`Finset.card_image_...` 同値版を使う
+    -- 安定のため明示に書く：
+    apply Finset.card_image_of_injOn
+
+    exact Set.injOn_iff_injective.mpr hinj -- ← もし手元の mathlib で card=card の直接補題名が違う場合、ここを差し替えて下さい。
+  -- クラス個数は等しい
+  have hnum :
+      numClasses (traceAt u F) = numClasses F := by
+    -- 定義展開と `hclassSet`、`hcard_image`
+    unfold numClasses
+    have : (classSet (traceAt u F)).card
+           = ((classSet F).image (fun C => C.erase u)).card :=
+      congrArg Finset.card hclassSet
+    -- これで card = card
+    have : (classSet (traceAt u F)).card = (classSet F).card :=
+      Eq.trans this hcard_image
+    -- そのまま戻す
+    exact this
+  -- あとは算術
+  -- LHS = (a - 1) - b, RHS = (a - b) - 1 をともに a - (b + 1) に落とす
+  unfold excess
+  -- 左辺 使わなかったのか？
+  have L :
+      (traceAt u F).ground.card - numClasses (traceAt u F)
+      = (F.ground.card:Int) - (1 + numClasses F) := by
+    -- ground.card = a - 1, classes = b
+    -- (a - 1) - b = a - (1 + b)
+    have : (traceAt u F).ground.card = F.ground.card - 1 := hground
+    have : (F.ground.card - 1) - numClasses (traceAt u F)
+           = F.ground.card - (1 + numClasses (traceAt u F)) :=
+      Nat.sub_sub _ _ _
+    -- 書き換え
+    -- numClasses(trace) = numClasses F
+    have : F.ground.card - (1 + numClasses (traceAt u F))
+           = F.ground.card - (1 + numClasses F) := by
+      -- 加法の第2引数を書き換え
+      exact congrArg (fun t => F.ground.card - (1 + t)) hnum
+    -- まとめ
+    -- まず ground を置換
+    have : (traceAt u F).ground.card - numClasses (traceAt u F)
+           = (F.ground.card:Int) - (1 + numClasses (traceAt u F)) := by
+      -- (a' - b) 形に合わせるため、一旦 (a - 1) に差し替え
+      simp
+      simp at this
+      simp_all
+      omega
+
+    -- 安定のため、直接等式連鎖を書かず、ゴールで使う形だけ残す
+    -- ここは上の等式連鎖で十分置換できている前提です
+    -- 最終形を返す
+    -- （もし上の補助がビルド環境で合わなければ、`rw [hground, hnum, Nat.sub_sub]` の列を書いてください）
+    rw [this]
+    simp_all only [ge_iff_le, Finset.one_le_card, ne_eq, Parallel, traceAt_ground, Finset.card_erase_of_mem, Nat.cast_sub,
+    Nat.cast_one]
+
+  -- 右辺
+  have R :
+      F.ground.card - numClasses F - 1
+      = F.ground.card - (numClasses F + 1) := by
+    exact Nat.sub_sub _ _ _
+  -- 仕上げ
+  -- LHS: (a - (1 + b)) - 0 みたいな形に合わせ、最後に `Nat.add_comm`
+  -- まず左辺の `excess (traceAt u F)` を L に、右辺 `excess F - 1` を R に置換
+  -- その後、`1 + b = b + 1` で一致
+  have : (traceAt u F).ground.card - numClasses (traceAt u F)
+          = F.ground.card - (numClasses F + 1) := by
+    -- L と加法可換律
+    have : F.ground.card - (1 + numClasses F)
+           = F.ground.card - (numClasses F + 1) :=
+      by
+        -- `a - (1 + b) = a - (b + 1)`
+        -- 右辺の引数を書き換えるだけ
+        exact congrArg (fun t => F.ground.card - t) (Nat.add_comm 1 (numClasses F))
+    -- L を流し込む
+    -- 注意：ここは `calc` で安全に
+    have L' :
+        (traceAt u F).ground.card - numClasses (traceAt u F)
+        = F.ground.card - (1 + numClasses F) := by
+      rw [←hnum]
+      rw [hground]
+      omega
+
+    exact Eq.trans L' this
+  -- 最後に excess の定義に戻す
+  -- (a - b) - 1 = a - (b + 1)
+  calc
+    excess (traceAt u F)
+        = (traceAt u F).ground.card - numClasses (traceAt u F) := rfl
+    _   = F.ground.card - (numClasses F + 1) := this
+    _   = (F.ground.card - numClasses F) - 1 := by
+            -- 逆向きに `Nat.sub_sub` を使う
+            exact Eq.symm (Nat.sub_sub _ _ _)
+    _   = excess F - 1 := rfl
+
+/-
+/-以下を示す必要はあったのか？-/
+lemma ParallelClass_card_trace
+  (F : SetFamily α) (u a : α) (ha : a ≠ u) :
+  (ParallelClass (traceAt u F) a).card =
+    if u ∈ ParallelClass F a then (ParallelClass F a).card - 1
+    else (ParallelClass F a).card := by
+    sorry
+-/
+
+/-同内容の補題あり。
+lemma ParallelClass_trace_eq_erase
+  (F : SetFamily α) (u w : α) (hw : w ≠ u) :
+  ParallelClass (traceAt u F) w
+  = (ParallelClass F w).erase u := by
+  classical
+  -- ext b; それぞれ mem_filter をほどき、(3) と b≠u を使って同値に落とすだけ
+  sorry
+-/
+
+
+
+
+
+
+
 
 /-
 --条件が弱いかも。uは大きさ2以上の同値類に含まれないといけない。
@@ -495,12 +913,6 @@ lemma NDS_traceAt_rewrite
 
 --------
 
-@[simp] lemma ground_card_trace_of_mem
-    (F : SetFamily α) {u : α} (hu : u ∈ F.ground) :
-    (traceAt u F).ground.card = F.ground.card - 1 := by
-  classical
-  -- `traceAt` の ground 定義が `F.ground.erase u` であることを使用
-  simp [traceAt, hu]
 
 /-ChatGPTの3番-/
 lemma erase_on_edges_injective_of_parallel
@@ -597,7 +1009,7 @@ lemma erase_on_edges_injective_of_parallel
 `parallel` はここでは不要（像集合の同一性）。 -/
 lemma edgeFinset_trace_eq_image_erase_of_parallel
     (F : SetFamily α) {u v : α}
-    (huv : F.Parallel u v) (hne : u ≠ v) :
+    (_ : F.Parallel u v) (_ : u ≠ v) :
     (traceAt u F).edgeFinset = F.edgeFinset.image (fun A => A.erase u) := by
   classical
   -- メンバーシップ同値で両包含を示す
@@ -777,15 +1189,7 @@ lemma sum_edge_sizes_trace_version_of_parallel
   仮定：`u` は ground に属し，`v` は `u` の parallel パートナー。 -/
 lemma NDS_eq_of_parallel
     (F : SetFamily α) {u v : α}
-    (huv : F.Parallel u v) (hne : u ≠ v) (hu : u ∈ F.ground)
-    (hNDSDef :
-      F.NDS
-        = 2 * (∑ A ∈ F.edgeFinset, (A.card : Int))
-          - (F.numHyperedges : Int) * (F.ground.card : Int))
-    (hNDSDefTrace :
-      (traceAt u F).NDS
-        = 2 * (∑ B ∈ (traceAt u F).edgeFinset, (B.card : Int))
-          - ((traceAt u F).numHyperedges : Int) * ((traceAt u F).ground.card : Int)) :
+    (huv : F.Parallel u v) (hne : u ≠ v) (hu : u ∈ F.ground):
     F.NDS = (traceAt u F).NDS + 2 * (F.degree u : Int) - (F.numHyperedges : Int) := by
 classical
   -- ⑧（Nat）を Int に持ち上げる：
@@ -822,8 +1226,7 @@ classical
     -- と `hV_nat` からの置換
     simp
     let nc := (Nat.succ_pred_eq_of_pos hV_pos)
-    simp_all only [Parallel, ne_eq, NDS_def, sub_left_inj, mul_eq_mul_left_iff, OfNat.ofNat_ne_zero, or_false,
-    traceAt_ground, Finset.card_erase_of_mem, Nat.cast_pred]
+    simp_all only [Parallel, ne_eq, traceAt_ground, Finset.card_erase_of_mem]
     exact nc
 
 
@@ -839,7 +1242,12 @@ classical
   calc
     F.NDS
         = 2 * (∑ A ∈ F.edgeFinset, (A.card : Int))
-            - (F.numHyperedges : Int) * (F.ground.card : Int) := hNDSDef
+            - (F.numHyperedges : Int) * (F.ground.card : Int) := by
+            let nd := NDS_def F
+            rw [nd]
+            dsimp [SetFamily.totalHyperedgeSize]
+            simp_all only [Parallel, ne_eq, traceAt_ground, Finset.card_erase_of_mem, Finset.card_pos, Finset.one_le_card,
+               Nat.sub_add_cancel, Nat.cast_sub, Nat.cast_one, sub_add_cancel, Nat.cast_add, Nat.cast_sum]
     _   = 2 * ( (∑ B ∈ (traceAt u F).edgeFinset, (B.card : Int))
                 + (F.degree u : Int))
             - ((traceAt u F).numHyperedges : Int) * (((traceAt u F).ground.card : Int) + 1) := by
