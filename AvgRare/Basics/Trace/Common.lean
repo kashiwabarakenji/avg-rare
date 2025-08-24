@@ -723,6 +723,8 @@ lemma excess_trace
             exact Eq.symm (Nat.sub_sub _ _ _)
     _   = excess F - 1 := rfl
 
+
+
 /-
 /-以下を示す必要はあったのか？-/
 lemma ParallelClass_card_trace

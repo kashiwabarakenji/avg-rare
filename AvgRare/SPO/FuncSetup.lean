@@ -161,6 +161,7 @@ lemma sim_trans {x y z : S.Elem} (hxy : S.sim x y) (hyz : S.sim y z) : S.sim x z
   · exact S.le_trans hyz.2 hxy.2
 
 /-- `sim` を `Setoid` に。 -/
+--現状使ってない
 def simSetoid : Setoid S.Elem where
   r := S.sim
   iseqv := ⟨S.sim_refl, S.sim_symm, S.sim_trans⟩
@@ -182,10 +183,11 @@ lemma f_ne_of_nontrivialClass {u : S.Elem}
 /-- （使い勝手用）非自明同値類のとき，後継 `f u` を
     「u と異なる ground の元」として取り出す形。 -/
 -- hvは暗黙につかっている。
+--現状使ってない。
 lemma exists_succ_partner_of_nontrivial
     {u : α} (hu : u ∈ S.ground)
     (h : S.nontrivialClass (S.toElem! hu)) :
-    ∃ (v : α) (hv : v ∈ S.ground), v ≠ u := by
+    ∃ (v : α) (_ : v ∈ S.ground), v ≠ u := by
   classical
   let ue : S.Elem := ⟨u, hu⟩
   let ve : S.Elem := S.f ue
@@ -298,6 +300,7 @@ def leOn (S : SPO.FuncSetup α) (y x : α) : Prop :=
   ∃ (hy : y ∈ S.ground) (hx : x ∈ S.ground),
       SPO.FuncSetup.le S ⟨y, hy⟩ ⟨x, hx⟩
 
+--結構使っている
 lemma leOn_iff_subtype (S : FuncSetup α) {a b : α}
   (ha : a ∈ S.ground) (hb : b ∈ S.ground) :
   S.leOn a b ↔ S.le ⟨a, ha⟩ ⟨b, hb⟩ := by
@@ -332,6 +335,22 @@ by
   have h_yz : S.le ⟨y, hy⟩ ⟨z, hz⟩ :=
     Relation.ReflTransGen.trans h_yx' h_xz
   exact ⟨hy, hz, h_yz⟩
+
+/-! ## 3) Lemma 3.1：maximal ⇒ rare -/
+
+lemma sim_of_maximal_above_class
+    (S : FuncSetup α) {u x y : S.Elem}
+    (hmax : S.maximal u)
+    (hyU : S.sim y u) (hyx : S.le y x) :
+    S.sim x u := by
+  -- `u ≤ x` と `x ≤ u` の両方を示せば良い
+  constructor
+  · -- まず `u ≤ x`
+    have hux : S.le u x := S.le_trans hyU.2 hyx
+    -- 最大性：`u ≤ x → x ≤ u`
+    exact hmax hux
+  · -- つぎに `u ≤ x` は上で得た `hux`
+    exact S.le_trans hyU.2 hyx
 
 /-- S に対応する order-ideal family を ground 型 `α` 上の `SetFamily` として与える。 -/
 --このファイルではidealは使わないが、FuncSetupからidealFaimilyが定理できると便利なので定義だけ与える。
@@ -439,20 +458,6 @@ lemma simClass_subset_of_contains
   have := hIdeal.2 (x := u.1) hxI (y := a) (by exact ha) h_leOn
   exact this
 
-/- ground 上の比較を subtype に引き上げる便利関数。 -/
---def toElem! (S : SPO.FuncSetup α) {x : α} (hx : x ∈ S.ground) : S.Elem := ⟨x, hx⟩
-
-/-! ## 2) Lemma 3.3：同値（∼）と parallel の同値 -/
-
-/-
---使ってない。パラレルとpreorderの同値性を証明するものか？
-lemma parallel_of_sim
-    (S : SPO.FuncSetup α) {u v : α} (hu : u ∈ S.ground) (hv : v ∈ S.ground)
-    (hSim : SPO.FuncSetup.sim S (S.toElem! hu) (S.toElem! hv)) :
-    (S.idealFamily).Parallel u v := by
-  -- `parallel_iff_sim` の →← のうち、← だけを先に言明
-  sorry
--/
 
 @[simp] lemma mem_coeFinset_val_iff
     (S : FuncSetup α) {I : Finset S.Elem} {a : α} :
@@ -595,6 +600,232 @@ lemma leOn_iff (S : FuncSetup α)
     · intro a
       induction a
       simp_all only [exists_true_left]
+
+--variable (S : FuncSetup α) (x y : S.Elem)
+--variable (S : FuncSetup α) [DecidableRel (S.le)]
+noncomputable def Iy (S : FuncSetup α) (y : S.Elem) : Finset S.Elem :=
+  S.ground.attach.filter (fun z : S.Elem => S.le z y)
+
+-- 目標： hb : b ∈ S.ground, hleOn : S.leOn b a, haGround : a ∈ S.coeFinset Iy
+--       から b ∈ S.coeFinset Iy を出す
+--xとyに大小関係があれば、yを含むidealは、xも含む。重要補題。
+--基礎補題を集めたファイルを作って分離してもよい。
+lemma le_iff_forall_ideal_mem
+  (S : FuncSetup α) (x y : S.Elem) :
+  S.le x y ↔
+    (∀ I : Finset S.Elem,
+      (S.idealFamily).sets (S.coeFinset I) → y ∈ I → x ∈ I) := by
+  constructor
+  · -- (→) : `x ≤ y` なら、任意のイデアル I で `y ∈ I → x ∈ I`
+    intro hxy I hI hyI
+    -- イデアルの定義は α 上の order-ideal なので、`coeFinset I` に持ち上げる
+    have hIdeal :
+        isOrderIdealOn (S.leOn) S.ground (S.coeFinset I) :=
+      (S.sets_iff_isOrderIdeal).1 hI
+    -- y ∈ I から y.1 ∈ coeFinset I
+    have hy' : (y.1 : α) ∈ S.coeFinset I := by
+
+      exact (mem_coeFinset_iff S (I:=I) (a:=y.1) (ha:=y.2)).2 hyI
+    -- order-ideal のダウンワード閉包で x.1 ∈ coeFinset I を得る
+    have hx' : (x.1 : α) ∈ S.coeFinset I := by
+      -- `S.leOn` は α 上の関係。`x y : S.Elem` からは `S.leOn x.1 y.1`
+      have hleOn : S.leOn x.1 y.1 := by exact (S.le_iff_leOn_val x y).mp hxy--S.le_to_leOn hxy
+      simp_all only [ FuncSetup.mem_coeFinset, Subtype.exists, exists_and_right,
+         exists_eq_right, Subtype.coe_eta, Finset.coe_mem, exists_const]
+      exact S.mem_of_le_of_mem_inIdeal hIdeal hleOn  hyI
+
+    -- もう一度 subtype に戻す
+    simp_all only [FuncSetup.mem_coeFinset, Subtype.exists, exists_and_right,
+    exists_eq_right, Subtype.coe_eta, Finset.coe_mem, exists_const]
+
+  · -- (←) : 逆向き。`Iy` を y 以下の元の集合として取る
+    intro hAll
+    -- `Iy := { z ∈ ground | z ≤ y }` を Finset S.Elem で
+    let Iy : Finset S.Elem :=
+      S.ground.attach.filter (fun z => S.le z y)
+    have hyIy : y ∈ Iy := by
+      -- y は ground にあり、かつ y ≤ y
+      have hy₀ : y ∈ S.ground.attach := by
+        exact Finset.mem_attach S.ground y
+      have : S.le y y := S.le_refl y
+      simpa [Iy] using Finset.mem_filter.mpr ⟨hy₀, this⟩
+    -- `S.coeFinset Iy` は α 上のイデアルであることを示す
+    have hIy_sets : (S.idealFamily).sets (S.coeFinset Iy) := by
+      -- isOrderIdealOn へ落とす（あなたの `sets_iff_isOrderIdeal` を利用）
+      have : isOrderIdealOn (S.leOn) S.ground (S.coeFinset Iy) := by
+        -- ⟨downward_closed, subset_ground⟩ を And で与える
+        refine And.intro ?dc ?subset
+        · -- ?dc : downward closed
+          -- 目標: ∀ a ∈ ground, ∀ b, S.leOn b a → a ∈ S.coeFinset Iy → b ∈ S.coeFinset Iy
+          simp_all only [Finset.mem_filter, Finset.mem_attach, true_and, Iy]
+          intro z hz
+          simp_all only [FuncSetup.mem_coeFinset, Finset.mem_filter, Finset.mem_attach, true_and, Subtype.exists,
+            ]
+          simp_all only [FuncSetup.le_iff_leOn_val, FuncSetup.sets_iff_isOrderIdeal, exists_and_left, exists_prop,
+            exists_eq_right_right]
+        · -- ?subset : S.coeFinset Iy ⊆ S.ground
+          intro a haIn
+          -- a ∈ coeFinset Iy から代表元 z を取り出す
+          rcases (S.mem_coeFinset_val_iff).1 haIn with ⟨z, hzIy, hz⟩
+          -- フィルタ左成分から z ∈ ground.attach
+          have hzInAttach : z ∈ S.ground.attach :=
+            (Finset.mem_filter).1 hzIy |>.left
+          -- attach から ground へ
+          have hzGround : z.1 ∈ S.ground := by
+            subst hz
+            simp_all only [ Finset.mem_filter, Finset.mem_attach, true_and,
+              FuncSetup.mem_coeFinset, Subtype.exists, Finset.coe_mem, Iy]
+
+          -- ので a ∈ ground
+          -- `rw [hz]` を使わず等式で置換してもOK
+          have : a ∈ S.ground := by
+            -- a = z.1
+            -- `subst` でも良い
+            -- `convert hzGround using 1; exact hz.symm`
+            exact Eq.ndrec hzGround hz
+
+          intro y_1 a_1 a_2
+          subst hz
+          simp_all only [Finset.mem_attach, FuncSetup.mem_coeFinset, Subtype.exists, Finset.coe_mem,Iy]
+          simp_all
+          apply S.leOn_trans
+          exact a_2
+          exact hzIy
+          -- 目標は b ∈ S.coeFinset Iy なので、存在証明で入れる
+      simp_all only [Finset.mem_filter, Finset.mem_attach, true_and, Iy]
+      exact this
+
+    -- 仮定 `hAll` を Iy に適用すると x ∈ Iy
+    have hxIy : x ∈ Iy := hAll Iy hIy_sets hyIy
+    -- 以上より `x ≤ y` が従う
+    have hxLe : S.le x y := (Finset.mem_filter.mp hxIy).2
+    exact hxLe
+
+/-- 論文 Lemma 3.3：
+`u, v` が同じ同値類（S.sim）であることと，`idealFamily S` における parallel が同値。 -/
+--この関係はfunctionalでなくても成り立つはずであるがここではfunctionalなものに対して証明している。
+theorem parallel_iff_sim
+  (S : FuncSetup α) (u v : S.Elem) :
+  (S.idealFamily).Parallel u v ↔ FuncSetup.sim S u v := by
+  constructor
+  · intro hPar
+    -- (∀ I, sets (coeFinset I) → (u∈I ↔ v∈I)) に言い換える
+
+    have hUV :
+      ∀ I : Finset S.Elem,
+        (S.idealFamily).sets (S.coeFinset I) →
+        (u ∈ I ↔ v ∈ I) := by
+      dsimp [SetFamily.Parallel, FuncSetup.coeFinset] at *
+      intro I hI
+      constructor
+      · intro hu
+        have : (Finset.image (fun x => ↑x) I) ∈ {A | S.idealFamily.sets A ∧ ↑u ∈ A} :=
+        by
+          rw [@Set.mem_setOf_eq]
+          constructor
+          · exact hI
+          · simp_all only [ Finset.mem_image, Subtype.exists, exists_and_right, exists_eq_right,
+            Subtype.coe_eta, Finset.coe_mem, exists_const]
+        simp_all only [ Set.mem_setOf_eq, Finset.mem_image, Subtype.exists, exists_and_right,
+          exists_eq_right, Subtype.coe_eta, Finset.coe_mem, exists_const, true_and]
+      · intro hv
+        have : (Finset.image (fun x => ↑x) I) ∈ {A | S.idealFamily.sets A ∧ ↑v ∈ A} :=
+        by
+          rw [@Set.mem_setOf_eq]
+          constructor
+          · exact hI
+          · simp_all only [Finset.mem_image, Subtype.exists, exists_and_right, exists_eq_right,
+            Subtype.coe_eta, Finset.coe_mem, exists_const]
+        rw [←hPar] at this
+        rw [Set.mem_setOf_eq] at this
+        simp_all only [Finset.mem_image, Subtype.exists, exists_and_right, exists_eq_right,
+          Subtype.coe_eta, Finset.coe_mem, exists_const]
+
+    -- 右向きに le_iff を使って S.le u v
+
+    have huv : S.le u v := by
+      let lifim := (le_iff_forall_ideal_mem S u v).mpr
+      apply lifim
+      intro I a a_1
+      simp_all only [SetFamily.Parallel]
+
+    -- 左向きに le_iff を使って S.le v u
+    have hvu : S.le v u := by
+      let lifim := (le_iff_forall_ideal_mem S v u).mpr
+      apply lifim
+      intro I a a_1
+      simp_all only [SetFamily.Parallel]
+    dsimp [FuncSetup.sim]
+    exact ⟨huv, hvu⟩
+
+  · intro hSim
+    -- `le_iff_forall_ideal_mem` を左右に使って各 ideal での会員同値を出す
+    rcases hSim with ⟨huv, hvu⟩
+    dsimp [SetFamily.Parallel] at *
+    ext J
+
+    constructor
+    swap
+    · intro hu
+
+      rw [@Set.mem_setOf_eq]
+      rw [@Set.mem_setOf_eq] at hu
+      constructor
+      · exact hu.1
+      · have : J ⊆ S.ground := by
+          exact S.idealFamily.inc_ground hu.1
+
+        let lifim := (le_iff_forall_ideal_mem S u v).mp huv (S.liftFinset J this)
+        rw [S.coeFinset_liftFinset] at lifim
+        specialize lifim hu.1
+        simp_all only [FuncSetup.le_iff_leOn_val, FuncSetup.sets_iff_isOrderIdeal, FuncSetup.mem_liftFinset_iff, forall_const]
+
+    · intro hv
+      -- 対称に同様
+      rw [@Set.mem_setOf_eq]
+      rw [@Set.mem_setOf_eq] at hv
+      constructor
+      · exact hv.1
+      · have : J ⊆ S.ground := by
+          exact S.idealFamily.inc_ground hv.1
+
+        let lifim := (le_iff_forall_ideal_mem S v u).mp hvu (S.liftFinset J this)
+        rw [S.coeFinset_liftFinset] at lifim
+        specialize lifim hv.1
+        simp_all only [FuncSetup.le_iff_leOn_val, FuncSetup.sets_iff_isOrderIdeal, FuncSetup.mem_liftFinset_iff, forall_const]
+
+
+/- =====================================================
+   2) sim ↔ Parallel（既存）を α レベルに渡すための型合わせ
+   ===================================================== -/
+
+-- 既存: parallel_iff_sim (S : FuncSetup α) (u v : S.Elem)
+-- をそのまま使い、必要なら underlying へ落とすだけ。
+lemma parallel_of_sim_coe (S : FuncSetup α) {x y : S.Elem}
+    (h : FuncSetup.sim S x y) :
+    (S.idealFamily).Parallel (x : α) (y : α) := by
+  -- `Parallel` の引数が α のとき、`x y : S.Elem` は自動で coercion されます。
+  -- 既存の `parallel_iff_sim` を使うだけで OK。
+  have hxy : (S.idealFamily).Parallel x y :=
+    (parallel_iff_sim S x y).2 h
+  -- ここで `x y` は自動 coercion され、目標型に一致します。
+  exact hxy
+
+/- ground 上の比較を subtype に引き上げる便利関数。 -/
+--def toElem! (S : SPO.FuncSetup α) {x : α} (hx : x ∈ S.ground) : S.Elem := ⟨x, hx⟩
+
+/-! ## 2) Lemma 3.3：同値（∼）と parallel の同値 -/
+
+/-
+--使ってない。パラレルとpreorderの同値性を証明するものか？
+lemma parallel_of_sim
+    (S : SPO.FuncSetup α) {u v : α} (hu : u ∈ S.ground) (hv : v ∈ S.ground)
+    (hSim : SPO.FuncSetup.sim S (S.toElem! hu) (S.toElem! hv)) :
+    (S.idealFamily).Parallel u v := by
+  -- `parallel_iff_sim` の →← のうち、← だけを先に言明
+  sorry
+-/
+
 
 
 /-
@@ -758,9 +989,11 @@ private lemma iterate_fixpoint {β} (g : β → β) (u : β) (n : ℕ) (hu : g u
     -- `simp [Nat.iterate, hu, ih]` だけでも通る
     simp [Nat.iterate, hu, ih]
 
+end IterateRTG
+
 --Parallel関係
 
-
+omit [DecidableEq α] in
 lemma maximal_of_nontrivialClass_lemma
     (f : α → α) [Fintype α] {u v : α}
     (huv : Relation.ReflTransGen (stepRel f) u v ∧
@@ -981,9 +1214,73 @@ lemma maximal_of_nontrivialClass_lemma
   -- イテレート等式から ReflTransGen を得る（← 方向）
   exact (reflTransGen_iff_exists_iterate f).2 ⟨t, h_iter_eq⟩
 
+--パラレルな元であれば、uからxにいければxからuにいける。
+--極大性は使ってない。parallel_iff_simは使う立場。
+--nontrivialClassの仮定を使って書き換えられそう。
+--nds_monotone_under_traceで利用されている。
+--この言明には、functionalという仮定が必要。
+lemma maximal_of_parallel_nontrivial
+    (S : SPO.FuncSetup α) {u v : α}
+    (hu : u ∈ S.ground) (hv : v ∈ S.ground)
+    (hpar : (S.idealFamily).Parallel u v)
+    (hneq : u ≠ v) :
+    ∀ x : S.Elem,
+      Relation.ReflTransGen (stepRel S.f) (S.toElem! hu) x →
+      Relation.ReflTransGen (stepRel S.f) x (S.toElem! hu) := by
+  -- ① parallel ⇒ sim
+  have hsim : SPO.FuncSetup.sim S (S.toElem! hu) (S.toElem! hv) := by
+    -- `parallel_iff_sim` の → 方向
+    have hiff := S.parallel_iff_sim (u:=S.toElem! hu) (v:=S.toElem! hv)
+    exact (S.parallel_iff_sim (S.toElem! hu) (S.toElem! hv)).mp hpar
+
+  -- ② sim ⇒ 互いに到達可能（= `S.le` が両向き）
+  --    ここはあなたの sim の定義／補題に合わせて置換してください。
+  --    例：`sim_iff` や `le_of_sim_left/right` 等。
+  have hle_uv : S.le (S.toElem! hu) (S.toElem! hv) ∧ S.le (S.toElem! hv) (S.toElem! hu) := by
+    -- 代表例：`sim_iff` がある場合
+    -- exact (SPO.FuncSetup.sim_iff (S:=S) (a:=S.toElem! hu) (b:=S.toElem! hv)).1 hsim
+    -- もしくは片側ずつ取り出す補題があるならそれで OK
+    simp_all only [SetFamily.Parallel, ne_eq]
+    exact hsim
+
+  -- ③ `S.le` を `ReflTransGen (stepRel S.fV)` に落とす
+  --    （`S.le` の定義が「被覆の反射推移閉包」なら `Iff.rfl`/既存のブリッジ補題で変換できます）
+  have huv :
+      Relation.ReflTransGen (stepRel S.f) (S.toElem! hu) (S.toElem! hv) ∧
+      Relation.ReflTransGen (stepRel S.f) (S.toElem! hv) (S.toElem! hu) := by
+    -- 代表例：`S.le` の定義が `Relation.ReflTransGen S.cover` で `S.cover = stepRel S.fV`
+    -- ならそれぞれ定義展開で終わりです。環境のブリッジ補題名に置換してください。
+    -- 例：`(reach_eq_reflTrans (S:=S) _ _).1/2` など
+    -- 左向き
+    have h1 := hle_uv.1
+    -- 右向き
+    have h2 := hle_uv.2
+    -- ここで h1, h2 を `ReflTransGen (stepRel S.fV)` へ移す
+    -- 置換例：
+    -- exact ⟨(by exact h1), (by exact h2)⟩
+    simp_all only [SetFamily.Parallel, ne_eq, and_self]
+    exact hsim
+
+  -- ④ `u ≠ v` をサブタイプでも非自明に
+  have hneq' : (S.toElem! hu) ≠ (S.toElem! hv) := by
+    intro h
+    -- 値写像で矛盾
+    have : u = v := congrArg Subtype.val h
+    exact hneq this
+
+  -- ⑤ あなたの補題を適用（`α := S.Elem, f := S.fV`）
+  have hmax :=
+    maximal_of_nontrivialClass_lemma
+      (α := S.Elem) (f := S.f)
+      (u := S.toElem! hu) (v := S.toElem! hv)
+      huv hneq'
+
+  -- ⑥ 仕上げ：任意の x に対して戻す
+  intro x hx
+  exact hmax x hx
+------------------------
 
 
-end IterateRTG
 
 /- 記法を開く（必要な箇所で使えるように）。 -/
 open FuncSetup (le cover)

@@ -875,6 +875,8 @@ lemma traced_is_functional_family
   exact idealFamily_traceAt_eq_eraseOne S u hNontriv
 
 
+
+
 -----ここから不要-----
 
 /-
