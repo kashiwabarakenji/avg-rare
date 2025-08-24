@@ -17,7 +17,7 @@ open SPO
 open FuncSetup
 open SetFamily
 
-variable (S : FuncSetup α)
+variable {α : Type u} [DecidableEq α] (S : FuncSetup α)
 
 namespace SPO
 
@@ -58,7 +58,7 @@ lemma rtg_of_iter (S : FuncSetup α) (x : S.Elem) (k : ℕ) :
 -- le ↔ ∃k.iter の既存補題を使って、le → RTG にするだけの最小版
 --なぜか{α}が必要。ないとle_iff_exists_iter S x zでエラー。
 --新しい証明で不要に？
-lemma rtg_of_le {α} (S : FuncSetup α) {x z : S.Elem} (hxz : S.le x z) :
+lemma rtg_of_le {α : Type u} [DecidableEq α] (S : FuncSetup α) {x z : S.Elem} (hxz : S.le x z) :
     Relation.ReflTransGen (stepRel S.f) x z := by
   --#check le_iff_exists_iter S x z-- hxz
   rcases (le_iff_exists_iter S x z).1 hxz with ⟨k, hk⟩
@@ -75,7 +75,7 @@ lemma rtg_of_le {α} (S : FuncSetup α) {x z : S.Elem} (hxz : S.le x z) :
 
 -- 逆向き RTG → le は、今回のゴールでは「最後に le を回収」する時に使います。
 -- 新しい証明でも必要
-lemma le_of_rtg {α} (S : FuncSetup α) {x z : S.Elem}
+lemma le_of_rtg {α} [DecidableEq α] (S : FuncSetup α) {x z : S.Elem}
   (h : Relation.ReflTransGen (stepRel S.f) x z) : S.le x z := by
   rcases (reflTransGen_iff_exists_iterate (S.f)).1 h with ⟨k, hk⟩
   exact (le_iff_exists_iter S x z).2 ⟨k, hk⟩
@@ -545,7 +545,7 @@ lemma map_rtg_S'_to_S_usingSucc
     exact Relation.ReflTransGen.trans one ih
 
 /-- (b) usingSucc 版：`S'.leOn a b → S.leOn a b`。 -/
-lemma leOn_lift_S'_to_S_usingSucc
+lemma leOn_lift_S'_to_S_usingSucc {α : Type u} [DecidableEq α]
   (S : FuncSetup α) (u : S.Elem) (hvne : S.f u ≠ u)
   {a b : α} (ha : a ∈ S.ground.erase u.1) (hb : b ∈ S.ground.erase u.1) :
   (eraseOne S u (S.f u) (by intro h; exact hvne h)).leOn a b → S.leOn a b := by
@@ -582,7 +582,7 @@ lemma leOn_lift_S'_to_S_usingSucc
 
 
 
-lemma leOn_restrict_S_to_S'_usingSucc
+lemma leOn_restrict_S_to_S'_usingSucc {α : Type u} [DecidableEq α]
   (S : FuncSetup α) (u : S.Elem) (hvne : S.f u ≠ u)
   {a b : α} (ha : a ∈ S.ground.erase u.1) (hb : b ∈ S.ground.erase u.1) :
   S.leOn a b →
@@ -621,7 +621,7 @@ lemma leOn_restrict_S_to_S'_usingSucc
 
 /-- S 側のイデアル `A` は，`u` を消去した S′（usingSucc 版）でも
     `A.erase u` がイデアル。 -/
-lemma isOrderIdealOn.erase_usingSucc
+lemma isOrderIdealOn.erase_usingSucc {α : Type u} [DecidableEq α]
   (S : FuncSetup α) (u : S.Elem) (hvne : S.f u ≠ u)
   {A : Finset α}
   (hA : isOrderIdealOn (S.leOn) S.ground A)
@@ -675,7 +675,7 @@ lemma isOrderIdealOn.erase_usingSucc
 
 -- 核心：trace の idealFamily と一致
 
-lemma idealFamily_traceAt_eq_eraseOne
+lemma idealFamily_traceAt_eq_eraseOne {α : Type u} [DecidableEq α]
   (S : FuncSetup α) (u : S.Elem) (hNontriv : S.nontrivialClass u) :
   (eraseOneUsingSucc S u hNontriv).idealFamily
     = Trace.traceAt u.1 (S.idealFamily) := by
@@ -865,14 +865,26 @@ lemma idealFamily_traceAt_eq_eraseOne
 --上の補題の書き換え。
 /-- 使い勝手の良い “存在形” の再掲（既存の `traced_is_functional_family` を置換）。 -/
 --定理名に反して、functionalまで示せてなくて、traceが単にidealFamilyであることを示している。
-lemma traced_is_functional_family
+lemma traced_is_functional_family {α : Type u} [DecidableEq α]
     (S : SPO.FuncSetup α) (u : S.Elem)
     (hNontriv : SPO.FuncSetup.nontrivialClass S u) :
     ∃ S' : SPO.FuncSetup α,
       S'.idealFamily = Trace.traceAt u.1 (S.idealFamily) := by
-  refine ⟨eraseOneUsingSucc (S := S) u hNontriv, ?_⟩
+  let eous := eraseOneUsingSucc (α := α) (S := S) u hNontriv
+  let iftee := idealFamily_traceAt_eq_eraseOne (S := S) (u := u) (hNontriv := hNontriv)
+  use eous
 
-  exact idealFamily_traceAt_eq_eraseOne S u hNontriv
+/-
+lemma traced_is_functional_family {α : Type u} [Fintype α]
+    (S : FuncSetup α) (u : S.Elem)
+    (hNontriv : FuncSetup.nontrivialClass S u) :
+    ∃ S' : FuncSetup α,
+      S'.idealFamily = Trace.traceAt u.1 (S.idealFamily) := by
+  refine ⟨eraseOneUsingSucc (α := α) (S := S) u hNontriv, ?_⟩
+
+  apply idealFamily_traceAt_eq_eraseOne S u hNontriv
+-/
+
 
 
 
@@ -955,7 +967,7 @@ lemma rtg_S'_to_S_usingSucc
 
 /-- `eraseOneUsingSucc` を使った S′ の `leOn` は S の `leOn` へ（端点が `ground.erase u` のとき） -/
 --多分いらないtと思ったけど必要な可能性が出てきた。でも必要なものは、S'_to_Sでなくて、S_to_S'かも。
-lemma leOn_restrict_S'_to_S_usingSucc
+lemma leOn_restrict_S'_to_S_usingSucc {α : Type u}
   (S : FuncSetup α) (u : S.Elem) (hNontriv : S.nontrivialClass u)
   {a b : α} (ha : a ∈ S.ground.erase u.1) (hb : b ∈ S.ground.erase u.1) :
   (eraseOneUsingSucc (S := S) u hNontriv).leOn a b → S.leOn a b := by

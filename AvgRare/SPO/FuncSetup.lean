@@ -33,7 +33,7 @@ variable {α : Type u} [DecidableEq α]
 
 /-- 機能的前順序の“入力データ”。`ground`（有限台集合）と，
     その上に閉じた自己写像 `f` を与える。 -/
-structure FuncSetup (α : Type u) [DecidableEq α] where
+structure FuncSetup (α : Type u)  [DecidableEq α] where
   ground : Finset α
   f      : {x // x ∈ ground} → {y // y ∈ ground}
 
@@ -49,7 +49,7 @@ abbrev Elem := {x : α // x ∈ S.ground}
 
 @[simp] lemma mem_ground_coe (x : S.Elem) : x.1 ∈ S.ground := x.2
 
-instance instDecidableEqElem : DecidableEq S.Elem := inferInstance
+--instance instDecidableEqElem : DecidableEq S.Elem := inferInstance
 
 /-- 被覆関係：`x ⋖ y` iff `f x = y`。 -/
 def cover (x y : S.Elem) : Prop := S.f x = y
@@ -169,12 +169,12 @@ def simSetoid : Setoid S.Elem where
 
 
 /-- 「同値類が非自明（別の点がある）」の実用形。 -/
-def nontrivialClass (x : S.Elem) : Prop :=
+def nontrivialClass {α : Type u} [DecidableEq α] (S : FuncSetup α) (x : S.Elem) : Prop :=
   ∃ y : S.Elem, y ≠ x ∧ S.sim x y
 
 /-- **復活版**：非自明同値類に属する `u` は自己固定点ではない（`f u ≠ u`）。 -/
 --2箇所で使っている。
-lemma f_ne_of_nontrivialClass {u : S.Elem}
+lemma f_ne_of_nontrivialClass {α : Type u} [DecidableEq α] (S : FuncSetup α) {u : S.Elem}
     (h : S.nontrivialClass u) : S.f u ≠ u := by
   /- 方針：もし `S.f u = u` なら，`u` から到達できる点は `u` のみ。
      しかし非自明同値類なら `u ≤ y` かつ `y ≠ u` なる `y` が存在して矛盾。 -/
@@ -184,8 +184,8 @@ lemma f_ne_of_nontrivialClass {u : S.Elem}
     「u と異なる ground の元」として取り出す形。 -/
 -- hvは暗黙につかっている。
 --現状使ってない。
-lemma exists_succ_partner_of_nontrivial
-    {u : α} (hu : u ∈ S.ground)
+lemma exists_succ_partner_of_nontrivial {α : Type u} [DecidableEq α]
+    (S : FuncSetup α) {u : α} (hu : u ∈ S.ground)
     (h : S.nontrivialClass (S.toElem! hu)) :
     ∃ (v : α) (_ : v ∈ S.ground), v ≠ u := by
   classical
@@ -944,7 +944,7 @@ lemma reflTransGen_iff_exists_iterate
 
 /-- 論文 Lemma 2.2：
 `x ≤ y` ↔ ある `k ≥ 0` で `f^[k] x = y`。 -/
-lemma le_iff_exists_iter (S : FuncSetup α)(x y : S.Elem) :
+lemma le_iff_exists_iter {α} [DecidableEq α] (S : FuncSetup α) (x y : S.Elem) :
     S.le x y ↔ ∃ k : Nat, S.iter k x = y := by
   -- ReflTransGen ↔ 反復到達 の標準対応
   -- 後で詳細証明を埋める。
