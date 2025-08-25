@@ -172,13 +172,31 @@ def simSetoid : Setoid S.Elem where
 def nontrivialClass {α : Type u} [DecidableEq α] (S : FuncSetup α) (x : S.Elem) : Prop :=
   ∃ y : S.Elem, y ≠ x ∧ S.sim x y
 
+lemma fixed_point_unique {α : Type u} [DecidableEq α] (S : FuncSetup α) (u : S.Elem)
+    (h_fixed : S.f u = u) {v : S.Elem} (h_le : S.le u v) : u = v := by
+  induction h_le with
+  | refl => rfl
+  | tail hb h_cover ih =>
+    rename_i b c
+    have : S.f b = c:= by exact h_cover
+    rw [ih] at h_fixed
+    rw [h_fixed] at this
+    rw [←ih] at this
+    exact this
+
 /-- **復活版**：非自明同値類に属する `u` は自己固定点ではない（`f u ≠ u`）。 -/
 --2箇所で使っている。
 lemma f_ne_of_nontrivialClass {α : Type u} [DecidableEq α] (S : FuncSetup α) {u : S.Elem}
     (h : S.nontrivialClass u) : S.f u ≠ u := by
   /- 方針：もし `S.f u = u` なら，`u` から到達できる点は `u` のみ。
      しかし非自明同値類なら `u ≤ y` かつ `y ≠ u` なる `y` が存在して矛盾。 -/
-  sorry
+  dsimp [nontrivialClass] at h
+  dsimp [sim] at h
+  obtain ⟨y, hy_ne, hy_sim⟩ := h
+  contrapose hy_ne
+  have hy_ne2:  S.f u = u:= by simp_all only [ne_eq, Decidable.not_not]
+  let fpu := fixed_point_unique S u hy_ne2 hy_sim.1
+  exact fun a => hy_ne fun a_1 => a (id (Eq.symm fpu))
 
 /-- （使い勝手用）非自明同値類のとき，後継 `f u` を
     「u と異なる ground の元」として取り出す形。 -/
@@ -338,6 +356,7 @@ by
 
 /-! ## 3) Lemma 3.1：maximal ⇒ rare -/
 
+--Monotonicity.leanで利用。
 lemma sim_of_maximal_above_class
     (S : FuncSetup α) {u x y : S.Elem}
     (hmax : S.maximal u)
@@ -796,7 +815,7 @@ theorem parallel_iff_sim
 
 
 /- =====================================================
-   2) sim ↔ Parallel（既存）を α レベルに渡すための型合わせ
+   このあたりからisPosetならば、本当に半順序になることを証明するためのFuncSetupに関する補題。
    ===================================================== -/
 
 -- 既存: parallel_iff_sim (S : FuncSetup α) (u v : S.Elem)
@@ -811,40 +830,146 @@ lemma parallel_of_sim_coe (S : FuncSetup α) {x y : S.Elem}
   -- ここで `x y` は自動 coercion され、目標型に一致します。
   exact hxy
 
+--FuncSetupを使っているので、SetFamilyには移せない。移せるとしたらFuncSetup。
+--`simClass u` と `ParallelClass F u` の同値性だが、さがせば似たような補題があるかも。
+lemma simClass_eq_parallelClass
+  (S : FuncSetup α) (u : S.Elem) :
+  S.simClass u = (S.idealFamily).ParallelClass  (u : α) := by
+  classical
+  -- 要素 a : α による外延性
+  apply Finset.ext
+  intro a
+  constructor
+  · -- → : a ∈ simClass u ⇒ a ∈ ParallelClass F u
+    intro ha
+    -- mem_simClass_iff : a ∈ simClass u ↔ ∃ ha, S.sim ⟨a,ha⟩ u
+    rcases (S.mem_simClass_iff u).mp ha with ⟨ha', hsim⟩
+    -- `Parallel` と `sim` の同値（coercion に注意）
+    have hpar :
+        (S.idealFamily).Parallel u a := --⟨a, ha'⟩ :=
+      (S.parallel_iff_sim u ⟨a, ha'⟩).2 (S.sim_symm hsim)
+    -- ParallelClass の membership は filter での条件
+    exact
+      Finset.mem_filter.mpr (And.intro ha' hpar)
+  · -- ← : a ∈ ParallelClass F u ⇒ a ∈ simClass u
+    intro ha
+    -- filter のメンバ判定をほどく
+    have hsub : a ∈ (S.idealFamily).ground ∧
+                (S.idealFamily).Parallel (u : α) a :=
+      Finset.mem_filter.mp ha
+    rcases hsub with ⟨ha', hpar⟩
+    -- Parallel ↔ sim から sim へ
+    have hsim' : S.sim u ⟨a, ha'⟩ :=
+      (S.parallel_iff_sim u ⟨a, ha'⟩).1 hpar
+    -- mem_simClass_iff の → 方向
+    exact (S.mem_simClass_iff u).mpr ⟨ha', S.sim_symm hsim'⟩
+
+lemma mem_simClass_of_sim
+  (S : FuncSetup α) {u v : S.Elem} (h : S.sim u v) :
+  (v : α) ∈ S.simClass u := by
+  classical
+  -- 対称性で `S.sim v u` にしてから、mem_simClass_iff を使う
+  have hsym : S.sim v u := S.sim_symm h
+  -- `⟨(v : α), v.2⟩ = v` で書換
+  have hv : (⟨(v : α), v.2⟩ : S.Elem) = v := by
+    apply Subtype.ext; rfl
+  -- mem_simClass_iff の → 方向に渡す
+  --   目標: ∃ hv, S.sim ⟨(v:α), hv⟩ u
+  --   ここでは hv := v.2 を選べばよい
+  exact
+    (S.mem_simClass_iff u).mpr
+      ⟨v.2, by
+        -- `S.sim ⟨(v : α), v.2⟩ u` へ変形
+        -- hsym : S.sim v u, かつ hv : ⟨(v:α),v.2⟩ = v
+        -- 書換で OK
+        -- （エディタでは `rw [hv]`）
+        exact hsym⟩
+
+lemma eq_of_sim_of_all_classes_card_one
+  (S : FuncSetup α)
+  (h1 : ∀ C ∈ (S.idealFamily).classSet , C.card = 1) :
+  ∀ {u v : S.Elem}, S.sim u v → u = v := by
+  classical
+  intro u v hsim
+  -- `sim u v` から `(v:α) ∈ simClass u`
+  have hv_mem : (v : α) ∈ S.simClass u :=
+    mem_simClass_of_sim S hsim
+  -- `u` 自身も `sim` の反射でクラスに入る
+  have hu_mem : (u : α) ∈ S.simClass u := by
+    -- refl：S.sim u u
+    have hrefl : S.sim u u := S.sim_refl u
+    exact mem_simClass_of_sim S hrefl
+  -- `simClass u = ParallelClass F u`
+  have hEq := simClass_eq_parallelClass S u
+  -- これより `card (simClass u) = 1`
+  have hcard_one :
+      (S.simClass u).card = 1 := by
+    -- `ParallelClass F u ∈ classSet F`
+    have hC : (S.idealFamily).ParallelClass  (u : α)
+              ∈ (S.idealFamily).classSet  := by
+      -- classSet = ground.image (λ a, ParallelClass F a)
+      -- 代表 `u.1` は ground にある
+      have hu : (u : α) ∈ (S.idealFamily).ground := u.2
+      unfold SetFamily.classSet
+      exact Finset.mem_image.mpr ⟨(u : α), hu, rfl⟩
+    -- 書換えて `h1` を適用
+    -- （エディタでは `rw [hEq]`）
+    have := h1 ((S.idealFamily).ParallelClass  (u : α)) hC
+    -- `S.simClass u = ParallelClass ...` を左辺に反映
+    -- ここでは最終形だけ使います
+    simp_all only [SetFamily.mem_ParallelClass_iff, Finset.coe_mem, SetFamily.Parallel, FuncSetup.sets_iff_isOrderIdeal, true_and, and_self]
+
+  -- `card = 1` から「単集合」であることを取り出す
+  rcases Finset.card_eq_one.mp hcard_one with ⟨a, ha_single⟩
+  -- メンバシップを単集合に移して等式化
+  have : (v : α) = a := by
+    -- `hv_mem : v ∈ simClass u` と `simClass u = {a}`
+    -- から `v = a`
+    -- （エディタでは `have := hv_mem; rw [hEq, ha_singleton] at this; exact Finset.mem_singleton.mp this`）
+    -- ここでは結論だけ：
+    rw [ha_single] at hv_mem
+    exact Finset.mem_singleton.1 hv_mem
+
+  have : (u : α) = a := by
+    -- 同様に `u` もクラスに属す
+    rw [ha_single] at hu_mem
+    exact Finset.mem_singleton.1 hu_mem
+  -- 以上から `(u : α) = (v : α)`
+  have huv : (u : α) = (v : α) := by
+    -- どちらも `= a`
+    exact Eq.trans this (Eq.symm ‹(v : α) = a›)
+  -- サブタイプ等式へ
+  apply Subtype.ext
+  exact huv
+
+/-
+/-- 逆に、`v` が `u` のクラスに入るなら `sim u v`。 -/
+--つかってないかも。
+lemma sim_of_mem_simClass
+  (S : FuncSetup α) {u : S.Elem} {a : α}
+  (ha : a ∈ S.ground) (hmem : a ∈ S.simClass u) :
+  S.sim ⟨a, ha⟩ u := by
+  classical
+  have := (S.mem_simClass_iff u).mp hmem
+  -- this : ∃ ha', S.sim ⟨a, ha'⟩ u
+  rcases this with ⟨_, hsim⟩
+  -- ground 証明が違っても Subtype.ext で同一視
+  -- ⟨a, ha⟩ と ⟨a, _⟩ は値が同じなので transport で書き換え
+  -- 実際には値部分が同じなので hsim をそのまま使えます
+  exact hsim
+-/
+
 /- ground 上の比較を subtype に引き上げる便利関数。 -/
 --def toElem! (S : SPO.FuncSetup α) {x : α} (hx : x ∈ S.ground) : S.Elem := ⟨x, hx⟩
 
 /-! ## 2) Lemma 3.3：同値（∼）と parallel の同値 -/
-
-/-
---使ってない。パラレルとpreorderの同値性を証明するものか？
-lemma parallel_of_sim
-    (S : SPO.FuncSetup α) {u v : α} (hu : u ∈ S.ground) (hv : v ∈ S.ground)
-    (hSim : SPO.FuncSetup.sim S (S.toElem! hu) (S.toElem! hv)) :
-    (S.idealFamily).Parallel u v := by
-  -- `parallel_iff_sim` の →← のうち、← だけを先に言明
-  sorry
--/
-
-
-
-/-
-variable (S : FuncSetup α)
-
-@[inline] def toElem! {x : α} (hx : x ∈ S.ground) : S.Elem := ⟨x, hx⟩
-
-@[simp] lemma toElem!_val {x : α} {hx : x ∈ S.ground} :
-    (S.toElem! (x:=x) hx).1 = x := rfl
-
-@[simp] lemma toElem!_mem {x : α} {hx : x ∈ S.ground} :
-    (S.toElem! (x:=x) hx).2 = hx := rfl
--/
 
 end FuncSetup
 
 section IterateRTG
 variable {α : Type*} (f : α → α)
 
+--SetFamilyもFuncSetupも出てこない、一般的な補題は、Generalに置くべきかもしれない。
 -- 関係 R_f : x R_f y ↔ f x = y
 def stepRel : α → α → Prop := fun x y => f x = y
 
@@ -992,7 +1117,7 @@ private lemma iterate_fixpoint {β} (g : β → β) (u : β) (n : ℕ) (hu : g u
 end IterateRTG
 
 --Parallel関係
-
+--これもFuncSetupが出てこない一般的な補題。
 omit [DecidableEq α] in
 lemma maximal_of_nontrivialClass_lemma
     (f : α → α) [Fintype α] {u v : α}
@@ -1283,7 +1408,7 @@ lemma maximal_of_parallel_nontrivial
 
 
 /- 記法を開く（必要な箇所で使えるように）。 -/
-open FuncSetup (le cover)
+--open FuncSetup (le cover)
 
 
 end SPO

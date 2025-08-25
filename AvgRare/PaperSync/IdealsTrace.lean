@@ -1,6 +1,7 @@
 import Mathlib.Data.Finset.Basic
 import Mathlib.Algebra.BigOperators.Finsupp.Basic
 import Mathlib.Algebra.Order.GroupWithZero.Unbundled.Defs
+import Mathlib.Algebra.Order.Sub.Basic
 import AvgRare.Basics.SetFamily
 import AvgRare.Basics.Ideals
 import AvgRare.SPO.FuncSetup
@@ -24,8 +25,9 @@ namespace AvgRare
 namespace PaperSync
 open Trace
 open SPO
+open SetFamily
 
-variable {α : Type u} [Fintype α] [DecidableEq α]
+variable {α : Type u} [DecidableEq α]
 
 --idealFamilyの定義は、FuncSetupで与える。
 
@@ -159,7 +161,6 @@ lemma NDS_le_trace_of_nontrivialClass {α : Type u} [DecidableEq α]
 /- principal idealがIdealであること？ -/
 --現状ではどこからも使ってないが、後半使うかも。そのときは、半順序かも。
 --FuncSetupに移動するのも、ideal関係だしへん。principal Idealの話は、IdealsかForestに移動かも？
-omit [Fintype α] in
 lemma idealFamily_mem_principal
   (S : FuncSetup α) (x : S.Elem) :
   isOrderIdealOn (le := S.leOn) (V := S.ground) (S.principalIdeal x.1 x.2)  := by
@@ -414,6 +415,83 @@ theorem main_nds_nonpos_of_secondary {α : Type u} [DecidableEq α]
         _   = (T'.idealFamily).NDS := hNDS_eq
         _   ≤ 0 := hIH_T'
 
+---ここからは、isPosetのときに、本当にposetになっていることを示す。証明の一部はSetFunctionに。
+
+
+
+/- `isPoset`（≡ excess=0）なら `|ground| = #classes`。 -/
+lemma ground_card_eq_numClasses_of_isPoset
+  (S : FuncSetup α) (h : isPoset S) :
+  (S.idealFamily).ground.card = numClasses (S.idealFamily) := by
+  classical
+  -- excess = |ground| − #classes = 0 ⇒ |ground| ≤ #classes
+  have hle₁ :
+      (S.idealFamily).ground.card ≤ numClasses (S.idealFamily) := by
+    -- `Nat.sub_eq_zero.mp : a - b = 0 → a ≤ b`
+    -- 定義 `excess := ground.card - numClasses`
+    -- 実ファイルでは `simp [excess, numClasses] at h`
+    -- ここでは直接：
+
+    exact tsub_eq_zero_iff_le.mp (by
+      -- `excess (S.idealFamily) = 0` が `h`
+      -- そのまま使う
+      exact h)
+  -- 逆向き：#classes ≤ |ground|
+  have hle₂ :
+      numClasses (S.idealFamily) ≤ (S.idealFamily).ground.card :=
+    numClasses_le_ground_card (F := S.idealFamily)
+  exact Nat.le_antisymm hle₁ hle₂
+
+/- `isPoset S` なら `classSet (S.idealFamily)` の各クラスの大きさは 1。 -/
+lemma classes_card_one_of_isPoset
+  (S : FuncSetup α) (h : isPoset S) :
+  ∀ C ∈ classSet (S.idealFamily), C.card = 1 := by
+  classical
+  let F := S.idealFamily
+  -- 非空
+  have hnon : ∀ C ∈ classSet F, C.Nonempty :=
+    classSet_nonempty (F := F)
+  -- 互いに素
+  have hdisj :
+      ∀ C ∈ classSet F, ∀ D ∈ classSet F, C ≠ D → Disjoint C D :=
+    by intro C hC D hD hne; exact classSet_disjoint_of_ne (F := F) hC hD hne
+  -- 被覆
+  have hcover : F.ground = Finset.biUnion (classSet F) (fun C => C) :=
+    ground_eq_biUnion_classSet (F := F)
+  -- 全体サイズ＝ブロック個数（isPoset → equality）
+  have hcard : F.ground.card = (classSet F).card :=
+    ground_card_eq_numClasses_of_isPoset (S := S) h
+  -- 抽象補題を適用
+  have hiff :=
+    card_eq_blocks_iff_all_blocks_card_one
+      (s := F.ground) (P := classSet F) hdisj hcover hnon
+  -- `s.card = P.card` の「→」向きを使う
+  -- 実ファイルでは `exact (hiff.mp hcard)`
+  exact (by
+    -- 1 行：`exact (Iff.mp hiff hcard)`
+    exact (Iff.mp hiff hcard))
+
+
+
+lemma antisymm_of_isPoset
+  (S : FuncSetup α) (h : isPoset S) :
+  ∀ {u v : S.Elem}, S.le u v → S.le v u → u = v := by
+  classical
+  intro u v hxy hyx
+  -- まず `sim u v`
+  have hsim : S.sim u v := And.intro hxy hyx
+  -- `isPoset` から「全クラスのサイズ＝1」
+  have hall1 : ∀ C ∈ classSet (S.idealFamily), C.card = 1 :=
+    classes_card_one_of_isPoset (S := S) h
+  -- 3) を適用
+  exact FuncSetup.eq_of_sim_of_all_classes_card_one S hall1 hsim
+
+instance functional_poset (S : FuncSetup α) (h : isPoset S) :
+   PartialOrder S.Elem := by
+  refine { le := S.le,
+           le_refl := fun a => by exact FuncSetup.le_refl S a,
+           le_trans := fun a b c hab hbc => by exact FuncSetup.le_trans S hab hbc,
+           le_antisymm := fun a b hab hba => by exact antisymm_of_isPoset S h hab hba }
 
 end PaperSync
 end AvgRare
