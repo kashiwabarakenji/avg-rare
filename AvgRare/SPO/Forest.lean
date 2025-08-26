@@ -1116,6 +1116,59 @@ private lemma exists_init_append_last_of_rev_head
       -- L = (rrest.reverse) ++ [v]
       simp_all only [List.head?_cons, List.reverse_eq_cons_iff, List.append_cancel_right_eq, exists_eq']
 
+/-- （A）`front ++ [y,z]` の直前は `y`。 -/
+private lemma penultimate_head_of_append_two
+  {β : Type _} (front : List β) (y z : β) :
+  (((front ++ [y, z]).take ((front ++ [y, z]).length - 1)).reverse).head? = some y := by
+  -- 長さ計算：`length (front) + 2`，`-1` で `front.length + 1`
+  -- `take (front.length+1) (front ++ [y,z]) = front ++ [y]`
+  -- それを reverse すると先頭は `y`
+  have : (front ++ [y, z]).take (front.length + 1) = front ++ [y] := by
+    -- `take_append_of_le_length`
+    have hle : front.length ≤ front.length + 1 := Nat.le_succ _
+    -- `List.take_append_eq_append_take` と同等の計算
+    -- `take (front.len+1) (front ++ [y,z]) = front ++ take 1 [y,z] = front ++ [y]`
+    -- `simp` で評価してしまう
+    simp_all only [le_add_iff_nonneg_right, zero_le]
+    simp [List.take_succ]
+  have hlen : (front ++ [y, z]).length - 1 = front.length + 1 := by
+    -- `length (front ++ [y,z]) = front.length + 2`
+    -- よって `-1` で `front.length + 1`
+    have : (front ++ [y, z]).length = front.length + 2 := by simp
+    -- 書き換え後は自明
+    -- `Nat.succ (front.length + 1) - 1 = front.length + 1`
+    simp_all only [List.length_append, List.length_cons, List.length_nil, zero_add, Nat.reduceAdd, Nat.add_one_sub_one]
+
+  -- 以上を当てはめる
+  -- `take (len-1)` を `take (front.len+1)` に置き換え
+  -- 最後に reverse して head? をとる
+  -- `[y] ++ front.reverse` の head? は `some y`
+  -- `simp` で落ちる
+  simp_all only [List.length_append, List.length_cons, List.length_nil, zero_add, Nat.reduceAdd, Nat.add_one_sub_one,
+     List.reverse_append, List.reverse_cons, List.reverse_nil, List.nil_append,
+    List.cons_append, List.head?_cons]
+
+
+/-- （C）`Chain' R (a :: t)` と `Chain R a t` は同値（定義展開）。 -/
+private lemma chain'_cons_iff {β : Type _} {R : β → β → Prop} {a : β} {t : List β} :
+  List.Chain' R (a :: t) ↔ List.Chain R a t := by
+  -- mathlib: `by simp [List.Chain']` が効く環境が多い
+  constructor
+  · intro h; simpa [List.Chain'] using h
+  · intro h; simpa [List.Chain'] using h
+
+/-- （D）`p.verts = prefix ++ [a,m,b] ++ suffix` なら `prefix.length + 2 ≤ p.verts.length`。 -/
+private lemma len_lb_of_block
+  {β : Type _} {prefix0 suffix : List β} {a m b : β} :
+  prefix0.length + 2 ≤ (prefix0 ++ [a,m,b] ++ suffix : List β).length := by
+  -- 右辺長さは `prefix.length + 3 + suffix.length`
+  -- よって `prefix.length + 2 ≤ prefix.length + 3 ≤ prefix.length + 3 + suffix.length`
+  have h1 : prefix0.length + 2 ≤ prefix0.length + 3 := Nat.le_succ _
+  have h2 : prefix0.length + 3 ≤ prefix0.length + 3 + suffix.length := Nat.le_add_right _ _
+  simp_all only [add_le_add_iff_left, Nat.reduceLeDiff, le_add_iff_nonneg_right, zero_le, List.append_assoc,
+    List.cons_append, List.nil_append, List.length_append, List.length_cons, le_add_iff_nonneg_left]
+
+
 lemma exists_switch_vertex_on_path_len3
   (S : SPO.FuncSetup α)
   {u v : S.Elem} (p : Path S u v)
@@ -1412,180 +1465,6 @@ lemma exists_switch_vertex_on_path_len3
                             List.chain_cons, ne_eq, exists_and_right, Subtype.mk.injEq, and_imp, Subtype.forall]
 
 
-/-
-          have scan :
-            ∀ (front : List S.Elem) (prev cur : S.Elem) (xs : List S.Elem),
-              p.verts = front ++ prev :: cur :: xs →
-              List.Chain (adj S) prev (cur :: xs) →
-              isDown S prev cur →
-              ∃ (prefix0 : List S.Elem) (m a b : S.Elem) (suffix : List S.Elem),
-                p.verts = prefix0 ++ [a, m, b] ++ suffix
-                ∧ S.cover m a ∧ S.cover m b ∧ a ≠ b := by
-            intro front prev cur xs eqshape hchain hdown
-            -- `xs` を場合分け（必ず非空：最後は v で終わる）
-            revert front prev cur
-            induction xs with
-            | nil =>
-                intro front prev cur eqshape hchain hdown
-                -- `xs = []`：`p.verts = front ++ [prev,cur]`
-                -- 末尾は `cur`、一方 `p.last_ok` と `hend` より末尾直前 `y` から `v` への up が存在。
-                -- ここに到達するのは、直前の再帰で「次の辺も down」のケースからのみだが、
-                -- `xs = []` では「次の辺」が存在せず矛盾。よってこの分岐は起きない。
-                -- 形式的には `hend` と `eqshape` を突き合わせて矛盾を作る：
-                rcases hend with ⟨y2, hy2, hup_y2v⟩
-                -- 末尾は `cur` なので `cur = v`、従って `y2` も存在できない
-                have hv_last : (front ++ [prev, cur]).reverse.head? = some v := by
-                  subst ha rt hv0
-                  simp_all only [List.chain_cons, List.Chain.nil, and_true, List.drop_one, List.head?_tail, List.length_append,
-                    List.length_cons, List.length_nil, zero_add, Nat.reduceAdd, lt_add_iff_pos_left, add_pos_iff, Nat.lt_add_one,
-                    or_true, getElem?_pos, Option.some.injEq, exists_eq_left', Nat.reduceLeDiff, List.reverse_append, List.reverse_cons,
-                    List.reverse_nil, List.nil_append, List.cons_append, List.cons.injEq, Nat.add_one_sub_one, List.head?_reverse,
-                    List.head?_cons]
-
-                -- 左辺を計算：`reverse (front ++ [prev,cur])` の先頭は `cur`
-                have : some v = some cur := by
-                  apply Eq.trans (Eq.symm (by
-                  -- `head? (reverse (front ++ [prev,cur])) = some cur`
-                  rfl))
-                  subst ha rt hv0
-                  simp_all only [List.chain_cons, List.Chain.nil, and_true, List.reverse_append, List.reverse_cons, List.reverse_nil,
-                    List.nil_append, List.cons_append, List.head?_cons, Option.some.injEq, List.drop_one, List.head?_tail,
-                    List.length_append, List.length_cons, List.length_nil, zero_add, Nat.reduceAdd, lt_add_iff_pos_left, add_pos_iff,
-                    Nat.lt_add_one, or_true, getElem?_pos, exists_eq_left', Nat.reduceLeDiff, List.cons.injEq, true_and,
-                    Nat.add_one_sub_one, List.head?_reverse]
-                have hvcur : v = cur := Option.some.inj this
-                -- `hy2` は「末尾直前がある」主張だが、いま末尾は `cur` で直前が無い
-                -- ので矛盾を作れる。ここは簡潔に False を作って閉じる。
-                --cases hvcur
-                -- `take (len-1)` が空になるので `hy2` は成立しない
-                show ∃ prefix0 m a b suffix, p.verts = prefix0 ++ [a, m, b] ++ suffix ∧ S.cover m a ∧ S.cover m b ∧ a ≠ b
-                --直接ゴールを示すのではなくて、仮定が矛盾することを示すのか。
-
-                exact False.elim (by
-                  -- `hy2 : (((p.verts.take (p.verts.length - 1)).reverse).head?) = some y2`
-                  -- ところが `p.verts = front ++ [prev, cur]` なので左辺は `none`
-
-                  have : (((front ++ [prev, cur]).take ((front ++ [prev, cur]).length - 1)).reverse).head?
-                          = (none : Option S.Elem) := by
-                    simp_all
-                    sorry
-                    -- 長さ 2 の `take 1` は 1 要素、`reverse.head?` はその唯一の要素
-                    -- が、この唯一の要素が「直前」で、存在しない（ここは細かく計算しても可）
-                    -- 簡潔には `simp` で評価
-                  subst rt ha r2 hvcur hv0
-                  simp_all only [List.drop_succ_cons, List.drop_zero, List.head?_cons, Option.some.injEq, exists_eq_left',
-                    List.length_cons, le_add_iff_nonneg_left, zero_le, List.reverse_cons, List.append_assoc, List.cons_append,
-                    List.nil_append, add_tsub_cancel_right, List.take_succ_cons, List.head?_append, List.head?_reverse, Option.or_some,
-                    List.chain_cons, List.Chain.nil, and_true, reduceCtorEq]
-                )
-
-            | cons nxt xs' ih =>
-                intro front prev cur eqshape hchain hdown
-                -- `hchain : Chain (adj S) prev (cur :: nxt :: xs')`
-                -- まず一歩目と残りに分解
-                cases hchain with
-                | cons h_prev_cur htail =>
-                  -- さらに `htail : Chain (adj S) cur (nxt :: xs')` の先頭を取り出す
-                  cases htail with
-                  | cons h_cur_nxt htail' =>
-                    -- `h_cur_nxt : adj S cur nxt` の向きで分岐
-                    cases h_cur_nxt with
-                    | inl hup_cur_nxt =>
-                        -- 切替点発見：`m = cur, a = prev, b = nxt`
-                        -- 形を `front ++ [prev,cur,nxt] ++ xs'` に整える
-                        have eq1 : p.verts = front ++ prev :: cur :: nxt :: xs' := by
-                          subst ha rt hv0
-                          simp_all only [List.drop_one, List.head?_tail, Subtype.exists, List.length_append, List.length_cons,
-                            Nat.add_succ_sub_one, List.head?_reverse, List.reverse_append, List.reverse_cons, List.append_assoc,
-                            List.cons_append, List.nil_append, List.chain_cons, ne_eq, exists_and_right, Subtype.mk.injEq, and_imp,
-                            Subtype.forall]
-
-                        -- `cons_append` と結合則で変形
-                        have eqBlock : p.verts = front ++ [prev, cur, nxt] ++ xs' := by
-                          -- `front ++ prev :: cur :: nxt :: xs'`
-                          -- = `front ++ ([prev,cur,nxt] ++ xs')`
-                          -- = `front ++ [prev,cur,nxt] ++ xs'`
-                          have : front ++ prev :: cur :: nxt :: xs' =
-                                  front ++ ([prev, cur, nxt] ++ xs') := by
-                            simp [List.cons_append]
-                          exact Eq.trans eq1 (by
-                            cases this
-                            subst ha rt hv0
-                            simp_all only [List.drop_one, List.head?_tail, Subtype.exists, List.length_append, List.length_cons,
-                              Nat.add_succ_sub_one, List.head?_reverse, List.reverse_append, List.reverse_cons, List.append_assoc,
-                              List.cons_append, List.nil_append, List.chain_cons, ne_eq, exists_and_right, Subtype.mk.injEq, and_imp,
-                              Subtype.forall]
-                            )
-                        -- `p.nodup` を右辺に移す
-                        have hnd_rhs : (front ++ [prev,cur,nxt] ++ xs').Nodup := by
-                          have hnd := p.nodup
-                          -- `rw` で置換
-                          rw [eqBlock] at hnd
-                          exact hnd
-                        -- `a ≠ b`
-                        have hneq : prev ≠ nxt :=
-                          ne_of_nodup_middle_block
-                            (prefix0 := front) (suffix := xs') (a := prev) (m := cur) (b := nxt) hnd_rhs
-                        -- 長さ条件：`i = front.length`
-                        let i : Nat := front.length
-                        have hlen : i + 2 ≤ p.verts.length := by
-                          -- `p.verts.length = front.length + 3 + xs'.length`
-                          have hl := congrArg List.length eqBlock
-                          -- `front.length + 2 ≤ front.length + 3 + xs'.length`
-                          have base :
-                            front.length + 2 ≤ front.length + 3 + xs'.length := by
-                            have h1 : front.length + 2 ≤ front.length + 3 :=
-                              Nat.le_succ (front.length + 2)
-                            have h2 : front.length + 3 ≤ front.length + 3 + xs'.length :=
-                              Nat.le_add_right _ _
-                            exact Nat.le_trans h1 h2
-                          subst ha rt hv0
-                          simp_all only [List.append_assoc, List.cons_append, List.nil_append, ne_eq, List.drop_one, List.head?_tail,
-                            Subtype.exists, List.length_append, List.length_cons, Nat.add_succ_sub_one, List.head?_reverse, List.reverse_append,
-                            List.reverse_cons, List.chain_cons, exists_and_right, Subtype.mk.injEq, and_imp, Subtype.forall,
-                             add_le_add_iff_left, le_add_iff_nonneg_left, zero_le, i]
-
-                        -- まとめて返す
-                        exact ⟨front, cur, prev, nxt, xs', eqBlock, hdown, hup_cur_nxt, hneq⟩
-                    | inr hdown_cur_nxt =>
-                        -- hdown_cur_nxt : S.cover nxt cur
-                        -- まだ down。ひとつ進める：`front := front ++ [prev]`
-                        -- 形：`p.verts = (front ++ [prev]) ++ cur :: nxt :: xs'`
-                        have eqshape' : p.verts =
-                            (front ++ [prev]) ++ cur :: nxt :: xs' := by
-                          subst ha rt hv0
-                          simp_all only [List.drop_one, List.head?_tail, Subtype.exists, List.length_append, List.length_cons,
-                            Nat.add_succ_sub_one, List.head?_reverse, List.reverse_append, List.reverse_cons, List.append_assoc,
-                            List.cons_append, List.nil_append, List.chain_cons, ne_eq, exists_and_right, Subtype.mk.injEq, and_imp,
-                            Subtype.forall]
-
-                        -- 帰納呼び出し
-                        have res :=
-                          ih (front := front ++ [prev]) (prev := cur) (cur := nxt)
-                            (eqshape := eqshape') (hchain := ?_) (hdown := hdown_cur_nxt)
-                        exact res
-                        show List.Chain (adj S) cur (nxt :: xs')
-                        sorry
-            -/
-
-          -- 走査を起動：`front = []`, `prev = a`, `cur = b`, `xs = rest2`
-          -- まず `p.chain` を `Chain a (b :: rest2)` に
-          /-
-          have hc0 : List.Chain (adj S) a (b :: rest2) := by
-            -- `p.chain : Chain' (adj S) (a :: b :: rest2)`
-            -- 定義展開で十分
-            have t := p.chain
-            -- `Chain' (x::xs)` は `Chain x xs`
-            subst rt ha r2 hv0
-            simp_all only [List.drop_succ_cons, List.drop_zero, List.head?_cons, Option.some.injEq, exists_eq_left',
-              List.length_cons, add_tsub_cancel_right, List.take_succ_cons, List.reverse_cons, List.append_assoc,
-              List.cons_append, List.nil_append, List.head?_append, List.head?_reverse, Option.or_some, le_add_iff_nonneg_left,
-              zero_le, List.chain_cons, ne_eq, exists_and_right, Subtype.exists, Subtype.mk.injEq, and_imp, Subtype.forall,
-              List.chain'_cons_cons, true_and]
-            obtain ⟨left, right⟩ := t
-            obtain ⟨left_1, right⟩ := right
-            exact right
-          -/
           have ⟨xs0, htailv⟩ :
             ∃ xs0, p.verts = [] ++ a :: b :: xs0 ++ [v] := by
             -- p.verts = a :: b :: rest2 かつ p.verts の末尾は v（hr/hv0）なので
@@ -1602,77 +1481,114 @@ lemma exists_switch_vertex_on_path_len3
                 -- （`simp [pv, rt]` で `p.verts` を具体化してから `this` を当ててもOK）
                 simpa [pv, rt] using this)
 
-            have hx2 : ∃ xs2, rest2 = xs2 ++ [v] := by
-              have := p.last_ok
-              exact exists_init_append_last_of_rev_head rest2 (v := v) (by
-                sorry)
+            have hx_all : ∃ xs, p.verts = xs ++ [v] := by
+              have hl : (p.verts.reverse).head? = some v := by
+                -- from hr,hv0
+                subst ha r2 hv0 rt
+                simp_all only [List.drop_succ_cons, List.drop_zero, List.head?_cons, Option.some.injEq, exists_eq_left',
+                  List.length_cons, add_tsub_cancel_right, List.take_succ_cons, List.reverse_cons, List.append_assoc,
+                  List.cons_append, List.nil_append, List.head?_append, List.head?_reverse, Option.or_some, le_add_iff_nonneg_left,
+                  zero_le, List.chain_cons, ne_eq, exists_and_right, Subtype.exists, Subtype.mk.injEq, and_imp, Subtype.forall]
 
-            rcases hx with ⟨xs, hx'⟩
-            --constructor
-            --· sorry
-            --· sorry
-            simp
-            show ∃ xs0, p.verts = a :: b :: (xs0 ++ [v])
-            --pv:p.verts = a :: rest
-            --rt : rest = b :: rest2
-            -- hx' : a :: b :: rest2 = xs ++ [v]
-            --useすべきは、rest2から末尾のvを外したもの。
-            obtain ⟨xs2, hv2⟩ := hx2
-            use xs2
-            rw [pv]
-            rw [rt]
-            rw [hv2]
+              exact exists_init_append_last_of_rev_head p.verts hl
+
+            -- これを `a :: b :: rest2 = xs ++ [v]` に当てて、`rest2 = xs0 ++ [v]` を抽出
+            obtain ⟨xs, hxs⟩ := hx_all
+            have hx_form : a :: b :: rest2 = xs ++ [v] := by
+              -- pv: p.verts = a :: b :: rest2
+              -- hxs: p.verts = xs ++ [v]
+              -- 連立から
+              subst ha r2 hv0 rt
+              simp_all only [List.drop_one, List.head?_tail, Subtype.exists, List.length_append, List.length_cons, List.length_nil,
+                zero_add, add_tsub_cancel_right, List.take_left', List.head?_reverse, Nat.reduceLeDiff, List.reverse_append,
+                List.reverse_cons, List.reverse_nil, List.nil_append, List.cons_append, List.cons.injEq, true_and,
+                List.append_assoc, List.chain_cons, ne_eq, exists_and_right, Subtype.mk.injEq, and_imp, Subtype.forall,
+                List.append_cancel_right_eq, exists_eq']
+
+            simp_all only [List.drop_one, List.head?_tail, Subtype.exists,  List.length_cons,
+              add_tsub_cancel_right, List.head?_reverse, Nat.reduceLeDiff,
+              List.reverse_cons,  List.nil_append, List.cons_append, List.cons.injEq, true_and,
+              List.append_assoc, List.chain_cons, ne_eq, exists_and_right, Subtype.mk.injEq, and_imp, Subtype.forall]
+
+            -- xs は必ず `a :: b :: xs0` の形
+            cases xs with
+            | nil =>
+                -- `[] ++ [v]` は `a :: ...` に一致しない
+                subst hv0 r2 rt ha
+                simp_all only [List.length_cons, lt_add_iff_pos_left, add_pos_iff, Nat.zero_lt_succ, or_true, getElem?_pos,
+                  List.getElem_cons_succ, List.getElem_cons_zero, Option.some.injEq, List.take_succ_cons, List.getLast?_cons_cons,
+                  List.nil_append, List.cons.injEq, List.nil_eq, reduceCtorEq, and_false]
+
+
+            | cons x xs1 =>
+              have hx1 : x = a := by
+                -- 先頭比較
+                subst hv0 r2 rt ha
+                simp_all only [List.length_cons, lt_add_iff_pos_left, add_pos_iff, Nat.zero_lt_succ, or_true, getElem?_pos,
+                  List.getElem_cons_succ, List.getElem_cons_zero, Option.some.injEq, List.take_succ_cons, List.getLast?_cons_cons,
+                  List.cons_append, List.cons.injEq]
+
+              cases hx1
+              cases xs1 with
+              | nil =>
+                  -- `[a] ++ [v]` は `a :: b :: rest2` にならない
+                  subst hv0 r2 rt ha
+                  simp_all only [List.length_cons, lt_add_iff_pos_left, add_pos_iff, Nat.zero_lt_succ, or_true, getElem?_pos,
+                    List.getElem_cons_succ, List.getElem_cons_zero, Option.some.injEq, List.take_succ_cons, List.getLast?_cons_cons,
+                    List.cons_append, List.nil_append, List.cons.injEq, List.nil_eq, reduceCtorEq, and_false]
+
+              | cons y xs0 =>
+                have hy : y = b := by
+                  -- 2 番目の比較
+                  subst hv0 r2 rt ha
+                  simp_all only [List.length_cons, lt_add_iff_pos_left, add_pos_iff, Nat.zero_lt_succ, or_true, getElem?_pos,
+                    List.getElem_cons_succ, List.getElem_cons_zero, Option.some.injEq, List.take_succ_cons, List.getLast?_cons_cons,
+                    List.cons_append, List.cons.injEq, true_and]
+                cases hy
+                -- 残りから `rest2 = xs0 ++ [v]`
+                have hvrest : rest2 = xs0 ++ [v] := by
+                  subst hv0 r2 rt ha
+                  simp_all only [List.length_cons, lt_add_iff_pos_left, add_pos_iff, Nat.zero_lt_succ, or_true, getElem?_pos,
+                    List.getElem_cons_succ, List.getElem_cons_zero, Option.some.injEq, List.take_succ_cons, List.getLast?_cons_cons,
+                    List.cons_append, List.cons.injEq, true_and]
+                -- 以降では `rest2 = xs0 ++ [v]` を使う
+                -- `htailv` 用に
+                have htailv : p.verts = [] ++ a :: b :: xs0 ++ [v] := by
+                  simpa [pv, rt, hvrest]
+                subst hv0 r2 rt ha
+                simp_all only [List.length_cons, List.length_append, List.length_nil, zero_add, lt_add_iff_pos_left, add_pos_iff,
+                  Nat.zero_lt_succ, or_true, getElem?_pos, List.getElem_cons_succ, List.getElem_cons_zero, Option.some.injEq,
+                  List.take_succ_cons, List.getLast?_cons_cons, List.nil_append, List.cons_append, List.append_cancel_right_eq,
+                  exists_eq']
+
 
           -- これで scan を起動
-          have hc0 : List.Chain (adj S) a (b :: (Classical.choose ⟨xs0, rfl⟩) ++ [v]) := by
-            -- p.chain を `Chain a (b :: xs0 ++ [v])` に落とす
-            -- 具体の `xs0` は上の分解の右辺から取り出せます。`simp` でOKです。
-            -- （もし詰まる場合は、その行を貼ってください。調整します。）
-            simp
-            constructor
-            · dsimp [isDown] at hdown_ab
-              dsimp [adj]
-              exact Or.inr hdown_ab
-            · show List.Chain (adj S) b (xs0 ++ [v])
-              -- hr : p.verts.reverse = v0 :: rrest
-              -- rt : rest = b :: rest2
-              --htailv : p.verts = [] ++ a :: b :: xs0 ++ [v]
-              -- pv : p.verts = a :: rest
-              sorry
+          have hc0 : List.Chain (adj S) a (b :: xs0 ++ [v]) := by
+            have h' := p.chain
+            -- 右辺を具体化してから `Chain' ↔ Chain`
+            rw [htailv] at h'
+            have : List.Chain' (adj S) (a :: (b :: xs0 ++ [v])) := h'
+            -- （C）で落とす
+            exact (chain'_cons_iff).1 this
+
 
           have ⟨prefix0, m, a0, b0, suffix, heq, hma, hmb, hneq⟩ :=
-            scan [] a b (Classical.choose ⟨xs0, rfl⟩) (by simpa using htailv) hc0 hdown_ab
-          -- 起動
-          /-
-          have ⟨prefix0, m, a0, b0, suffix, heq, hma, hmb, hneq⟩ :=
-            scan [] a b rest2 (by
-              subst rt ha r2 hv0
-              simp_all only [List.chain_cons, List.drop_succ_cons, List.drop_zero, List.head?_cons, Option.some.injEq,
-                exists_eq_left', List.length_cons, add_tsub_cancel_right, List.take_succ_cons, List.reverse_cons, List.append_assoc,
-                List.cons_append, List.nil_append, List.head?_append, List.head?_reverse, Option.or_some, le_add_iff_nonneg_left,
-                zero_le, ne_eq, exists_and_right, Subtype.exists, Subtype.mk.injEq, and_imp, Subtype.forall]
-            ) hc0 hdown_ab
-          -/
-          -- `i := prefix0.length`
+            scan [] a b xs0 (by simpa using htailv) hc0 hdown_ab
+
           let i : Nat := prefix0.length
           -- 長さ条件 コメントアウトするとゴールが残る。
           have hlen : i + 2 ≤ p.verts.length := by
-            have hl := congrArg List.length heq
-            -- `prefix0.length + 2 ≤ prefix0.length + 3 + suffix.length`
-            have base :
-              prefix0.length + 2 ≤ prefix0.length + 3 + suffix.length := by
-              have h1 : prefix0.length + 2 ≤ prefix0.length + 3 :=
-                Nat.le_succ (prefix0.length + 2)
-              have h2 : prefix0.length + 3 ≤ prefix0.length + 3 + suffix.length :=
-                Nat.le_add_right _ _
-              exact Nat.le_trans h1 h2
-            subst rt ha r2 hv0
-            simp_all only [ne_eq, List.chain_cons, List.append_assoc, List.cons_append, List.nil_append, List.drop_one,
-              List.head?_tail, Subtype.exists, List.length_append, List.length_cons, Nat.add_succ_sub_one, List.head?_reverse,
-              List.reverse_append, List.reverse_cons, exists_and_right, Subtype.mk.injEq, and_imp, Subtype.forall,
-                i]
-            simp
-            sorry
+            have : (prefix0.length + 2) ≤ (prefix0 ++ [a0,m,b0] ++ suffix).length :=
+              len_lb_of_block (prefix0 := prefix0) (suffix := suffix) (a := a0) (m := m) (b := b0)
+            -- `congrArg List.length heq` で右辺を `p.verts.length` に置換
+            have := congrArg List.length heq
+            have := Eq.trans_le (by rfl) (by
+              rw [List.length_append, add_comm] at this
+              exact hlen3
+            )
+            simp [i]
+            (expose_names; exact le_of_le_of_eq this_1 (id (Eq.symm this_2)))
+
 
           -- 完了
           refine ⟨i, m, a0, b0, ?_, hma, hmb, hneq⟩
