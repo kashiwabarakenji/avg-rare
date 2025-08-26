@@ -493,5 +493,63 @@ instance functional_poset (S : FuncSetup α) (h : isPoset S) :
            le_trans := fun a b c hab hbc => by exact FuncSetup.le_trans S hab hbc,
            le_antisymm := fun a b hab hba => by exact antisymm_of_isPoset S h hab hba }
 
+--逆にFuncSetupがすべての同値類のサイズが1のときに、isPosetになる。
+lemma isPoset_of_classes_card_one (S : FuncSetup α) (h : ∀ C ∈ classSet (S.idealFamily), C.card = 1) :
+  isPoset S := by
+  classical
+  dsimp [isPoset]
+  dsimp [excess]
+  dsimp [SetFamily.numClasses]
+  --dsimp [SetFamily.classSet]
+  rw [card_ground_eq_sum_card_classes]
+  simp_all only [Finset.sum_const, smul_eq_mul, mul_one, tsub_self]
+
+--FuncSetupのleがanti-symmetricなときに、isPosetになる。
+lemma isPoset_of_le_antisymm (S : FuncSetup α) (h : ∀ {u v : S.Elem}, S.le u v → S.le v u → u = v) :
+  isPoset S := by
+  --任意のsimClassが1要素集合であることを示す。
+  have : ∀ (x : S.Elem), (S.simClass x).card  = 1 := by
+    intro x
+    dsimp [SPO.FuncSetup.simClass]
+    dsimp [SPO.FuncSetup.simClassElem]
+    dsimp [SPO.FuncSetup.sim]
+    simp
+    simp_all only [FuncSetup.le_iff_leOn_val, Subtype.forall, Subtype.mk.injEq, Finset.coe_mem]
+    refine Finset.card_eq_one.mpr ?_
+    use x
+    obtain ⟨val, property⟩ := x
+    simp_all only [Finset.coe_mem]
+    ext
+    simp_all only [Finset.coe_mem, Finset.mem_image, Finset.mem_filter, Finset.mem_attach, true_and, Subtype.exists,
+      exists_and_left, exists_prop, exists_eq_right_right, Finset.mem_singleton]
+    apply Iff.intro
+    · intro a
+      obtain ⟨left, right⟩ := a
+      obtain ⟨left, right_1⟩ := left
+      apply h
+      · simp_all only
+      · simp_all only
+      · simp_all only
+      · simp_all only
+    · intro a
+      subst a
+      simp_all only [and_self, and_true]
+      tauto
+
+  have :  ∀ C ∈ classSet (S.idealFamily), C.card = 1 := by
+    intro C hC
+    dsimp [SetFamily.classSet] at hC
+    rw [Finset.mem_image] at hC
+    obtain ⟨a,ha⟩ := hC
+    let sf :=  SPO.FuncSetup.simClass_eq_parallelClass S (S.toElem! ha.1)
+    simp at sf
+    rw [←sf] at ha
+    specialize this (S.toElem! ha.1)
+    have :(S.idealFamily.ParallelClass (S.toElem! ha.1)).card = 1:= by
+      simp_all only [FuncSetup.le_iff_leOn_val, Subtype.forall, Subtype.mk.injEq, FuncSetup.toElem!_val]
+    simp_all only [FuncSetup.le_iff_leOn_val, Subtype.forall, Subtype.mk.injEq, FuncSetup.toElem!_val]
+
+  exact isPoset_of_classes_card_one S this
+
 end PaperSync
 end AvgRare

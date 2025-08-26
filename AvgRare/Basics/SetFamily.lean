@@ -448,7 +448,7 @@ classical
     exact hsub haC
 
 
---方針を変えたので、使わない方向
+--方針を変えたので、使わないが、外から使っている。
 lemma card_ground_eq_sum_card_classes (F : SetFamily α) :
   F.ground.card = ∑ C ∈ classSet F, C.card := by
   classical

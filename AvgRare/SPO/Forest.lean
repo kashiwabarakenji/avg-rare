@@ -9,6 +9,7 @@ namespace AvgRare
 open SPO
 --open FuncSetup
 open Trace
+open PaperSync
 
 universe u
 variable {α : Type u} [DecidableEq α]
@@ -16,10 +17,11 @@ variable {α : Type u} [DecidableEq α]
 
 open Classical
 
+
 instance (S : SPO.FuncSetup α) : DecidableEq S.Elem := by infer_instance
 
 /-! ## 0) 出発点（与えられている定義） -/
-
+/-
 structure FuncSetup (α : Type u) [DecidableEq α] where
   ground : Finset α
   f      : {x // x ∈ ground} → {y // y ∈ ground}
@@ -39,7 +41,7 @@ axiom antisymm_of_isPoset
 
 /-- 極大の定義（ユーザ方針に合わせて） -/
 def maximal (S : SPO.FuncSetup α)(u : S.Elem) : Prop := ∀ v, S.le u v → S.le v u
-
+-/
 /-- 無向隣接（ハッセ図の無向化） -/
 def adj(S : SPO.FuncSetup α) (x y : S.Elem) : Prop := S.cover x y ∨ S.cover y x
 
@@ -515,7 +517,7 @@ lemma maximal_of_fixpoint  (S : SPO.FuncSetup α){u : S.Elem} (huu : S.cover u u
 
 
 /-- `u` が極大で `isPoset` なら `f u = u`（= cover u u） -/
-lemma fixpoint_of_maximal (S : SPO.FuncSetup α)  {u : S.Elem} (h : isPoset) (hu : S.maximal u) :
+lemma fixpoint_of_maximal (S : SPO.FuncSetup α)  {u : S.Elem} (h : isPoset S) (hu : S.maximal u) :
   S.cover u u := by
   -- 1 歩先 v := f u に対し、u ≤ v、極大性から v ≤ u、反対称で v = u
   let v := S.f u
@@ -533,7 +535,7 @@ lemma fixpoint_of_maximal (S : SPO.FuncSetup α)  {u : S.Elem} (h : isPoset) (hu
   exact this
 
 /-- （まとめ）反対称性ありなら「極大 ⇔ 固定点」 -/
-lemma maximal_iff_fixpoint (S : SPO.FuncSetup α)  {u : S.Elem} (h : isPoset) :
+lemma maximal_iff_fixpoint (S : SPO.FuncSetup α)  {u : S.Elem} (h : isPoset S) :
   S.maximal u ↔ S.cover u u := by
   constructor
   · intro hu; exact fixpoint_of_maximal (S := S) h hu
@@ -544,8 +546,8 @@ lemma maximal_iff_fixpoint (S : SPO.FuncSetup α)  {u : S.Elem} (h : isPoset) :
 
 /-- 始点が極大なら、最初の 1 歩は「下向き」 -/
 lemma first_step_isDown_of_maximal
-  (S : SPO.FuncSetup α) [Fintype S.Elem] (h : isPoset)
-  {u v : S.Elem} (hu : maximal S u)
+  (S : SPO.FuncSetup α) [Fintype S.Elem] (h : isPoset S)
+  {u v : S.Elem} (hu : S.maximal u)
   (p : Path S u v)
   (hpmin : ∀ q : Path S u v, p.verts.length ≤ q.verts.length) :
   ∀ y, (p.verts.drop 1).head? = some y → isDown S u y := by
@@ -663,8 +665,8 @@ private lemma adj_symm (S : SPO.FuncSetup α) :
 
 /-- 終点が極大なら、最後の 1 歩は「上向き」 -/
 lemma last_step_isUp_of_maximal
-  (S : SPO.FuncSetup α) [Fintype S.Elem] (h : isPoset)
-  {u v : S.Elem} (hv : maximal S v)
+  (S : SPO.FuncSetup α) [Fintype S.Elem] (h : isPoset S)
+  {u v : S.Elem} (hv : S.maximal v)
   (p : Path S u v)
   (hpmin : ∀ q : Path S u v, p.verts.length ≤ q.verts.length) :
   ∀ y, (p.verts.take (p.verts.length - 1)).reverse.head? = some y → isUp S y v := by
@@ -1017,8 +1019,8 @@ lemma last_step_isUp_of_maximal
               exact (hneq hyv).elim
 
 lemma first_step_down_or_eq
-  (S : SPO.FuncSetup α) [Fintype S.Elem] (h : isPoset)
-  {u v : S.Elem} (hu : maximal S u)
+  (S : SPO.FuncSetup α) [Fintype S.Elem] (h : isPoset S)
+  {u v : S.Elem} (hu : S.maximal u)
   (p : Path S u v)
   (hpmin : ∀ q : Path S u v, p.verts.length ≤ q.verts.length) :
   (∃ y, (p.verts.drop 1).head? = some y ∧ isDown S u y) ∨ u = v := by
@@ -1600,7 +1602,7 @@ lemma exists_switch_vertex_on_path_len3
 
 
 lemma geodesic_len_ge_three_of_distinct_maxima {α} [DecidableEq α]
-  (S : SPO.FuncSetup α) [Fintype S.Elem] (hpos : isPoset)
+  (S : SPO.FuncSetup α) [Fintype S.Elem] (hpos : isPoset S)
   {u v : S.Elem} (hu : S.maximal u) (hv : S.maximal v)
   (p : Path S u v) (hpmin : ∀ q : Path S u v, p.verts.length ≤ q.verts.length)
   (hne : u ≠ v) :
@@ -1715,7 +1717,7 @@ lemma switch_contradicts_functionality (S : SPO.FuncSetup α)
 
 /-- **目標**：連結かつ反対称性がある functional 構造では極大はただ一つ -/
 theorem unique_maximal_of_connected (S : SPO.FuncSetup α)
-  [Fintype S.Elem] (hpos : isPoset) (hconn : isConnected S)
+  [Fintype S.Elem] (hpos : isPoset S) (hconn : isConnected S)
   {u v : S.Elem} (hu : S.maximal u) (hv : S.maximal v) :
   u = v := by
   -- 既存：

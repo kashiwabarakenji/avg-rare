@@ -71,6 +71,9 @@ lemma le_trans {x y z : S.Elem} (hxy : S.le x y) (hyz : S.le y z) : S.le x z := 
   -- Relation.ReflTransGen.trans
   exact Relation.ReflTransGen.trans hxy hyz
 
+def has_le_antisymm  : Prop :=
+∀ {x y : S.Elem}, (S.le x y) → (S.le y x) → x = y
+
 /-- 被覆から 1 ステップで `≤`。 -/
 lemma cover_to_le {x y : S.Elem} (h : S.cover x y) : S.le x y := by
   -- Relation.ReflTransGen.single
@@ -129,6 +132,20 @@ def toElem! {x : α} (hx : x ∈ S.ground) : S.Elem := ⟨x, hx⟩
 @[simp] lemma toElem!_mem {x : α} (hx : x ∈ S.ground) :
     (S.toElem! hx).2 = hx := rfl
 
+-- toElem! の往復（既存なら @[simp] を付けると後の書き換えが楽）。FuncSetupに移してもよい。
+@[simp] lemma toElem!_coe (S : FuncSetup α) (x : S.Elem) :
+    S.toElem! x.property = x := by
+  cases x with
+  | mk x hx => rfl
+
+-- S.Elem の不等号から underlying へ
+lemma coe_ne_of_ne {S : FuncSetup α} {x y : S.Elem} (h : x ≠ y) :
+    (x : α) ≠ (y : α) := by
+  intro hxy
+  apply h
+  apply Subtype.ext
+  exact hxy
+
 /-- `f` の像は常に ground の中。 -/
 @[simp] lemma f_mem_ground (x : S.Elem) : (S.f x).1 ∈ S.ground := (S.f x).2
 
@@ -184,7 +201,7 @@ lemma fixed_point_unique {α : Type u} [DecidableEq α] (S : FuncSetup α) (u : 
     rw [←ih] at this
     exact this
 
-/-- **復活版**：非自明同値類に属する `u` は自己固定点ではない（`f u ≠ u`）。 -/
+/-- 非自明同値類に属する `u` は自己固定点ではない（`f u ≠ u`）。 -/
 --2箇所で使っている。
 lemma f_ne_of_nontrivialClass {α : Type u} [DecidableEq α] (S : FuncSetup α) {u : S.Elem}
     (h : S.nontrivialClass u) : S.f u ≠ u := by
@@ -198,116 +215,6 @@ lemma f_ne_of_nontrivialClass {α : Type u} [DecidableEq α] (S : FuncSetup α) 
   let fpu := fixed_point_unique S u hy_ne2 hy_sim.1
   exact fun a => hy_ne fun a_1 => a (id (Eq.symm fpu))
 
-/-- （使い勝手用）非自明同値類のとき，後継 `f u` を
-    「u と異なる ground の元」として取り出す形。 -/
--- hvは暗黙につかっている。
---現状使ってない。
-lemma exists_succ_partner_of_nontrivial {α : Type u} [DecidableEq α]
-    (S : FuncSetup α) {u : α} (hu : u ∈ S.ground)
-    (h : S.nontrivialClass (S.toElem! hu)) :
-    ∃ (v : α) (_ : v ∈ S.ground), v ≠ u := by
-  classical
-  let ue : S.Elem := ⟨u, hu⟩
-  let ve : S.Elem := S.f ue
-  refine ⟨ve.1, ve.2, ?_⟩
-  -- `ve ≠ ue` を `Subtype.ext` で基の α に落とす
-  have hne : ve ≠ ue := S.f_ne_of_nontrivialClass (u := ue) h
-  intro hval
-  apply hne
-  apply Subtype.ext
-  exact hval
-
--- 部分型の同値 ≠ から基底の ≠ を取り出す補助
-private lemma ne_val_of_ne {x y : {a // a ∈ S.ground}} (h : x ≠ y) : x.1 ≠ y.1 := by
-  intro hval
-  apply h
-  apply Subtype.ext
-  exact hval
-
-
---このあたりからfunctionalのtraceはfunctionalであることを示す部分か？
---今の所使ってない。ほぼ定義そのままなのでいらないかも。
-lemma exists_partner_on_ground
-    {u : S.Elem} (h : S.nontrivialClass u) :
-     ∃ (v : α) (hv : v ∈ S.ground), v ≠ u.1 ∧ S.sim u ⟨v, hv⟩ := by
-  -- ∃ v, (v ∈ S.ground) ∧ ((hv : v ∈ S.ground) → v ≠ u.1 ∧ S.sim u ⟨v, hv⟩) := by
-  -- h から subtype の相手 y を取り出す
-  rcases h with ⟨y, hy_ne, hy_sim⟩
-  -- v := y.1, hv := y.2 をそのまま使う
-  refine ⟨y.1, y.2, ?neq, ?hsim⟩
-  -- 値が等しければ subtype が等しいので hy_ne に反する：Subtype.ext を使用
-  · intro hval
-    apply hy_ne
-    apply Subtype.ext
-    exact hval
-  -- ⟨y.1, y.2⟩ は定義的に y なので、そのまま置換して終わり
-  · change S.sim u y
-    exact hy_sim
-
-
-
-/-TraceFunctionalで行うことにした。
-/-- ground を `ground.erase u` に差し替え，`f` を上の付け替え写像に。 -/
-def eraseOne (u v : {a // a ∈ S.ground}) (hvne : v ≠ u) : FuncSetup α :=
-{ ground := S.ground.erase u.1
-, f      := S.eraseOneMap u v hvne }
-
-def eraseOneUsingSucc (u : S.Elem)
-    (hNontriv : S.nontrivialClass u) : FuncSetup α :=
-  FuncSetup.eraseOne S u (S.f u)
-    (FuncSetup.f_ne_of_nontrivialClass (S := S) hNontriv)
--/
-
--- 便利記法：S の台集合上の要素
---abbrev Elem := S.Elem
---principalIdeal関係。今でも外から参照がある。
-
-noncomputable def principalIdeal (S : FuncSetup α) (a : α) (ha : a ∈ S.ground) : Finset α := by
-  classical
-  -- attach は {y // y ∈ ground}、述語は `S.le y ⟨a,ha⟩`
-  exact (S.ground.attach.filter (fun (y : {z // z ∈ S.ground}) => S.le y ⟨a, ha⟩)).map
-    ⟨Subtype.val, by simp_all only [Subtype.val_injective]⟩
-
-
-/-- 会員判定（存在形）：`y ∈ ↓a` ↔ `∃ hy, y ∈ ground ∧ (⟨y,hy⟩ ≤ₛ ⟨a,ha⟩)`。 -/
-lemma mem_principalIdeal_iff (S : FuncSetup α)
-  {a y : α} (ha : a ∈ S.ground) :
-  y ∈ S.principalIdeal a ha ↔ ∃ hy : y ∈ S.ground, S.le ⟨y, hy⟩ ⟨a, ha⟩ := by
-  classical
-  constructor
-  · intro hy
-    rcases Finset.mem_map.mp hy with ⟨u, hu, huv⟩
-    -- 条件部を取り出す
-    have hcond : S.le u ⟨a, ha⟩ := (Finset.mem_filter.mp hu).2
-    -- `u.val = y`
-    cases u with
-    | mk uval up =>
-      cases huv
-      exact ⟨up, hcond⟩
-  · rintro ⟨hy, hle⟩
-    have hy_att : ⟨y, hy⟩ ∈ S.ground.attach := Finset.mem_attach _ _
-    have hy_fil :
-        ⟨y, hy⟩ ∈ S.ground.attach.filter (fun z => S.le z ⟨a, ha⟩) :=
-      Finset.mem_filter.mpr ⟨hy_att, hle⟩
-    exact Finset.mem_map.mpr ⟨⟨y, hy⟩, hy_fil, rfl⟩
-
-/-- ground 側を前提にした簡約形：`y ∈ ↓a` ↔ `⟨y,hy⟩ ≤ₛ ⟨a,ha⟩`。 -/
-lemma mem_principalIdeal_iff_le (S : FuncSetup α)
-  {a y : α} (ha : a ∈ S.ground) (hy : y ∈ S.ground) :
-  y ∈ S.principalIdeal a ha ↔ S.le ⟨y, hy⟩ ⟨a, ha⟩ := by
-  classical
-  constructor
-  · intro h
-    rcases (S.mem_principalIdeal_iff (a:=a) (y:=y) ha).1 h with ⟨hy', hle⟩
-    -- 証明部を差し替え（部分型の値は同じなので `Subtype.ext` で輸送）
-    have ey : (⟨y, hy'⟩ : S.Elem) = ⟨y, hy⟩ := Subtype.ext (by rfl)
-    -- `simpa` を使わず書換えで閉じる
-    -- `hle : S.le ⟨y,hy'⟩ ⟨a,ha⟩` を ey で左引数だけ置換
-    -- 置換は `Eq.ndrec` 相当だが、ここでは `cases ey` で十分
-    cases ey
-    exact hle
-  · intro hle
-    exact (S.mem_principalIdeal_iff (a:=a) (y:=y) ha).2 ⟨hy, hle⟩
 
 /-! ## 1) 功能的前順序 S から ground 上の関係を作る -/
 
@@ -544,7 +451,8 @@ lemma simClass_subset_of_contains
       (mem_liftFinset_iff S).2 haJ
     exact (mem_coeFinset_val_iff S).2 ⟨⟨a, hJ haJ⟩, hz, rfl⟩
 
-lemma mem_of_le_of_mem_inIdeal
+--下で使っている。
+private lemma mem_of_le_of_mem_inIdeal
   (S : FuncSetup α) {I : Finset S.Elem}
   (hIdeal : isOrderIdealOn S.leOn S.ground (S.coeFinset I))
   {x y : S.Elem}
@@ -820,6 +728,7 @@ theorem parallel_iff_sim
 
 -- 既存: parallel_iff_sim (S : FuncSetup α) (u v : S.Elem)
 -- をそのまま使い、必要なら underlying へ落とすだけ。
+--そとから使っている。Monotonicity.leanでもIdealTraceでも。
 lemma parallel_of_sim_coe (S : FuncSetup α) {x y : S.Elem}
     (h : FuncSetup.sim S x y) :
     (S.idealFamily).Parallel (x : α) (y : α) := by
@@ -830,8 +739,9 @@ lemma parallel_of_sim_coe (S : FuncSetup α) {x y : S.Elem}
   -- ここで `x y` は自動 coercion され、目標型に一致します。
   exact hxy
 
---FuncSetupを使っているので、SetFamilyには移せない。移せるとしたらFuncSetup。
---`simClass u` と `ParallelClass F u` の同値性だが、さがせば似たような補題があるかも。
+--FuncSetupを使っているので、SetFamilyには移せない。
+--`simClass u` と `ParallelClass F u` の同値性。
+--そとからも使っている。
 lemma simClass_eq_parallelClass
   (S : FuncSetup α) (u : S.Elem) :
   S.simClass u = (S.idealFamily).ParallelClass  (u : α) := by
@@ -864,7 +774,8 @@ lemma simClass_eq_parallelClass
     -- mem_simClass_iff の → 方向
     exact (S.mem_simClass_iff u).mpr ⟨ha', S.sim_symm hsim'⟩
 
-lemma mem_simClass_of_sim
+--下で使っている。
+private lemma mem_simClass_of_sim
   (S : FuncSetup α) {u v : S.Elem} (h : S.sim u v) :
   (v : α) ∈ S.simClass u := by
   classical
@@ -885,6 +796,7 @@ lemma mem_simClass_of_sim
         -- （エディタでは `rw [hv]`）
         exact hsym⟩
 
+--そとからも使っている。
 lemma eq_of_sim_of_all_classes_card_one
   (S : FuncSetup α)
   (h1 : ∀ C ∈ (S.idealFamily).classSet , C.card = 1) :
@@ -963,6 +875,104 @@ lemma sim_of_mem_simClass
 --def toElem! (S : SPO.FuncSetup α) {x : α} (hx : x ∈ S.ground) : S.Elem := ⟨x, hx⟩
 
 /-! ## 2) Lemma 3.3：同値（∼）と parallel の同値 -/
+
+----使ってないもの。
+
+
+/-- （使い勝手用）非自明同値類のとき，後継 `f u` を
+    「u と異なる ground の元」として取り出す形。 -/
+-- hvは暗黙につかっている。
+--現状使ってない。
+lemma exists_succ_partner_of_nontrivial {α : Type u} [DecidableEq α]
+    (S : FuncSetup α) {u : α} (hu : u ∈ S.ground)
+    (h : S.nontrivialClass (S.toElem! hu)) :
+    ∃ (v : α) (_ : v ∈ S.ground), v ≠ u := by
+  classical
+  let ue : S.Elem := ⟨u, hu⟩
+  let ve : S.Elem := S.f ue
+  refine ⟨ve.1, ve.2, ?_⟩
+  -- `ve ≠ ue` を `Subtype.ext` で基の α に落とす
+  have hne : ve ≠ ue := S.f_ne_of_nontrivialClass (u := ue) h
+  intro hval
+  apply hne
+  apply Subtype.ext
+  exact hval
+
+-- 部分型の同値 ≠ から基底の ≠ を取り出す補助。現状使ってない。
+private lemma ne_val_of_ne {x y : {a // a ∈ S.ground}} (h : x ≠ y) : x.1 ≠ y.1 := by
+  intro hval
+  apply h
+  apply Subtype.ext
+  exact hval
+
+
+--このあたりからfunctionalのtraceはfunctionalであることを示す部分か？
+--今の所使ってない。ほぼ定義そのままなのでいらないかも。
+lemma exists_partner_on_ground
+    {u : S.Elem} (h : S.nontrivialClass u) :
+     ∃ (v : α) (hv : v ∈ S.ground), v ≠ u.1 ∧ S.sim u ⟨v, hv⟩ := by
+  -- ∃ v, (v ∈ S.ground) ∧ ((hv : v ∈ S.ground) → v ≠ u.1 ∧ S.sim u ⟨v, hv⟩) := by
+  -- h から subtype の相手 y を取り出す
+  rcases h with ⟨y, hy_ne, hy_sim⟩
+  -- v := y.1, hv := y.2 をそのまま使う
+  refine ⟨y.1, y.2, ?neq, ?hsim⟩
+  -- 値が等しければ subtype が等しいので hy_ne に反する：Subtype.ext を使用
+  · intro hval
+    apply hy_ne
+    apply Subtype.ext
+    exact hval
+  -- ⟨y.1, y.2⟩ は定義的に y なので、そのまま置換して終わり
+  · change S.sim u y
+    exact hy_sim
+
+--principalIdealにかんすること。あとで使うかも。
+
+noncomputable def principalIdeal (S : FuncSetup α) (a : α) (ha : a ∈ S.ground) : Finset α := by
+  classical
+  -- attach は {y // y ∈ ground}、述語は `S.le y ⟨a,ha⟩`
+  exact (S.ground.attach.filter (fun (y : {z // z ∈ S.ground}) => S.le y ⟨a, ha⟩)).map
+    ⟨Subtype.val, by simp_all only [Subtype.val_injective]⟩
+
+
+/-- 会員判定（存在形）：`y ∈ ↓a` ↔ `∃ hy, y ∈ ground ∧ (⟨y,hy⟩ ≤ₛ ⟨a,ha⟩)`。 -/
+lemma mem_principalIdeal_iff (S : FuncSetup α)
+  {a y : α} (ha : a ∈ S.ground) :
+  y ∈ S.principalIdeal a ha ↔ ∃ hy : y ∈ S.ground, S.le ⟨y, hy⟩ ⟨a, ha⟩ := by
+  classical
+  constructor
+  · intro hy
+    rcases Finset.mem_map.mp hy with ⟨u, hu, huv⟩
+    -- 条件部を取り出す
+    have hcond : S.le u ⟨a, ha⟩ := (Finset.mem_filter.mp hu).2
+    -- `u.val = y`
+    cases u with
+    | mk uval up =>
+      cases huv
+      exact ⟨up, hcond⟩
+  · rintro ⟨hy, hle⟩
+    have hy_att : ⟨y, hy⟩ ∈ S.ground.attach := Finset.mem_attach _ _
+    have hy_fil :
+        ⟨y, hy⟩ ∈ S.ground.attach.filter (fun z => S.le z ⟨a, ha⟩) :=
+      Finset.mem_filter.mpr ⟨hy_att, hle⟩
+    exact Finset.mem_map.mpr ⟨⟨y, hy⟩, hy_fil, rfl⟩
+
+/-- ground 側を前提にした簡約形：`y ∈ ↓a` ↔ `⟨y,hy⟩ ≤ₛ ⟨a,ha⟩`。 -/
+lemma mem_principalIdeal_iff_le (S : FuncSetup α)
+  {a y : α} (ha : a ∈ S.ground) (hy : y ∈ S.ground) :
+  y ∈ S.principalIdeal a ha ↔ S.le ⟨y, hy⟩ ⟨a, ha⟩ := by
+  classical
+  constructor
+  · intro h
+    rcases (S.mem_principalIdeal_iff (a:=a) (y:=y) ha).1 h with ⟨hy', hle⟩
+    -- 証明部を差し替え（部分型の値は同じなので `Subtype.ext` で輸送）
+    have ey : (⟨y, hy'⟩ : S.Elem) = ⟨y, hy⟩ := Subtype.ext (by rfl)
+    -- `simpa` を使わず書換えで閉じる
+    -- `hle : S.le ⟨y,hy'⟩ ⟨a,ha⟩` を ey で左引数だけ置換
+    -- 置換は `Eq.ndrec` 相当だが、ここでは `cases ey` で十分
+    cases ey
+    exact hle
+  · intro hle
+    exact (S.mem_principalIdeal_iff (a:=a) (y:=y) ha).2 ⟨hy, hle⟩
 
 end FuncSetup
 

@@ -21,23 +21,7 @@ variable {α : Type u} [DecidableEq α] (S : FuncSetup α)
 
 namespace SPO
 
-/- ================================
-   0) サブタイプの小手先
-   ================================ -/
 
--- toElem! の往復（既存なら @[simp] を付けると後の書き換えが楽）
-@[simp] lemma toElem!_coe (S : FuncSetup α) (x : S.Elem) :
-    S.toElem! x.property = x := by
-  cases x with
-  | mk x hx => rfl
-
--- S.Elem の不等号から underlying へ
-lemma coe_ne_of_ne {S : FuncSetup α} {x y : S.Elem} (h : x ≠ y) :
-    (x : α) ≠ (y : α) := by
-  intro hxy
-  apply h
-  apply Subtype.ext
-  exact hxy
 
 /- ==========================================
    1) 反射推移閉包 (RTG) と iterate の橋渡し
@@ -80,7 +64,7 @@ lemma le_of_rtg {α} [DecidableEq α] (S : FuncSetup α) {x z : S.Elem}
   rcases (reflTransGen_iff_exists_iterate (S.f)).1 h with ⟨k, hk⟩
   exact (le_iff_exists_iter S x z).2 ⟨k, hk⟩
 
---多分必要
+--必要。付け替え関数。
 noncomputable def eraseOneMap
     (u v : {a // a ∈ S.ground}) (hvne : v ≠ u) :
     {x // x ∈ S.ground.erase u.1} → {y // y ∈ S.ground.erase u.1} :=
@@ -112,20 +96,21 @@ noncomputable def eraseOneMap
         exact Finset.mem_erase.mpr ⟨hy_val_ne, y.2⟩
       exact ⟨y.1, hy_in_erase⟩
 
-/-- ground.erase u → ground の包含 -/
+/-- ground.erase u → ground の包含 。使われている。これもFuncSetup.leanに移動してもよい。-/
 noncomputable def inclErase (S : FuncSetup α) (u : S.Elem) :
   {x // x ∈ S.ground.erase u.1} → S.Elem :=
 fun x => ⟨x.1, (Finset.mem_erase.mp x.2).2⟩
 
+--少し使われている。
 @[simp] lemma inclErase_val (S : FuncSetup α) (u : S.Elem) (x) :
   (inclErase S u x).1 = x.1 := rfl
 
-/-- `inclErase` の像は明らかに `ground` 上。値で十分なときに便利。 -/
+/-- `inclErase` の像は明らかに `ground` 上。値で十分なときに便利。でも使われてない。-/
 @[simp] lemma inclErase_property (S : FuncSetup α) (u : S.Elem) (x : {x // x ∈ S.ground.erase u.1}) :
   (inclErase S u x).2 = (Finset.mem_erase.mp x.2).2 := rfl
 
 /-- `eraseOneMap` の分岐仕様（値） -/
---必要性不明
+--必要性不明。必要性不明の補題で使われているだけ。
 lemma eraseOneMap_spec
   (S : FuncSetup α) (u v : S.Elem) (hvne : v ≠ u)
   (x : {x // x ∈ S.ground.erase u.1}) :
@@ -142,13 +127,10 @@ lemma eraseOneMap_spec
   · -- else 分岐：出力は y
     simp_all only [↓reduceIte, ↓reduceDIte]
 
-
-
-
 /-! ## 3) 1 歩の橋渡し：S′ → S は `v = S.f u` の下で 1/2 歩に復元 -/
 
 /-- `v = S.f u` のもとで，S′ の 1 ステップは S で 1 または 2 ステップに復元できる。 -/
---多分いらない
+--使われているよう。
 lemma step_S'_to_S_usingSucc
   (S : FuncSetup α) (u v : S.Elem) (hvne : v ≠ u) (hv : v = S.f u)
   {x y : {a // a ∈ S.ground.erase u.1}}
@@ -237,23 +219,20 @@ lemma step_S'_to_S_usingSucc
     · exact Relation.ReflTransGen.refl
     · exact hstep
 
-
-
--- `eraseOneMap` の定義を使って `f` を付け替える
+-- `eraseOneMap` の定義を使って `f` を付け替える。必要。eraseOneMapは写像だけに対し、これはFuncSetupの対応。
 noncomputable def eraseOne (u v : {a // a ∈ S.ground}) (hvne : v ≠ u) : FuncSetup α :=
 { ground := S.ground.erase u.1
 , f      := eraseOneMap S u v hvne }
 
+--パラレルパートナーを持つものに限定した、FuncSetupのほうのtraceの対応。
 noncomputable def eraseOneUsingSucc (u : S.Elem)
     (hNontriv : S.nontrivialClass u) : FuncSetup α :=
   eraseOne S u (S.f u)
     (FuncSetup.f_ne_of_nontrivialClass (S := S) hNontriv)
 
-
-
 /-- `foldMap S u hvne z`：
   `z = u` なら `S.f u` に，そうでなければ `z` 自身を `ground.erase u` 上に埋め込む。 -/
---必要な定義
+--必要な定義。他の場面でも使えるかも。他で使えることが判明すればFuncSetup.leanに移す。
 noncomputable def foldMap
   (S : FuncSetup α) (u : S.Elem) (hvne : S.f u ≠ u)
   (z : S.Elem) : {a // a ∈ S.ground.erase u.1} :=
@@ -273,7 +252,7 @@ by
     refine ⟨z.1, ?_⟩
     have hval_ne : z.1 ≠ u.1 := by
       -- z ≠ u ⇒ 値も異なる
-      have : (z : α) ≠ (u : α) := coe_ne_of_ne (S := S) hz
+      have : (z : α) ≠ (u : α) := S.coe_ne_of_ne hz
       exact this
     exact Finset.mem_erase.mpr ⟨hval_ne, z.2⟩
 
@@ -502,27 +481,7 @@ lemma rtg_S_to_S'_usingSucc
   -- 端点書換え後ちょうど目標
   simpa [hx, hy] using mapped
 
-
-lemma rtg_inclErase_to_foldMap_usingSucc
-  (S : FuncSetup α) (u : S.Elem) (hvne : S.f u ≠ u)
-  (x : {a // a ∈ S.ground.erase u.1}) :
-  Relation.ReflTransGen
-    (stepRel (eraseOneMap S u (S.f u) (by intro h; exact hvne h)))
-    x (foldMap (S := S) (u := u) (hvne := hvne) (inclErase S u x)) := by
-  -- foldMap (inclErase x) = x を取り出してゴールを書き換え
-  have hx : foldMap (S := S) (u := u) (hvne := hvne) (inclErase S u x) = x :=
-    foldMap_inclErase (S := S) (u := u) (hvne := hvne) x
-  -- 右辺を書き換え
-  -- これでゴールは `x ⟶* x` になり，`refl` で終了
-  -- （`cases hx` だと依存パターンで怒られることがあるので `rw` を使う）
-  -- ただしゴールは命題なので `rw` が素直に効く
-  -- 右辺を x に置換
-  simp_all only [foldMap_inclErase]
-  rfl
-
-
-
-/-- (a) usingSucc 版：S′ の RTG を S の RTG に持ち上げる。 -/
+/-- (a) usingSucc 版：S′ の RTG を S の RTG に持ち上げる。使われている -/
 lemma map_rtg_S'_to_S_usingSucc
   (S : FuncSetup α) (u : S.Elem) (hvne : S.f u ≠ u)
   {x y : {a // a ∈ S.ground.erase u.1}}
@@ -544,7 +503,7 @@ lemma map_rtg_S'_to_S_usingSucc
         (hvne := by intro h; exact hvne h) (hv := rfl) hpq
     exact Relation.ReflTransGen.trans one ih
 
-/-- (b) usingSucc 版：`S'.leOn a b → S.leOn a b`。 -/
+/-- (b) usingSucc 版：`S'.leOn a b → S.leOn a b`。 使われている-/
 lemma leOn_lift_S'_to_S_usingSucc {α : Type u} [DecidableEq α]
   (S : FuncSetup α) (u : S.Elem) (hvne : S.f u ≠ u)
   {a b : α} (ha : a ∈ S.ground.erase u.1) (hb : b ∈ S.ground.erase u.1) :
@@ -581,7 +540,7 @@ lemma leOn_lift_S'_to_S_usingSucc {α : Type u} [DecidableEq α]
   exact (leOn_iff_subtype (S := S) (a := a) (b := b) (ha := haG) (hb := hbG)).2 hle
 
 
-
+--使われている。
 lemma leOn_restrict_S_to_S'_usingSucc {α : Type u} [DecidableEq α]
   (S : FuncSetup α) (u : S.Elem) (hvne : S.f u ≠ u)
   {a b : α} (ha : a ∈ S.ground.erase u.1) (hb : b ∈ S.ground.erase u.1) :
@@ -617,10 +576,8 @@ lemma leOn_restrict_S_to_S'_usingSucc {α : Type u} [DecidableEq α]
     (S:=eraseOne S u (S.f u) (by intro h; exact hvne h))
     (a:=a) (b:=b) (ha:=ha) (hb:=hb)).2 hS'le
 
-
-
 /-- S 側のイデアル `A` は，`u` を消去した S′（usingSucc 版）でも
-    `A.erase u` がイデアル。 -/
+    `A.erase u` がイデアル。 使われている。-/
 lemma isOrderIdealOn.erase_usingSucc {α : Type u} [DecidableEq α]
   (S : FuncSetup α) (u : S.Elem) (hvne : S.f u ≠ u)
   {A : Finset α}
@@ -670,8 +627,6 @@ lemma isOrderIdealOn.erase_usingSucc {α : Type u} [DecidableEq α]
     -- したがって y ∈ A.erase u
     exact (Finset.mem_erase).2 ⟨hy_ne, hyA⟩
   · exact hNontriv
-
-
 
 -- 核心：trace の idealFamily と一致
 
@@ -856,11 +811,6 @@ lemma idealFamily_traceAt_eq_eraseOne {α : Type u} [DecidableEq α]
   exact
     Subsingleton.helim (congrArg DecidablePred h_sets) S'.idealFamily.decSets
       (traceAt (↑u) S.idealFamily).decSets
-  --show S'.idealFamily.inc_ground ≍ (traceAt (↑u) S.idealFamily).inc_ground
-
-  --have h_sets : S'.idealFamily.sets = (traceAt (↑u) S.idealFamily).sets := funext (λ B => propext (hsets B))
-  --have h_ground : S'.idealFamily.ground = (traceAt (↑u) S.idealFamily).ground := hground
-  --exact eq_to_heq (funext fun A => funext fun h => rfl)
 
 --上の補題の書き換え。
 /-- 使い勝手の良い “存在形” の再掲（既存の `traced_is_functional_family` を置換）。 -/
@@ -874,22 +824,25 @@ lemma traced_is_functional_family {α : Type u} [DecidableEq α]
   let iftee := idealFamily_traceAt_eq_eraseOne (S := S) (u := u) (hNontriv := hNontriv)
   use eous
 
-/-
-lemma traced_is_functional_family {α : Type u} [Fintype α]
-    (S : FuncSetup α) (u : S.Elem)
-    (hNontriv : FuncSetup.nontrivialClass S u) :
-    ∃ S' : FuncSetup α,
-      S'.idealFamily = Trace.traceAt u.1 (S.idealFamily) := by
-  refine ⟨eraseOneUsingSucc (α := α) (S := S) u hNontriv, ?_⟩
-
-  apply idealFamily_traceAt_eq_eraseOne S u hNontriv
--/
-
-
-
-
-
 -----ここから不要-----
+
+---使われてないっぽい。
+lemma rtg_inclErase_to_foldMap_usingSucc
+  (S : FuncSetup α) (u : S.Elem) (hvne : S.f u ≠ u)
+  (x : {a // a ∈ S.ground.erase u.1}) :
+  Relation.ReflTransGen
+    (stepRel (eraseOneMap S u (S.f u) (by intro h; exact hvne h)))
+    x (foldMap (S := S) (u := u) (hvne := hvne) (inclErase S u x)) := by
+  -- foldMap (inclErase x) = x を取り出してゴールを書き換え
+  have hx : foldMap (S := S) (u := u) (hvne := hvne) (inclErase S u x) = x :=
+    foldMap_inclErase (S := S) (u := u) (hvne := hvne) x
+  -- 右辺を書き換え
+  -- これでゴールは `x ⟶* x` になり，`refl` で終了
+  -- （`cases hx` だと依存パターンで怒られることがあるので `rw` を使う）
+  -- ただしゴールは命題なので `rw` が素直に効く
+  -- 右辺を x に置換
+  simp_all only [foldMap_inclErase]
+  rfl
 
 /-
 -- 必要と思ったが使ってないみたい。証明もできてないしコメントアウト。
@@ -1150,46 +1103,6 @@ lemma rtg_S_to_S'
 
   · intro p q hpq hqr ih
     simp_all only
--/
-
-/-
-/-! ## `leOn`（S → S′）：`eraseOneUsingSucc` 版の片方向 -/
---使わない可能性あり
-lemma leOn_restrict_S_to_S'_usingSucc
-  (S : FuncSetup α) (u : S.Elem) (hNontriv : S.nontrivialClass u)
-  {a b : α} (ha : a ∈ S.ground.erase u.1) (hb : b ∈ S.ground.erase u.1) :
-  S.leOn a b → (eraseOneUsingSucc (S := S) u hNontriv).leOn a b := by
-  intro hab
-  -- shorthand
-  set S' := eraseOneUsingSucc (S := S) u hNontriv
-  -- ground 証明
-  have haG : a ∈ S.ground := (Finset.mem_erase.mp ha).2
-  have hbG : b ∈ S.ground := (Finset.mem_erase.mp hb).2
-  have haE : a ∈ S'.ground := by change a ∈ S.ground.erase u.1; exact ha
-  have hbE : b ∈ S'.ground := by change b ∈ S.ground.erase u.1; exact hb
-  -- S.leOn → S.le
-  have hSle : S.le ⟨a, haG⟩ ⟨b, hbG⟩ :=
-    (leOn_iff_subtype (S := S) (a := a) (b := b) (ha := haG) (hb := hbG)).1 hab
-  -- le → RTG（S）
-  have hrtg_S :
-      Relation.ReflTransGen (stepRel S.f) ⟨a, haG⟩ ⟨b, hbG⟩ :=
-    rtg_of_le (S := S) hSle
-  -- 非自明性から `S.f u ≠ u`
-  have hvne : S.f u ≠ u :=
-    FuncSetup.f_ne_of_nontrivialClass (S := S) hNontriv
-  -- RTG（S）→ RTG（S′） usingSucc
-  have hrtg_S' :
-      Relation.ReflTransGen (stepRel (eraseOneMap S u (S.f u)
-        (by intro h; exact hvne  h)))
-        ⟨a, ha⟩ ⟨b, hb⟩ :=
-    rtg_S_to_S'_usingSucc (S := S) (u := u) (hvne := hvne)
-      (x := ⟨a, ha⟩) (y := ⟨b, hb⟩) hrtg_S
-  -- RTG → S′.le
-  have hS'le : S'.le ⟨a, haE⟩ ⟨b, hbE⟩ := by
-    exact hrtg_S'
-
-  -- subtype → leOn
-  exact (leOn_iff_subtype (S := S') (a := a) (b := b) (ha := haE) (hb := hbE)).2 hS'le
 -/
 
 /-
