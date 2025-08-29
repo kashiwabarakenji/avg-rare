@@ -474,48 +474,6 @@ lemma exists_geodesic_path (S : SPO.FuncSetup α)
     · simp_all only
 
 
-
-/-! ## 2) 「機能性」：出次数高々 1 -/
-
-/-- 同じ元からの `cover` の像は一意 -/
-lemma cover_out_unique (S : SPO.FuncSetup α){u y z : S.Elem} :
-  S.cover u y → S.cover u z → y = z := by
-  intro hy hz
-
-  dsimp [FuncSetup.cover] at hy hz
-  -- hy : S.f u = y, hz : S.f u = z
-  have h' := hz
-  -- 左辺 `S.f u` を hy で置換すると `y = z`
-  -- （simpa を使わず、書き換え＋ exact）
-  rw [hy] at h'
-  exact h'
-
-/-! ## 3) 固定点と極大の関係 -/
-
-/-- `f u = u` なら `u` は極大（反対称性不要） -/
-lemma maximal_of_fixpoint  (S : SPO.FuncSetup α){u : S.Elem} (huu : S.cover u u) :
-  S.maximal u := by
-  intro v huv
-  -- 「u から到達できるのは u のみ」を反復閉包で帰納
-  have reach_eq : ∀ w, S.le u w → w = u := by
-    intro w hw
-    induction hw with
-    | @refl =>
-        rfl
-    | @tail w x hw ih hwx =>
-        -- `hw : u ≤ w`, `hwx : cover w x`, 帰納法の仮定 `ih : w = u`
-        have hux : S.cover u x := by
-          cases ih
-          exact congrArg S.f (id (Eq.symm hwx))
-        have hx : x = u := by
-          exact cover_out_unique S hux huu
-        exact hx
-  have hveq : v = u := reach_eq v huv
-  cases hveq
-  exact Relation.ReflTransGen.refl
-
-
-
 /-- `u` が極大で `isPoset` なら `f u = u`（= cover u u） -/
 lemma fixpoint_of_maximal (S : SPO.FuncSetup α)  {u : S.Elem} (h : isPoset S) (hu : S.maximal u) :
   S.cover u u := by
@@ -539,7 +497,9 @@ lemma maximal_iff_fixpoint (S : SPO.FuncSetup α)  {u : S.Elem} (h : isPoset S) 
   S.maximal u ↔ S.cover u u := by
   constructor
   · intro hu; exact fixpoint_of_maximal (S := S) h hu
-  · intro huu; exact maximal_of_fixpoint (S := S) huu
+  · intro huu; exact FuncSetup.maximal_of_fixpoint (S := S) huu
+
+
 
 
 /-! ## 4) 最短路の端点近傍の向き -/
@@ -627,7 +587,7 @@ lemma first_step_isDown_of_maximal
           | inl hup =>
               -- 上向きだと `cover u u` と一意性で y = u
               have hyu : y = u :=
-                cover_out_unique S (u := u) (y := y) (z := u) hup huu
+                FuncSetup.cover_out_unique S (u := u) (y := y) (z := u) hup huu
               -- しかし `p.nodup` から先頭 a と次 b は異なる
               have hnd : (a :: b :: rest2).Nodup := by
                 subst hyu hu rt hb ha
@@ -967,7 +927,7 @@ lemma last_step_isUp_of_maximal
               -- v 極大 ⇒ `S.cover v v`
               have hvv : S.cover v v := fixpoint_of_maximal S h hv
               -- `cover_out_unique` で y = v
-              have hyv : y = v := cover_out_unique S (u := v) (y := y) (z := v) hdown hvv
+              have hyv : y = v := FuncSetup.cover_out_unique S (u := v) (y := y) (z := v) hdown hvv
               -- しかしノーデュープより y ≠ v（末尾2点は異なる）
               -- `p.verts.reverse = v :: y :: r2`
               -- なので `p.verts.reverse` は `v` と `y` が連続、ノーデュープで v ≠ y
@@ -1710,7 +1670,7 @@ lemma switch_contradicts_functionality (S : SPO.FuncSetup α)
   {m a b : S.Elem} :
   S.cover m a → S.cover m b → a ≠ b → False := by
   intro hma hmb hne
-  have h : a = b := cover_out_unique S (u := m) (y := a) (z := b) hma hmb
+  have h : a = b := FuncSetup.cover_out_unique S (u := m) (y := a) (z := b) hma hmb
   exact hne h
 
 /-! ## 5) 連結 functional 半順序の極大元一意性（主張） -/

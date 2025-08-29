@@ -45,7 +45,7 @@ theorem maximal_of_nontrivialClass {α : Type u} [DecidableEq α]
   -- α レベルの `maximal_of_parallel_nontrivial` を適用
   -- 引数として ground 含意が要るので property で供給
   have H :=
-    maximal_of_parallel_nontrivial S
+    FuncSetup.maximal_of_parallel_nontrivial S
       (u := (x : α)) (v := (y : α))
       (hu := x.property) (hv := y.property)
       (hpar := hpar)
@@ -57,12 +57,12 @@ theorem maximal_of_nontrivialClass {α : Type u} [DecidableEq α]
   -- `toElem!` を潰して、以降 x と同一視
   have Hx :
       ∀ z : S.Elem,
-        Relation.ReflTransGen (stepRel S.f) x z →
-        Relation.ReflTransGen (stepRel S.f) z x := by
+        Relation.ReflTransGen (FuncSetup.stepRel S.f) x z →
+        Relation.ReflTransGen (FuncSetup.stepRel S.f) z x := by
     intro z hz
     -- `@[simp] toElem!_coe` で両端を x に書き換える
     have hz' :
-        Relation.ReflTransGen (stepRel S.f) (S.toElem! x.property) z := by
+        Relation.ReflTransGen (FuncSetup.stepRel S.f) (S.toElem! x.property) z := by
       -- 左辺のみ書換え
       -- `simp` を使わず、明示的に書き換えたい場合は `rw` を使います。
       -- （ユーザ方針に合わせて `simpa using` は使いません）
@@ -82,9 +82,9 @@ theorem maximal_of_nontrivialClass {α : Type u} [DecidableEq α]
   -- maximal x : ∀ {z}, x ≤ z → z ≤ x
   intro z hxz
   -- x ≤ z から RTG x z を得る
-  have hxz_rtg : Relation.ReflTransGen (stepRel S.f) x z := by exact hxz --rtg_of_le S hxz
+  have hxz_rtg : Relation.ReflTransGen (FuncSetup.stepRel S.f) x z := by exact hxz --rtg_of_le S hxz
   -- Hx で逆向きを入手
-  have hzx_rtg : Relation.ReflTransGen (stepRel S.f) z x :=
+  have hzx_rtg : Relation.ReflTransGen (FuncSetup.stepRel S.f) z x :=
     Hx z hxz_rtg
   -- RTG z x から z ≤ x を回収（`le_iff_exists_iter` の ← 向き）
   -- 具体的には、`reflTransGen_iff_exists_iterate`（S.Elem 版）と
@@ -92,7 +92,7 @@ theorem maximal_of_nontrivialClass {α : Type u} [DecidableEq α]
   -- ここでは最小限のため、`le_iff_exists_iter` を直接使います：
   --   RTG z x ⇒ ∃k, iter k z = x ⇒ z ≤ x
   -- まず ∃k を取り出す（既存の IterateRTG の補題名に合わせて置換）
-  rcases (reflTransGen_iff_exists_iterate (S.f)).1 hzx_rtg with ⟨k, hk⟩
+  rcases (FuncSetup.reflTransGen_iff_exists_iterate (S.f)).1 hzx_rtg with ⟨k, hk⟩
   -- `le_iff_exists_iter` の → 向きを使って z ≤ x を得る
   --   （等式の向きに注意）
   -- `le_iff_exists_iter S z x` : S.le z x ↔ ∃ k, S.iter k z = x

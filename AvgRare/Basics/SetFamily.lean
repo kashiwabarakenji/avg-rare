@@ -81,6 +81,24 @@ def totalHyperedgeSize : Nat :=
 def degree (x : α) : Nat :=
   ∑ A ∈ F.edgeFinset, (if x ∈ A then (1 : Nat) else 0)
 
+noncomputable def sumProd {α} [DecidableEq α]
+  (F₁ F₂ : SetFamily α) : SetFamily α := by
+  classical
+  refine
+  { ground := F₁.ground ∪ F₂.ground
+    , sets := fun X =>
+        ∃ A B, F₁.sets A ∧ F₂.sets B ∧ X = A ∪ B
+    , decSets := Classical.decPred _
+    , inc_ground := ?_ }
+  intro X hX
+  rcases hX with ⟨A, B, hA, hB, rfl⟩
+  have hAsub : A ⊆ F₁.ground := F₁.inc_ground hA
+  have hBsub : B ⊆ F₂.ground := F₂.inc_ground hB
+  exact Finset.union_subset
+          (by exact hAsub.trans (Finset.subset_union_left))
+          (by exact hBsub.trans (Finset.subset_union_right))
+
+
 /-- NDS（正規化された次数和）：
 `2 * (サイズ総和) - (エッジ数) * (台集合の大きさ)` を `Int` で定義。 -/
 def NDS (F : SetFamily α) : Int :=
@@ -555,7 +573,7 @@ lemma sum_card_sub_one_add_card
 --方針を変えたので、使わない方向
 /-- 「∑1 = 個数」の基本補題。 -/
 lemma sum_one_eq_card (s : Finset (Finset α)) :
-  ∑ C ∈ s, (1 : Nat) = s.card := by
+  ∑ _ ∈ s, (1 : Nat) = s.card := by
   classical
   refine Finset.induction_on s ?h0 ?hstep
   · simp

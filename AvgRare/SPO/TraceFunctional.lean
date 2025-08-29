@@ -222,7 +222,13 @@ lemma step_S'_to_S_usingSucc
 -- `eraseOneMap` の定義を使って `f` を付け替える。必要。eraseOneMapは写像だけに対し、これはFuncSetupの対応。
 noncomputable def eraseOne (u v : {a // a ∈ S.ground}) (hvne : v ≠ u) : FuncSetup α :=
 { ground := S.ground.erase u.1
-, f      := eraseOneMap S u v hvne }
+  nonempty := by
+        have : v.1 ∈ S.ground.erase u.1 := by
+          apply Finset.mem_erase.mpr
+          simp_all only [ne_eq, Finset.coe_mem, and_true]
+          exact Subtype.coe_ne_coe.mpr hvne
+        exact ⟨v, this⟩
+  f      := eraseOneMap S u v hvne }
 
 --パラレルパートナーを持つものに限定した、FuncSetupのほうのtraceの対応。
 noncomputable def eraseOneUsingSucc (u : S.Elem)
