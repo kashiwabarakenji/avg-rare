@@ -17,6 +17,7 @@ open AvgRare
 open FuncSetup
 
 --generalに移してもいいが、ここでしか使わないのでとりあえずここにおいておく。
+--posetのファイルができたら移動。
 private lemma iterate_has_collision
   {β : Type _} [Fintype β] (f : β → β) (x : β) :
   ∃ i j : Fin (Fintype.card β + 1), i ≠ j ∧
@@ -72,7 +73,7 @@ private lemma iterate_has_collision
   exact ⟨i, j, hneq, heq⟩
 
 /-- 反復に周期が出たら、反対称性により長さ 1 のサイクル（不動点）になる。 -/
---使っている
+--使っている。posetのファイルができたら移動。
 private lemma eventually_hits_fixpoint
   (S : FuncSetup α) [Fintype S.Elem] (hpos : isPoset S)
   (x : S.Elem) :
@@ -829,8 +830,8 @@ private lemma lift_le_to_traceCore_if_not_m_below
     -- 連結して z ≤* b（trace 側）
     exact Relation.ReflTransGen.head hzc' hcb'
 
---使っている
-private lemma edgeFinset_trace_eq_filter_not_mem
+--使っている。Forest.leanからも引用。
+lemma edgeFinset_trace_eq_filter_not_mem
   (S : FuncSetup α) [Fintype S.Elem]
   (m : S.Elem) (geq2: S.ground.card ≥ 2)
   (hKeep :
@@ -881,8 +882,8 @@ private lemma edgeFinset_trace_eq_filter_not_mem
     -- F'.edge へ
     exact (SetFamily.mem_edgeFinset_iff_sets (F := F') (A := A)).2 hA_sets'
 
---使っている。edgeFinset_trace_eq_filter_not_memを使って証明。
-private lemma edge_card_trace_eq_filter_not_mem
+--使っている。edgeFinset_trace_eq_filter_not_memを使って証明。Forestからも引用。
+lemma edge_card_trace_eq_filter_not_mem
   (S : FuncSetup α) [Fintype S.Elem]
   (m : S.Elem) (geq2: S.ground.card ≥ 2)
   (hKeep :
@@ -904,7 +905,8 @@ private lemma edge_card_trace_eq_filter_not_mem
 
 --mでtraceしたときのidealにはmが入らないこと。
 --使っている。back_sets_from_trace_at_max_sets'からもわかる内容で被っている。消すことが可能。
-private lemma no_m_in_Fprime_ideal
+--Forestから引用されている。
+lemma no_m_in_Fprime_ideal
   (S : FuncSetup α) [Fintype S.Elem]
   (m : S.Elem) (geq2: S.ground.card ≥ 2)
   --(hOnlyTop : ∀ I : Finset α, isOrderIdealOn (S.leOn) S.ground I → m.1 ∈ I → I = S.ground)
@@ -1114,7 +1116,8 @@ lemma keep_sets_from_trace_at_uniqueMax
 
 --極大なもののtraceで、traceしたあとの集合族は、元の集合族に含まれる。
 --back_sets_from_trace_at_max_sets'を証明するのにつかっている。たくさん使われている。
-private lemma back_sets_from_trace_at_max_sets
+--Forestからも使われている。
+lemma back_sets_from_trace_at_max_sets
   (S : FuncSetup α) [Fintype S.Elem]
   (hpos : isPoset S) (m : S.Elem) (geq2: S.ground.card ≥ 2)(hm : S.maximal m)
   {I : Finset α}

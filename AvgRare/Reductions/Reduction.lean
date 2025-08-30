@@ -395,6 +395,7 @@ private lemma ground_card_eq_numClasses_of_isPoset
   exact Nat.le_antisymm hle₁ hle₂
 
 /- `isPoset S` なら `classSet (S.idealFamily)` の各クラスの大きさは 1。 -/
+--後ろで使われている。
 private lemma classes_card_one_of_isPoset
   (S : FuncSetup α) (h : isPoset_excess S) :
   ∀ C ∈ classSet (S.idealFamily), C.card = 1 := by
