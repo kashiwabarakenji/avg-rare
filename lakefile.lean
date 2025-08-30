@@ -15,23 +15,14 @@ lean_lib AvgRare where
     -- Basics
     `AvgRare.Basics.General,           --一般的な補題
     `AvgRare.Basics.SetFamily,         --集合族とIdealに関する基本
-    `AvgRare.Basics.Trace.Common,      --Traceに関する基本
-    `AvgRare.Basics.Trace.Monotonicity, --Traceの単調性
-    --`AvgRare.Basics.Trace.TraceErase, --Traceの単調性
-    `AvgRare.Basics.Ideals,            --イデアルに関する基本。廃止の可能性
-
-    -- 2) SPO（functional preorder）
-    `AvgRare.SPO.FuncSetup,           --前順序に関すること
-    `AvgRare.SPO.Forest,              -- 半順序に関すること
-    `AvgRare.SPO.TraceFunctional,     -- FunctionalのTraceがFunctional
-
-    -- 3) Forests（アルゴリズム／帰納用の補題群）
-    `AvgRare.Forests.Induction,       --半順序と帰納法
-    `AvgRare.Forests.DirectProduct,   --半順序のunion product
-
-    -- 4) PaperSync（論文と同期する高レベル補題・主定理）
-    `AvgRare.PaperSync.IdealsTrace,   -- ← trace×FuncSetup の結合レイヤ。名前を変えるかも。PaperLemmaとか。
-    `AvgRare.PaperSync.MainStatement  -- ← 主定理
+    `AvgRare.Basics.SetTrace,      --Traceに関する基本
+    `AvgRare.Functional.FuncSetup,           --前順序に関すること
+    `AvgRare.Functional.TraceFunctional,     -- FunctionalのTraceがFunctional
+    `AvgRare.Reductions.Monotonicity, --Traceの単調性
+    `AvgRare.Reductions.Reduction,   -- ← trace×FuncSetup の結合レイヤ。名前を変えるかも。PaperLemmaとか。
+    `AvgRare.Secondary.Induction,       --半順序と帰納法
+    `AvgRare.Secondary.DirectProduct,   --半順序のunion product
+    `AvgRare.Secondary.MainStatement  -- ← 主定理
   ]
   srcDir := "."
 

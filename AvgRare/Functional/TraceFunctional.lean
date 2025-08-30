@@ -2,9 +2,9 @@ import Mathlib.Data.Finset.Basic
 import Mathlib.Algebra.BigOperators.Finsupp.Basic
 import Mathlib.Algebra.Order.GroupWithZero.Unbundled.Defs
 import AvgRare.Basics.SetFamily
-import AvgRare.Basics.Ideals
-import AvgRare.SPO.FuncSetup
-import AvgRare.Basics.Trace.Common
+import AvgRare.Basics.SetTrace
+import AvgRare.Functional.FuncSetup
+
 
 universe u
 open Classical
@@ -12,14 +12,10 @@ open Classical
 open scoped BigOperators
 
 namespace AvgRare
-open Trace
-open SPO
-open FuncSetup
-open SetFamily
+namespace FuncSetup
 
 variable {α : Type u} [DecidableEq α] (S : FuncSetup α)
 
-namespace SPO
 
 --functionalのtraceは、functionalというもの
 --theorem  traced_is_functional_family
@@ -590,16 +586,16 @@ private lemma leOn_restrict_S_to_S'_usingSucc {α : Type u} [DecidableEq α]
 private lemma isOrderIdealOn.erase_usingSucc {α : Type u} [DecidableEq α]
   (S : FuncSetup α) (u : S.Elem) (hvne : S.f u ≠ u)
   {A : Finset α}
-  (hA : isOrderIdealOn (S.leOn) S.ground A)
+  (hA : SetFamily.isOrderIdealOn (S.leOn) S.ground A)
   (hNontriv : S.nontrivialClass u) :
-  isOrderIdealOn ((eraseOneUsingSucc S u hNontriv).leOn)
+  SetFamily.isOrderIdealOn ((eraseOneUsingSucc S u hNontriv).leOn)
                  (eraseOneUsingSucc S u hNontriv).ground
                  (A.erase u.1) := by
   classical
   -- ground 同定
   have : (eraseOneUsingSucc (S := S) u ?_).ground = S.ground.erase u.1 := rfl
   -- 2 条件を分けて示す
-  dsimp [isOrderIdealOn]
+  dsimp [SetFamily.isOrderIdealOn]
   rw [this]
   constructor
   · -- subset
@@ -642,7 +638,7 @@ private lemma isOrderIdealOn.erase_usingSucc {α : Type u} [DecidableEq α]
 private lemma idealFamily_traceAt_eq_eraseOne {α : Type u} [DecidableEq α]
   (S : FuncSetup α) (u : S.Elem) (hNontriv : S.nontrivialClass u) :
   (eraseOneUsingSucc S u hNontriv).idealFamily
-    = Trace.traceAt u.1 (S.idealFamily) := by
+    = SetFamily.traceAt u.1 (S.idealFamily) := by
   classical
   -- 記号の短縮
   set S' := eraseOneUsingSucc (S := S) u hNontriv
@@ -650,16 +646,16 @@ private lemma idealFamily_traceAt_eq_eraseOne {α : Type u} [DecidableEq α]
 
   -- ground は定義計算で一致
   have hground :
-      S'.ground = (traceAt u.1 (S.idealFamily)).ground := by
+      S'.ground = (SetFamily.traceAt u.1 (S.idealFamily)).ground := by
     -- S' の ground は `S.ground.erase u`
     -- traceAt の ground も `F.ground.erase u`
-    simp [S', eraseOneUsingSucc, eraseOne, traceAt]
+    simp [S', eraseOneUsingSucc, eraseOne, SetFamily.traceAt]
     exact rfl
 
   -- `sets` の同値を両方向で用意
   have hsets :
     ∀ B : Finset α,
-      (S'.idealFamily).sets B ↔ (traceAt u.1 (S.idealFamily)).sets B := by
+      (S'.idealFamily).sets B ↔ (SetFamily.traceAt u.1 (S.idealFamily)).sets B := by
     intro B
     constructor
     ----------------------------------------------------------------
@@ -669,14 +665,14 @@ private lemma idealFamily_traceAt_eq_eraseOne {α : Type u} [DecidableEq α]
       intro hB
       -- S' 側の isOrderIdealOn へ展開
       have hBideal' :
-          isOrderIdealOn (S'.leOn) S'.ground B := by
+          SetFamily.isOrderIdealOn (S'.leOn) S'.ground B := by
         simpa [S'.sets_iff_isOrderIdeal] using hB
       -- A := { a∈S.ground | ∃ b∈B, S.leOn a b } を構成
       let A : Finset α :=
         S.ground.filter (fun a => ∃ b, b ∈ B ∧ S.leOn a b)
       -- A が S 側の isOrderIdealOn になっていることを示す
       have hAideal :
-          isOrderIdealOn (S.leOn) S.ground A := by
+          SetFamily.isOrderIdealOn (S.leOn) S.ground A := by
         refine And.intro ?Asub ?Adown
         · -- ⊆ ground は filter の定理
           exact Finset.filter_subset _ _
@@ -748,7 +744,7 @@ private lemma idealFamily_traceAt_eq_eraseOne {α : Type u} [DecidableEq α]
               (by exact hab)
           -- B は S' で downward closed
           have hBideal' :
-            isOrderIdealOn (S'.leOn) S'.ground B := by
+            SetFamily.isOrderIdealOn (S'.leOn) S'.ground B := by
             simpa [S'.sets_iff_isOrderIdeal] using hB
           -- したがって a∈B
           exact hBideal'.2
@@ -794,12 +790,12 @@ private lemma idealFamily_traceAt_eq_eraseOne {α : Type u} [DecidableEq α]
       -- A.erase u が S' の isOrderIdealOn であることを示す
       -- S 側 ideal へ展開
       have hAideal :
-          isOrderIdealOn (S.leOn) S.ground A := by
+          SetFamily.isOrderIdealOn (S.leOn) S.ground A := by
         simpa [S.sets_iff_isOrderIdeal] using hAsets
 
       -- 目標：isOrderIdealOn (S'.leOn) S'.ground (A.erase u.1)
       have hIdeal' :
-          isOrderIdealOn (S'.leOn) S'.ground (A.erase u.1) := by
+          SetFamily.isOrderIdealOn (S'.leOn) S'.ground (A.erase u.1) := by
         exact isOrderIdealOn.erase_usingSucc S u hvne hAsets hNontriv
 
       -- S' 側の sets に戻す
@@ -815,20 +811,20 @@ private lemma idealFamily_traceAt_eq_eraseOne {α : Type u} [DecidableEq α]
   -- ground：`hground`， sets：`funext (λ B => propext (hsets B))`
   -- で閉じます。
   apply SetFamily.ext hground (funext (λ B => propext (hsets B)))
-  show S'.idealFamily.decSets ≍ (traceAt (↑u) S.idealFamily).decSets
-  have h_sets : S'.idealFamily.sets = (traceAt (↑u) S.idealFamily).sets := funext (λ B => propext (hsets B))
+  show S'.idealFamily.decSets ≍ (SetFamily.traceAt (↑u) S.idealFamily).decSets
+  have h_sets : S'.idealFamily.sets = (SetFamily.traceAt (↑u) S.idealFamily).sets := funext (λ B => propext (hsets B))
   exact
     Subsingleton.helim (congrArg DecidablePred h_sets) S'.idealFamily.decSets
-      (traceAt (↑u) S.idealFamily).decSets
+      (SetFamily.traceAt (↑u) S.idealFamily).decSets
 
 --上の補題の書き換え。
 /-- 使い勝手の良い “存在形” の再掲（既存の `traced_is_functional_family` を置換）。 -/
 --functionalのtraceがまたfunctionalになる。このファイルのメインの結果。そとから使われている。
 theorem  traced_is_functional_family {α : Type u} [DecidableEq α]
-    (S : SPO.FuncSetup α) (u : S.Elem)
-    (hNontriv : SPO.FuncSetup.nontrivialClass S u) :
-    ∃ S' : SPO.FuncSetup α,
-      S'.idealFamily = Trace.traceAt u.1 (S.idealFamily) := by
+    (S : FuncSetup α) (u : S.Elem)
+    (hNontriv : FuncSetup.nontrivialClass S u) :
+    ∃ S' : FuncSetup α,
+      S'.idealFamily = SetFamily.traceAt u.1 (S.idealFamily) := by
   let eous := eraseOneUsingSucc (α := α) (S := S) u hNontriv
   let iftee := idealFamily_traceAt_eq_eraseOne (S := S) (u := u) (hNontriv := hNontriv)
   use eous
@@ -1031,4 +1027,4 @@ lemma step_S_to_S'
   · exact Relation.ReflTransGen.refl
   · exact hstep
 -/
-end AvgRare.SPO
+end AvgRare.FuncSetup

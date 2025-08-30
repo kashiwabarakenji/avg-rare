@@ -3,11 +3,11 @@ import Mathlib.Algebra.BigOperators.Finsupp.Basic
 import Mathlib.Algebra.Order.GroupWithZero.Unbundled.Defs
 import Mathlib.Algebra.Order.Sub.Basic
 import AvgRare.Basics.SetFamily
---import AvgRare.Basics.Ideals
-import AvgRare.SPO.FuncSetup
-import AvgRare.SPO.TraceFunctional
-import AvgRare.Basics.Trace.Common
-import AvgRare.Basics.Trace.Monotonicity
+import AvgRare.Basics.SetTrace
+import AvgRare.Functional.FuncSetup
+import AvgRare.Functional.TraceFunctional
+import AvgRare.Reductions.Monotonicity
+
 
 /-
 IdealsTrace.lean — 「functional preorder × ideals × trace」の結合層（論文 §3）
@@ -22,9 +22,9 @@ open Classical
 open scoped BigOperators
 
 namespace AvgRare
-namespace PaperSync
-open Trace
-open SPO
+namespace Reduction
+open AvgRare
+open Reduction
 open SetFamily
 
 variable {α : Type u} [DecidableEq α]
@@ -35,7 +35,7 @@ variable {α : Type u} [DecidableEq α]
 --非自明同値類 ⇒ 極大
 --ここも{α}が必要。下の定理で使っているがこのファイル内なのでprivateにした。
 private theorem maximal_of_nontrivialClass {α : Type u} [DecidableEq α]
-    (S : SPO.FuncSetup α) {x : S.Elem}
+    (S : FuncSetup α) {x : S.Elem}
     (hx : S.nontrivialClass x) : S.maximal x := by
   -- 非自明同値類 ⇒ パラレル相手 y と x≠y を取る
   rcases hx with ⟨y, hneq, hsim⟩
@@ -107,12 +107,12 @@ private theorem maximal_of_nontrivialClass {α : Type u} [DecidableEq α]
 S の極大元 `u` は，`idealFamily S` において rare。 -/
 --重要補題で、下で使っているがこのファイル内なのでprivateにした。
 private theorem rare_of_maximal {α : Type u} [DecidableEq α]
-  (S : SPO.FuncSetup α) {u : S.Elem} (hmax : S.maximal u) :
+  (S : FuncSetup α) {u : S.Elem} (hmax : S.maximal u) :
   (S.idealFamily).Rare u.1 := by
   classical
   -- Φ（単射）を用意
   let Φ :=
-    Phi (u := u) (hmax := hmax)
+    AvgRare.Reduction.Phi (u := u) (hmax := hmax)
   have hΦ : Function.Injective Φ :=
     Phi_injective (u := u) S hmax
   -- 一般補題に適用
@@ -122,7 +122,7 @@ private theorem rare_of_maximal {α : Type u} [DecidableEq α]
 /- 論文 Lemma 3.6(1) の言明：-/
 --大きさ2以上の同値類をtraceすると増えることがない。このファイルのみで引用なのでprivateに。
 private theorem NDS_le_trace_of_nontrivialClass {α : Type u} [DecidableEq α]
-  (S : SPO.FuncSetup α) {u : S.Elem}
+  (S : FuncSetup α) {u : S.Elem}
   (hx : S.nontrivialClass u) :
   (S.idealFamily).NDS ≤ (traceAt u.1 (S.idealFamily)).NDS := by
   classical
@@ -301,7 +301,7 @@ theorem main_nds_nonpos_of_secondary {α : Type u} [DecidableEq α]
         exists_nontrivialClass_of_excess_pos (S := T) hpos
       -- NDS は trace で増えない
       have hNDS_mono :
-          (T.idealFamily).NDS ≤ (Trace.traceAt u.1 (T.idealFamily)).NDS :=
+          (T.idealFamily).NDS ≤ (SetFamily.traceAt u.1 (T.idealFamily)).NDS :=
         NDS_le_trace_of_nontrivialClass (S := T) (u := u) hnontriv
       -- 相方 v と sim
       obtain ⟨v, hneq_uv, hsim⟩ := hnontriv
@@ -328,7 +328,7 @@ theorem main_nds_nonpos_of_secondary {α : Type u} [DecidableEq α]
         · intro x a y a_1 a_2
           exact a_1
       have h_excess :
-          excess (Trace.traceAt u.1 (T.idealFamily))
+          excess (SetFamily.traceAt u.1 (T.idealFamily))
             = excess (T.idealFamily) - 1 := by
         have hu : u.1 ∈ (T.idealFamily).ground := u.2
         -- v.1 ∈ ground, u.1 ≠ v.1
@@ -342,13 +342,13 @@ theorem main_nds_nonpos_of_secondary {α : Type u} [DecidableEq α]
       -- trace 後も functional
       have hNontriv' : FuncSetup.nontrivialClass T u :=
         ⟨v, And.intro hneq_uv hsim⟩  -- 順序を揃える
-      let tisf := traced_is_functional_family T (u := u) hNontriv'
+      let tisf := T.traced_is_functional_family (u := u) hNontriv'
       obtain ⟨T', hTrace⟩ := tisf
       -- `excess (T'.idealFamily) = k'`
       have hex_T' : excess (T'.idealFamily) = k' := by
         calc
           excess (T'.idealFamily)
-              = excess (Trace.traceAt u.1 (T.idealFamily)) := by
+              = excess (SetFamily.traceAt u.1 (T.idealFamily)) := by
                 rw [hTrace]
           _   = excess (T.idealFamily) - 1 := by exact h_excess
           _   = Nat.succ k' - 1 := by rw [hk]
@@ -358,12 +358,12 @@ theorem main_nds_nonpos_of_secondary {α : Type u} [DecidableEq α]
         IH k' (Nat.lt_succ_self k') T' hex_T'
       -- 仕上げ
       have hNDS_eq :
-          (Trace.traceAt u.1 (T.idealFamily)).NDS
+          (SetFamily.traceAt u.1 (T.idealFamily)).NDS
             = (T'.idealFamily).NDS := by
         rw [← hTrace]
       calc
         (T.idealFamily).NDS
-            ≤ (Trace.traceAt u.1 (T.idealFamily)).NDS := hNDS_mono
+            ≤ (SetFamily.traceAt u.1 (T.idealFamily)).NDS := hNDS_mono
         _   = (T'.idealFamily).NDS := hNDS_eq
         _   ≤ 0 := hIH_T'
 
@@ -462,9 +462,9 @@ lemma isPoset_of_le_antisymm (S : FuncSetup α) (h : ∀ {u v : S.Elem}, S.le u 
   --任意のsimClassが1要素集合であることを示す。
   have : ∀ (x : S.Elem), (S.simClass x).card  = 1 := by
     intro x
-    dsimp [SPO.FuncSetup.simClass]
-    dsimp [SPO.FuncSetup.simClassElem]
-    dsimp [SPO.FuncSetup.sim]
+    dsimp [FuncSetup.simClass]
+    dsimp [FuncSetup.simClassElem]
+    dsimp [FuncSetup.sim]
     simp
     simp_all only [FuncSetup.le_iff_leOn_val, Subtype.forall, Subtype.mk.injEq, Finset.coe_mem]
     refine Finset.card_eq_one.mpr ?_
@@ -493,7 +493,7 @@ lemma isPoset_of_le_antisymm (S : FuncSetup α) (h : ∀ {u v : S.Elem}, S.le u 
     dsimp [SetFamily.classSet] at hC
     rw [Finset.mem_image] at hC
     obtain ⟨a,ha⟩ := hC
-    let sf :=  SPO.FuncSetup.simClass_eq_parallelClass S (S.toElem! ha.1)
+    let sf :=  FuncSetup.simClass_eq_parallelClass S (S.toElem! ha.1)
     --simp at sf
     simp_all only [FuncSetup.le_iff_leOn_val, Subtype.forall, Subtype.mk.injEq, FuncSetup.simClass_eq_parallelClass,
     Finset.coe_mem]
@@ -503,7 +503,7 @@ lemma isPoset_of_le_antisymm (S : FuncSetup α) (h : ∀ {u v : S.Elem}, S.le u 
 
   exact isPoset_of_classes_card_one S this
 
-end PaperSync
+end Reduction
 end AvgRare
 
 ------------------------

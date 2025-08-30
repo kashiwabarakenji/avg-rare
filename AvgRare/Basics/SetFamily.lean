@@ -2,6 +2,7 @@ import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Powerset
 import Mathlib.Algebra.BigOperators.Finsupp.Basic
 import Mathlib.Algebra.Order.BigOperators.Group.Finset
+
 import AvgRare.Basics.General
 import LeanCopilot
 
@@ -33,11 +34,9 @@ structure SetFamily (α : Type u) [DecidableEq α] where
   decSets    : DecidablePred sets
   inc_ground : ∀ {A : Finset α}, sets A → A ⊆ ground
 
-namespace SetFamily
+namespace SetFamily --ドット記法を有効にするために名前を揃える。
 
 variable (F : SetFamily α)
-
---attribute [simp] SetFamily.ground
 
 instance instDecidablePred_sets (F : SetFamily α) : DecidablePred F.sets :=
   F.decSets

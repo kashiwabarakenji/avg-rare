@@ -3,7 +3,6 @@ import Mathlib.Data.Finset.Powerset
 import Mathlib.Data.Nat.Basic
 import Mathlib.Logic.Function.Iterate
 import AvgRare.Basics.SetFamily   -- 依存を薄く保ちつつ将来の接続を意識
-import AvgRare.Basics.Ideals      -- 参照だけ（ここでは使わなくても OK）
 import LeanCopilot
 
 /-
@@ -27,7 +26,6 @@ open scoped BigOperators
 open Classical
 
 namespace AvgRare
-namespace SPO
 
 variable {α : Type u} [DecidableEq α]
 
@@ -38,6 +36,7 @@ structure FuncSetup (α : Type u)  [DecidableEq α] where
   nonempty : Nonempty ground  --ground.Nonemptyの方がいいそう。
   f      : {x // x ∈ ground} → {y // y ∈ ground}
 
+--namespace FuncSetup
 namespace FuncSetup
 
 variable (S : FuncSetup α)
@@ -76,10 +75,11 @@ lemma le_trans {x y z : S.Elem} (hxy : S.le x y) (hyz : S.le y z) : S.le x z := 
   -- Relation.ReflTransGen.trans
   exact Relation.ReflTransGen.trans hxy hyz
 
---名前をisPosetに変えたい。
+--isPosetと同じ条件
 def has_le_antisymm  : Prop :=
 ∀ {x y : S.Elem}, (S.le x y) → (S.le y x) → x = y
 
+--後半の議論で参照。
 def isPoset : Prop :=
   has_le_antisymm S
 
@@ -90,7 +90,7 @@ lemma cover_to_le {x y : S.Elem} (h : S.cover x y) : S.le x y := by
 
 /-- 同じ元からの `cover` の像は一意 -/
 --下で使われている。
-lemma cover_out_unique (S : SPO.FuncSetup α){u y z : S.Elem} :
+lemma cover_out_unique (S : FuncSetup α){u y z : S.Elem} :
   S.cover u y → S.cover u z → y = z := by
   intro hy hz
 
@@ -198,7 +198,7 @@ def maximal (x : S.Elem) : Prop :=
 
 /-- `f u = u` なら `u` は極大（反対称性不要） -/
 --使われている。
-lemma maximal_of_fixpoint  (S : SPO.FuncSetup α){u : S.Elem} (huu : S.cover u u) :
+lemma maximal_of_fixpoint  (S : FuncSetup α){u : S.Elem} (huu : S.cover u u) :
   S.maximal u := by
   intro v huv
   -- 「u から到達できるのは u のみ」を反復閉包で帰納
@@ -278,9 +278,9 @@ lemma f_ne_of_nontrivialClass (S : FuncSetup α) {u : S.Elem}
 --このあたりはleOnに関すること。Elemに関する順序？
 /-- `leOn S y x` : ground 上の要素 `y, x : α` について，
 S の部分型 `S.Elem` 上の `S.le ⟨y,hy⟩ ⟨x,hx⟩` が成り立つことを「存在」で述べる。 -/
-def leOn (S : SPO.FuncSetup α) (y x : α) : Prop :=
+def leOn (S : FuncSetup α) (y x : α) : Prop :=
   ∃ (hy : y ∈ S.ground) (hx : x ∈ S.ground),
-      SPO.FuncSetup.le S ⟨y, hy⟩ ⟨x, hx⟩
+      FuncSetup.le S ⟨y, hy⟩ ⟨x, hx⟩
 
 --結構使っている
 lemma leOn_iff_subtype (S : FuncSetup α) {a b : α}
@@ -454,16 +454,16 @@ lemma sim_of_maximal_above_class
     exact S.le_trans hyU.2 hyx
 
 /-- ground 上の要素型 `S.Elem` における `u` の同値類（Finset 版）。 -/
-noncomputable def simClassElem (S : SPO.FuncSetup α) (u : S.Elem) : Finset S.Elem :=
+noncomputable def simClassElem (S : FuncSetup α) (u : S.Elem) : Finset S.Elem :=
   S.ground.attach.filter (fun v => S.sim v u)
 
 /-- `α` 側へ戻した同値類（`idealFamily : SetFamily α` が扱うのはこちら）。 -/
-noncomputable def simClass (S : SPO.FuncSetup α) (u : S.Elem) : Finset α :=
+noncomputable def simClass (S : FuncSetup α) (u : S.Elem) : Finset α :=
   (S.simClassElem u).image (Subtype.val)
 
 /-- `v ∈ simClassElem u` の判定は「ちょうど `S.sim v u`」。 -/
 @[simp] lemma mem_simClassElem
-    (S : SPO.FuncSetup α) (u : S.Elem) (v : S.Elem) :
+    (S : FuncSetup α) (u : S.Elem) (v : S.Elem) :
     v ∈ S.simClassElem u ↔ S.sim v u := by
   classical
   unfold simClassElem
@@ -480,7 +480,7 @@ noncomputable def simClass (S : SPO.FuncSetup α) (u : S.Elem) : Finset α :=
 
 /-- `a ∈ simClass u` の判定。 -/
 lemma mem_simClass_iff
-    (S : SPO.FuncSetup α) (u : S.Elem) {a : α} :
+    (S : FuncSetup α) (u : S.Elem) {a : α} :
     a ∈ S.simClass u ↔ ∃ (ha : a ∈ S.ground), S.sim ⟨a, ha⟩ u := by
   classical
   unfold simClass
@@ -501,20 +501,20 @@ lemma mem_simClass_iff
 /-- S に対応する order-ideal family を ground 型 `α` 上の `SetFamily` として与える。 -/
 --FuncSetupからidealFaimilyが定理できると便利なので定義だけ与える。
 --と思ったが、FuncSetupでIdealを使ったものを集めたファイルがないので、分離するとよいかも。
-noncomputable def idealFamily (S : SPO.FuncSetup α) : SetFamily α :=
-  orderIdealFamily (le := leOn S) (V := S.ground)
+noncomputable def idealFamily (S : FuncSetup α) : SetFamily α :=
+  SetFamily.orderIdealFamily (le := leOn S) (V := S.ground)
 
 @[simp] lemma sets_iff_isOrderIdeal
-    (S : SPO.FuncSetup α) {I : Finset α} :
-    (S.idealFamily).sets I ↔ isOrderIdealOn (S.leOn) S.ground I := Iff.rfl
+    (S : FuncSetup α) {I : Finset α} :
+    (S.idealFamily).sets I ↔ SetFamily.isOrderIdealOn (S.leOn) S.ground I := Iff.rfl
 
 /-- `S.ground` は `idealFamily` の edge（＝理想）である。 -/
 lemma ground_mem_ideal_edge (S : FuncSetup α) :
   S.ground ∈ (S.idealFamily).edgeFinset := by
   classical
   -- `S.ground` が order ideal であることを直展開で示す
-  have hIdeal : isOrderIdealOn (S.leOn) S.ground S.ground := by
-    dsimp [isOrderIdealOn]
+  have hIdeal : SetFamily.isOrderIdealOn (S.leOn) S.ground S.ground := by
+    dsimp [SetFamily.isOrderIdealOn]
     constructor
     · intro x hx; exact hx
     · intro x hx y hy _; exact hy
@@ -528,8 +528,8 @@ lemma empty_mem_ideal_edge (S : FuncSetup α) :
   (∅ : Finset α) ∈ (S.idealFamily).edgeFinset := by
   classical
   -- 空集合は自明に order ideal
-  have hIdeal : isOrderIdealOn (S.leOn) S.ground (∅ : Finset α) := by
-    dsimp [isOrderIdealOn]
+  have hIdeal : SetFamily.isOrderIdealOn (S.leOn) S.ground (∅ : Finset α) := by
+    dsimp [SetFamily.isOrderIdealOn]
     constructor
     · intro x hx; cases hx
     · intro x hx; cases hx
@@ -577,15 +577,15 @@ lemma numHyperedges_ge_two
   simpa [SetFamily.numHyperedges, hPcard] using this
 
 lemma simClass_subset_of_contains
-    (S : SPO.FuncSetup α) {u : S.Elem} {I : Finset α}
+    (S : FuncSetup α) {u : S.Elem} {I : Finset α}
     (hI : (S.idealFamily).sets I) (huI : u.1 ∈ I) :
     S.simClass u ⊆ I := by
   classical
   -- isOrderIdealOn に展開
-  have hIdeal : isOrderIdealOn (S.leOn) S.ground I := by
+  have hIdeal : SetFamily.isOrderIdealOn (S.leOn) S.ground I := by
     -- `[simp] lemma sets_iff_isOrderIdeal` が `Iff.rfl` なので書換えだけで OK
     -- `rw` で潰す（`simpa using` は使わない）
-    change isOrderIdealOn (S.leOn) S.ground I
+    change SetFamily.isOrderIdealOn (S.leOn) S.ground I
     exact (S.sets_iff_isOrderIdeal).1 hI
   -- 以降：U の元 a を任意に取り、I に属することを示す
   intro a haU
@@ -611,7 +611,7 @@ lemma simClass_subset_of_contains
 --下で使っている。単なるidealが下に閉じているという性質のleOn版か。今はそとから参照されてないので、private。
 private lemma mem_of_le_of_mem_inIdeal
   (S : FuncSetup α) {I : Finset S.Elem}
-  (hIdeal : isOrderIdealOn S.leOn S.ground (S.coeFinset I))
+  (hIdeal : SetFamily.isOrderIdealOn S.leOn S.ground (S.coeFinset I))
   {x y : S.Elem}
   (hleOn : S.leOn (x : α) (y : α)) (hy : y ∈ I) :
   x ∈ I := by
@@ -652,7 +652,7 @@ lemma le_iff_forall_ideal_mem
     intro hxy I hI hyI
     -- イデアルの定義は α 上の order-ideal なので、`coeFinset I` に持ち上げる
     have hIdeal :
-        isOrderIdealOn (S.leOn) S.ground (S.coeFinset I) :=
+        SetFamily.isOrderIdealOn (S.leOn) S.ground (S.coeFinset I) :=
       (S.sets_iff_isOrderIdeal).1 hI
     -- y ∈ I から y.1 ∈ coeFinset I
     have hy' : (y.1 : α) ∈ S.coeFinset I := by
@@ -684,7 +684,7 @@ lemma le_iff_forall_ideal_mem
     -- `S.coeFinset Iy` は α 上のイデアルであることを示す
     have hIy_sets : (S.idealFamily).sets (S.coeFinset Iy) := by
       -- isOrderIdealOn へ落とす（あなたの `sets_iff_isOrderIdeal` を利用）
-      have : isOrderIdealOn (S.leOn) S.ground (S.coeFinset Iy) := by
+      have : SetFamily.isOrderIdealOn (S.leOn) S.ground (S.coeFinset Iy) := by
         -- ⟨downward_closed, subset_ground⟩ を And で与える
         refine And.intro ?dc ?subset
         · -- ?dc : downward closed
@@ -1018,7 +1018,7 @@ noncomputable def principalIdeal (S : FuncSetup α) (a : α) (ha : a ∈ S.groun
   exact (S.ground.attach.filter (fun (y : {z // z ∈ S.ground}) => S.le y ⟨a, ha⟩)).map
     ⟨Subtype.val, by simp_all only [Subtype.val_injective]⟩
 
-
+--後半の議論で参照。
 /-- 会員判定（存在形）：`y ∈ ↓a` ↔ `∃ hy, y ∈ ground ∧ (⟨y,hy⟩ ≤ₛ ⟨a,ha⟩)`。 -/
 lemma mem_principalIdeal_iff (S : FuncSetup α)
   {a y : α} (ha : a ∈ S.ground) :
@@ -1075,9 +1075,9 @@ lemma principalIdeal_subset_ground (S : FuncSetup α) (x : S.Elem) :
 /-- 7) principal ideal は ideal（`isOrderIdealOn` 版）。 -/
 lemma principalIdeal_isOrderIdealOn
   (S : FuncSetup α) {a : α} (ha : a ∈ S.ground) :
-  isOrderIdealOn (S.leOn) S.ground (S.principalIdeal a ha) := by
+  SetFamily.isOrderIdealOn (S.leOn) S.ground (S.principalIdeal a ha) := by
   -- isOrderIdealOn の定義：a ≤ b, b∈I なら a∈I
-  dsimp [isOrderIdealOn]
+  dsimp [SetFamily.isOrderIdealOn]
   constructor
   · dsimp [FuncSetup.principalIdeal]
     simp_all only [le_iff_leOn_val]
@@ -1512,7 +1512,7 @@ lemma sim_of_mem_simClass
 -/
 
 /- ground 上の比較を subtype に引き上げる便利関数。 -/
---def toElem! (S : SPO.FuncSetup α) {x : α} (hx : x ∈ S.ground) : S.Elem := ⟨x, hx⟩
+--def toElem! (S : FuncSetup α) {x : α} (hx : x ∈ S.ground) : S.Elem := ⟨x, hx⟩
 
 /-! ## 2) Lemma 3.3：同値（∼）と parallel の同値 -/
 
@@ -1582,5 +1582,5 @@ lemma principalOn_isOrderIdealOn
 /-! ## 8) 理想の個数は `|ground|+1` 以上 -/
 
 end FuncSetup
-end SPO
+
 end AvgRare

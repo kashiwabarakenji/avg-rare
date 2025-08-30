@@ -4,7 +4,7 @@ import Mathlib.Algebra.BigOperators.Finsupp.Basic
 import Mathlib.Logic.Relation
 import Mathlib.Tactic.Ring
 import AvgRare.Basics.SetFamily
-import AvgRare.SPO.FuncSetup
+import AvgRare.Functional.FuncSetup
 
 universe u
 namespace AvgRare
@@ -12,22 +12,21 @@ namespace DirectProduct
 open Classical
 variable {α : Type u} [DecidableEq α]
 open AvgRare
-open SPO
 open FuncSetup
 
 /-- `coIdeal m := ground \ principalIdeal m` -/
-noncomputable def coIdeal (S : SPO.FuncSetup α)(m : S.Elem) : Finset α :=
+noncomputable def coIdeal (S : FuncSetup α)(m : S.Elem) : Finset α :=
   S.ground \ S.principalIdeal m.1 m.2
 
 /-- `coIdeal m` の定義からの即物的な会員判定 -/
-lemma mem_coIdeal_iff (S : SPO.FuncSetup α)
+lemma mem_coIdeal_iff (S : FuncSetup α)
   {m : S.Elem} {y : α} :
   y ∈ coIdeal S m ↔ y ∈ S.ground ∧ y ∉ S.principalIdeal m.1 m.2 := by
   classical
   unfold coIdeal
   exact Finset.mem_sdiff
 
-lemma exists_first_step_or_refl (S : SPO.FuncSetup α)
+lemma exists_first_step_or_refl (S : FuncSetup α)
   {x m : S.Elem} :
   S.le x m → x = m ∨ ∃ z : S.Elem, S.cover x z ∧ S.le z m := by
   intro hxm
@@ -48,7 +47,8 @@ lemma exists_first_step_or_refl (S : SPO.FuncSetup α)
 
 /-! ### 3) principal ideal の「前進閉性」（極大点に対して） -/
 
-private lemma cover_preserves_principalIdeal_of_maximal (S : SPO.FuncSetup α)
+--posetのところに移動してもいいけど、posetの仮定はいらないみたい。移動なしでもいいかも。
+private lemma cover_preserves_principalIdeal_of_maximal (S : FuncSetup α)
   --(hpos : isPoset S)
   {m x y : S.Elem}
   (hm : S.maximal m)
@@ -86,7 +86,7 @@ private lemma cover_preserves_principalIdeal_of_maximal (S : SPO.FuncSetup α)
 /-! ### 4) coIdeal の前進閉性と，`≤` による拡張 -/
 
 /-- `coIdeal` は 1 歩先で保たれる：`x ∈ coIdeal m` かつ `x ⋖ y` ⇒ `y ∈ coIdeal m`. -/
-private lemma cover_preserves_coIdeal  (S : SPO.FuncSetup α)
+private lemma cover_preserves_coIdeal  (S : FuncSetup α)
   {m x y : S.Elem}
   (hx : x.1 ∈ coIdeal S m) (hxy : S.cover x y) :
   y.1 ∈ coIdeal S m := by
@@ -110,7 +110,7 @@ private lemma cover_preserves_coIdeal  (S : SPO.FuncSetup α)
   have hyG : y.1 ∈ S.ground := y.2
   exact (mem_coIdeal_iff S (m := m) (y := y.1)).2 ⟨hyG, this⟩
 
-private lemma le_preserves_coIdeal (S : SPO.FuncSetup α)
+private lemma le_preserves_coIdeal (S : FuncSetup α)
   {m x y : S.Elem} (hx : x.1 ∈ coIdeal S m) (hxy : S.le x y) :
   y.1 ∈ coIdeal S m := by
   classical
@@ -125,8 +125,10 @@ private lemma le_preserves_coIdeal (S : SPO.FuncSetup α)
 
 /-! ### 5) principal ideal の `≤` による前進閉性（極大点に対して） -/
 
+--これの内容は、cover_preserves_principalIdeal_of_maximalと同じと思ったらcoverとleの違い。
+--結局それを使って証明している。どっちも利用している。
 /-- `m` 極大のとき，`x ∈ ↓m` かつ `x ≤ y` なら `y ∈ ↓m`. -/
-private lemma le_preserves_principalIdeal_of_maximal (S : SPO.FuncSetup α)
+private lemma le_preserves_principalIdeal_of_maximal (S : FuncSetup α)
   --(hpos : isPoset S)
   {m x y : S.Elem}
   (hm : S.maximal m)
@@ -144,20 +146,20 @@ private lemma le_preserves_principalIdeal_of_maximal (S : SPO.FuncSetup α)
     exact ih
 
 /-! ## 存在：各 `x` の上に極大元がある -/
-
+--下の3つは、FuncSetupに移動することも可能。
 /-- `upSet y := { t ∈ ground | y ≤ t }`（`S.Elem` 版） -/
-noncomputable def upSet (S : SPO.FuncSetup α)
+noncomputable def upSet (S : FuncSetup α)
  (y : S.Elem) : Finset S.Elem :=
   (S.ground.attach).filter (fun t => S.le y t)
 
 /-- `U := { t | x ≤ t }` は非空（`x ∈ U`）。 -/
-lemma mem_U_of_x (S : SPO.FuncSetup α) (x : S.Elem) :
+lemma mem_U_of_x (S : FuncSetup α) (x : S.Elem) :
   x ∈ (S.ground.attach).filter (fun t => S.le x t) := by
   refine Finset.mem_filter.mpr ?_
   exact ⟨by simp, Relation.ReflTransGen.refl⟩
 
 /-- 各 `x` の上に極大元が存在。 -/
-lemma exists_maximal_above (S : SPO.FuncSetup α)
+lemma exists_maximal_above (S : FuncSetup α)
   [Fintype S.Elem] --(hpos : isPoset S)
   (x : S.Elem) :
   ∃ m : S.Elem, S.maximal m ∧ S.le x m := by
@@ -219,7 +221,7 @@ lemma exists_maximal_above (S : SPO.FuncSetup α)
 
 /-- 2 つ目の極大 `m'` があれば，`coIdeal m` は非空（`m'` 自身が入る）。 -/
 --仮定を(notconnected: ¬ (∃! mm: S.Elem, S.maximal mm))に変えてみる。
-lemma coIdeal_nonempty_of_two_maximal (S : SPO.FuncSetup α)
+lemma coIdeal_nonempty_of_two_maximal (S : FuncSetup α)
   (hpos : isPoset S)
   {m m' : S.Elem} (hm' : S.maximal m') (hne : m ≠ m') :
   (coIdeal S m).Nonempty := by
@@ -241,7 +243,7 @@ lemma coIdeal_nonempty_of_two_maximal (S : SPO.FuncSetup α)
   exact ⟨m'.1, this⟩
 
 lemma coIdeal_nonempty_of_not_unique_maximal
-  (S : SPO.FuncSetup α) [Fintype S.Elem]
+  (S : FuncSetup α) [Fintype S.Elem]
   (hpos : isPoset S)
   (notuniq : ¬ (∃! mm : S.Elem, S.maximal mm))
   (m : S.Elem) :
@@ -298,7 +300,7 @@ lemma coIdeal_nonempty_of_not_unique_maximal
     (m := m) (m' := mp) hmp_max hne_m_mp
 
 /-- `x ∈ ↓m` と `y ∈ coIdeal m` のとき，`x` と `y` は比較不能。 -/
-private lemma no_comparable_across_split (S : SPO.FuncSetup α)
+private lemma no_comparable_across_split (S : FuncSetup α)
   --(hpos : isPoset S)
   {m x y : S.Elem}
   (hm : S.maximal m)
@@ -333,7 +335,7 @@ private lemma no_comparable_across_split (S : SPO.FuncSetup α)
 /-- principal ideal への制限（`m` は極大と仮定）。 -/
 --FuncSetup+isPosetの定義
 --極大要素が唯一でないと仮定する。
-noncomputable def restrictToIdeal (S : SPO.FuncSetup α)
+noncomputable def restrictToIdeal (S : FuncSetup α)
   --(hpos : isPoset S)
   (m : S.Elem) (hm : S.maximal m): FuncSetup α := by
   classical
@@ -364,7 +366,7 @@ noncomputable def restrictToIdeal (S : SPO.FuncSetup α)
   exact ⟨y.1, this⟩
 
 /-- 補集合への制限（coIdeal は 1 歩先で閉じる） -/
-noncomputable def restrictToCoIdeal (S : SPO.FuncSetup α) (m : S.Elem)  (hpos : isPoset S) (notconnected: ¬ (∃! mm: S.Elem, S.maximal mm)): FuncSetup α := by
+noncomputable def restrictToCoIdeal (S : FuncSetup α) (m : S.Elem)  (hpos : isPoset S) (notconnected: ¬ (∃! mm: S.Elem, S.maximal mm)): FuncSetup α := by
   classical
   refine
     { ground := coIdeal S m,
@@ -387,7 +389,7 @@ noncomputable def restrictToCoIdeal (S : SPO.FuncSetup α) (m : S.Elem)  (hpos :
   exact ⟨y.1, this⟩
 
 lemma ground_union_split
-  (S : SPO.FuncSetup α) (m : S.Elem) (hm : S.maximal m)
+  (S : FuncSetup α) (m : S.Elem) (hm : S.maximal m)
   (hpos : isPoset S) (notconnected : ¬ (∃! mm : S.Elem, S.maximal mm)) :
   (restrictToIdeal S m hm).ground ∪ (restrictToCoIdeal S m hpos notconnected).ground
     = S.ground := by
@@ -404,7 +406,7 @@ lemma ground_union_split
 
 /-- おまけ：直和分割なので互いに素。 -/
 lemma ground_disjoint_split
-  (S : SPO.FuncSetup α) (m : S.Elem) (hm : S.maximal m)
+  (S : FuncSetup α) (m : S.Elem) (hm : S.maximal m)
   (hpos : isPoset S) (notconnected : ¬ (∃! mm : S.Elem, S.maximal mm)) :
   Disjoint (restrictToIdeal S m hm).ground (restrictToCoIdeal S m hpos notconnected).ground := by
   classical
@@ -416,7 +418,7 @@ lemma ground_disjoint_split
   exact Finset.disjoint_sdiff
 
 /-- 補助：`coIdeal` のサイズと差分公式。 -/
-lemma card_coIdeal_eq_sub (S : SPO.FuncSetup α) (m : S.Elem) :
+lemma card_coIdeal_eq_sub (S : FuncSetup α) (m : S.Elem) :
   (coIdeal S m).card = S.ground.card - (S.principalIdeal m.1 m.2).card := by
   classical
   have hsub : S.principalIdeal m.1 m.2 ⊆ S.ground :=
@@ -426,7 +428,7 @@ lemma card_coIdeal_eq_sub (S : SPO.FuncSetup α) (m : S.Elem) :
 
 /-- `coIdeal` と `principalIdeal` のサイズ和は `ground` のサイズ。 -/
 lemma card_coIdeal_add_card_principal
-  (S : SPO.FuncSetup α) (m : S.Elem) :
+  (S : FuncSetup α) (m : S.Elem) :
   (coIdeal S m).card + (S.principalIdeal m.1 m.2).card = S.ground.card := by
   classical
   have hsub : S.principalIdeal m.1 m.2 ⊆ S.ground :=
@@ -446,7 +448,7 @@ lemma card_coIdeal_add_card_principal
 
 /-- つねに `|coIdeal| < |ground|`。
 `m ∈ principalIdeal` なので `principalIdeal` が非空で、差分で 1 以上削れるため。 -/
-lemma card_coIdeal_lt_ground (S : SPO.FuncSetup α) (m : S.Elem) :
+lemma card_coIdeal_lt_ground (S : FuncSetup α) (m : S.Elem) :
   (coIdeal S m).card < S.ground.card := by
   classical
   -- principalIdeal は非空
@@ -486,7 +488,7 @@ lemma card_coIdeal_lt_ground (S : SPO.FuncSetup α) (m : S.Elem) :
 
 /-- `notconnected`（極大が一意でない）なら `|principalIdeal| < |ground|`。 -/
 lemma card_principal_lt_ground_of_not_unique
-  (S : SPO.FuncSetup α) [Fintype S.Elem]
+  (S : FuncSetup α) [Fintype S.Elem]
   (hpos : isPoset S) (notconnected : ¬ (∃! mm : S.Elem, S.maximal mm))
   (m : S.Elem) :
   (S.principalIdeal m.1 m.2).card < S.ground.card := by
@@ -526,7 +528,7 @@ lemma card_principal_lt_ground_of_not_unique
 
 /-- すぐ使える形：`restrictToCoIdeal` の台集合サイズが真に小さい。 -/
 lemma restrictToCoIdeal_card_lt
-  (S : SPO.FuncSetup α) (m : S.Elem)
+  (S : FuncSetup α) (m : S.Elem)
   (hpos : isPoset S) (notconnected : ¬ (∃! mm : S.Elem, S.maximal mm)) :
   (restrictToCoIdeal S m hpos notconnected).ground.card < S.ground.card := by
   classical
@@ -536,7 +538,7 @@ lemma restrictToCoIdeal_card_lt
 
 /-- すぐ使える形：`restrictToIdeal` の台集合サイズが（極大が一意でないなら）真に小さい。 -/
 lemma restrictToIdeal_card_lt_of_not_unique
-  (S : SPO.FuncSetup α) (m : S.Elem) (hm : S.maximal m)
+  (S : FuncSetup α) (m : S.Elem) (hm : S.maximal m)
   [Fintype S.Elem] (hpos : isPoset S)
   (notconnected : ¬ (∃! mm : S.Elem, S.maximal mm)) :
   (restrictToIdeal S m hm).ground.card < S.ground.card := by
@@ -552,7 +554,7 @@ lemma restrictToIdeal_card_lt_of_not_unique
 
 
 /-- `x` の上にある極大元の一意性。 -/
-lemma unique_maximal_above (S : SPO.FuncSetup α)
+lemma unique_maximal_above (S : FuncSetup α)
   [Fintype S.Elem] (hpos : isPoset S)
   {x m₁ m₂ : S.Elem}
   (hm₁ : S.maximal m₁) (hm₂ : S.maximal m₂)
@@ -580,7 +582,7 @@ lemma unique_maximal_above (S : SPO.FuncSetup α)
     exact hpos (hm₂ (hm₁ h₃)) h₂
 
 /-- まとめ：各 `x` には「上にある極大元」が存在一意。 -/
-lemma exists_unique_maxAbove (S : SPO.FuncSetup α)
+lemma exists_unique_maxAbove (S : FuncSetup α)
   [Fintype S.Elem] (hpos : isPoset S) (x : S.Elem) :
   ∃! m : S.Elem, S.maximal m ∧ S.le x m := by
   classical
@@ -593,20 +595,20 @@ lemma exists_unique_maxAbove (S : SPO.FuncSetup α)
   exact id (Eq.symm uma)
 
 def liftFromIdeal
-  (S : SPO.FuncSetup α) (m : S.Elem) (hm : S.maximal m)
+  (S : FuncSetup α) (m : S.Elem) (hm : S.maximal m)
   (x : (restrictToIdeal S m hm).Elem) : S.Elem :=
   ⟨ x.1, (S.principalIdeal_subset_ground ⟨m.1, m.2⟩) x.2 ⟩
 
 -- co-ideal 版
 def liftFromCoIdeal
-  (S : SPO.FuncSetup α) (m : S.Elem) (hpos : isPoset S) (notuniq : ¬∃! mm, S.maximal mm)
+  (S : FuncSetup α) (m : S.Elem) (hpos : isPoset S) (notuniq : ¬∃! mm, S.maximal mm)
   (x : (restrictToCoIdeal S m hpos notuniq).Elem) : S.Elem :=
   ⟨ x.1, (mem_coIdeal_iff S (m := m) (y := x.1)).1 x.2 |>.1 ⟩
 
 /-! ## 1. cover を持ち上げる -/
 
 lemma cover_lift_Ideal
-  (S : SPO.FuncSetup α) (m : S.Elem) (hm : S.maximal m)
+  (S : FuncSetup α) (m : S.Elem) (hm : S.maximal m)
   {x y : (restrictToIdeal S m hm).Elem} :
   (restrictToIdeal S m hm).cover x y →
   S.cover (liftFromIdeal S m hm x) (liftFromIdeal S m hm y) := by
@@ -626,7 +628,7 @@ lemma cover_lift_Ideal
   exact hval
 
 lemma cover_lift_CoIdeal
-  (S : SPO.FuncSetup α) (m : S.Elem) (hpos : isPoset S) (notuniq : ¬∃! mm, S.maximal mm)
+  (S : FuncSetup α) (m : S.Elem) (hpos : isPoset S) (notuniq : ¬∃! mm, S.maximal mm)
   {x y : (restrictToCoIdeal S m hpos notuniq).Elem} :
   (restrictToCoIdeal S m hpos notuniq).cover x y →
   S.cover (liftFromCoIdeal S m hpos notuniq x) (liftFromCoIdeal S m hpos notuniq y) := by
@@ -647,7 +649,7 @@ lemma cover_lift_CoIdeal
 
 /-- `restrictToIdeal` の `≤` を元の `S` の `≤` に持ち上げる（refine 不使用）。 -/
 lemma le_lift_Ideal
-  (S : SPO.FuncSetup α) (m : S.Elem) (hm : S.maximal m)
+  (S : FuncSetup α) (m : S.Elem) (hm : S.maximal m)
   {x y : (restrictToIdeal S m hm).Elem} :
   (restrictToIdeal S m hm).le x y →
   S.le (liftFromIdeal S m hm x) (liftFromIdeal S m hm y) := by
@@ -667,7 +669,7 @@ lemma le_lift_Ideal
 
 /-- `restrictToCoIdeal` の `≤` を元の `S` の `≤` に持ち上げる（refine 不使用）。 -/
 lemma le_lift_CoIdeal
-  (S : SPO.FuncSetup α) (m : S.Elem)
+  (S : FuncSetup α) (m : S.Elem)
   (hpos : isPoset S) (notuniq : ¬ (∃! mm : S.Elem, S.maximal mm))
   {x y : (restrictToCoIdeal S m hpos notuniq).Elem} :
   (restrictToCoIdeal S m hpos notuniq).le x y →
@@ -688,7 +690,7 @@ lemma le_lift_CoIdeal
 /-! ## 3. 反対称性の移送（= isPoset の保存） -/
 
 lemma antisymm_restrictToIdeal_of_isPoset
-  (S : SPO.FuncSetup α) (hpos : isPoset S) (m : S.Elem) (hm : S.maximal m) :
+  (S : FuncSetup α) (hpos : isPoset S) (m : S.Elem) (hm : S.maximal m) :
   ∀ {u v : (restrictToIdeal S m hm).Elem},
     (restrictToIdeal S m hm).le u v →
     (restrictToIdeal S m hm).le v u →
@@ -712,7 +714,7 @@ lemma antisymm_restrictToIdeal_of_isPoset
   exact Subtype.ext this
 
 lemma antisymm_restrictToCoIdeal_of_isPoset
-  (S : SPO.FuncSetup α) (hpos : isPoset S) (m : S.Elem)
+  (S : FuncSetup α) (hpos : isPoset S) (m : S.Elem)
   (notuniq : ¬∃! mm, S.maximal mm) :
   ∀ {u v : (restrictToCoIdeal S m hpos notuniq).Elem},
     (restrictToCoIdeal S m hpos notuniq).le u v →
@@ -798,7 +800,7 @@ lemma edgeFinset_sumProd {α} [DecidableEq α]
 /-成り立たない
 lemma idealFamily_eq_sumProd_split
   {α} [DecidableEq α]
-  (S : SPO.FuncSetup α) (m : S.Elem) (hm : S.maximal m)
+  (S : FuncSetup α) (m : S.Elem) (hm : S.maximal m)
   (hpos : isPoset S) (notuniq : ¬ (∃! mm : S.Elem, S.maximal mm)) :
   let F₁ := (restrictToIdeal S m hm).idealFamily
   let F₂ := (restrictToCoIdeal S m hpos notuniq).idealFamily
@@ -881,7 +883,7 @@ lemma idealFamily_eq_sumProd_split
 /-- principal ideal 側：`S₁ := restrictToIdeal S m hm` の `leOn` は
     ground 上では `S` の `leOn` を含意する。 -/
 private lemma leOn_of_leOn_restrict_I
-  (S : SPO.FuncSetup α) (m : S.Elem) (hm : S.maximal m)
+  (S : FuncSetup α) (m : S.Elem) (hm : S.maximal m)
   {x y : α} (hxI : x ∈ S.principalIdeal m.1 m.2) (hyI : y ∈ S.principalIdeal m.1 m.2)
   (hxy : (restrictToIdeal S m hm).leOn x y) :
   S.leOn x y := by
@@ -913,7 +915,7 @@ private lemma leOn_of_leOn_restrict_I
 /-- co-ideal 側：`S₂ := restrictToCoIdeal S m hpos notuniq` の `leOn` は
     ground 上では `S` の `leOn` を含意する。 -/
 private lemma leOn_of_leOn_restrict_C
-  (S : SPO.FuncSetup α) (m : S.Elem)
+  (S : FuncSetup α) (m : S.Elem)
   (hpos : isPoset S) (notuniq : ¬ (∃! mm : S.Elem, S.maximal mm))
   {x y : α} (hxC : x ∈ coIdeal S m) (hyC : y ∈ coIdeal S m)
   (hxy : (restrictToCoIdeal S m hpos notuniq).leOn x y) :
@@ -935,7 +937,7 @@ private lemma leOn_of_leOn_restrict_C
 /-! ### 補助２：ground の分割の便利形 -/
 
 private lemma mem_I_or_C_of_ground
-  (S : SPO.FuncSetup α) (m : S.Elem) (hm : S.maximal m)
+  (S : FuncSetup α) (m : S.Elem) (hm : S.maximal m)
   (hpos : isPoset S) (notuniq : ¬ (∃! mm : S.Elem, S.maximal mm))
   {x : α} (hxG : x ∈ S.ground) :
   x ∈ S.principalIdeal m.1 m.2 ∨ x ∈ coIdeal S m := by
@@ -956,7 +958,7 @@ private lemma mem_I_or_C_of_ground
   exact Finset.mem_union.mp this
 
 private lemma build_restrict_le_I
-  (S : SPO.FuncSetup α) (m : S.Elem) (hm : S.maximal m)
+  (S : FuncSetup α) (m : S.Elem) (hm : S.maximal m)
   {y x : α} (hyG : y ∈ S.ground) (hxG : x ∈ S.ground)
   (hyI : y ∈ S.principalIdeal m.1 m.2) (hxI : x ∈ S.principalIdeal m.1 m.2)
   (h : S.le ⟨y,hyG⟩ ⟨x,hxG⟩) :
@@ -1052,7 +1054,7 @@ private lemma build_restrict_le_I
 /--（前方向の証明内で使う）`S.le ⟨y,hyG⟩ ⟨x,hxG⟩` から
   `restrictToCoIdeal` 側の `le ⟨y,hyC⟩ ⟨x,hxC⟩` を構成する。 -/
 private lemma build_restrict_le_C
-  (S : SPO.FuncSetup α) (m : S.Elem)
+  (S : FuncSetup α) (m : S.Elem)
   (hpos : isPoset S) (notuniq : ¬ (∃! mm : S.Elem, S.maximal mm))
   {y x : α} (hyG : y ∈ S.ground) (hxG : x ∈ S.ground)
   (hyC : y ∈ coIdeal S m) (hxC : x ∈ coIdeal S m)
@@ -1134,7 +1136,7 @@ private lemma build_restrict_le_C
 /-! ## 本命：`sets` の同値 -/
 
 lemma ideal_sets_iff_sumProd
-  (S : SPO.FuncSetup α) (m : S.Elem) (hm : S.maximal m)
+  (S : FuncSetup α) (m : S.Elem) (hm : S.maximal m)
   (hpos : isPoset S) (notuniq : ¬ (∃! mm : S.Elem, S.maximal mm))
   {X : Finset α} :
   (S.idealFamily).sets X ↔
@@ -1161,7 +1163,7 @@ lemma ideal_sets_iff_sumProd
       -- isOrderIdealOn の定義を展開
       -- F₁ = orderIdealFamily (le := (restrict.leOn)) (V := I)
       -- 証明対象： A ⊆ I, かつ downward closed
-      dsimp [SetFamily.sets, SetFamily, FuncSetup.idealFamily, orderIdealFamily] at *
+      dsimp [SetFamily.sets, SetFamily, FuncSetup.idealFamily] at *
       -- A ⊆ I
       have hAsub : A ⊆ I := by
         intro x hx
@@ -1198,7 +1200,7 @@ lemma ideal_sets_iff_sumProd
     -- B が F₂ のイデアル
     have hB : F₂.sets B := by
       -- 同様に展開して書く
-      dsimp [SetFamily.sets, SetFamily, FuncSetup.idealFamily, orderIdealFamily] at *
+      dsimp [SetFamily.sets, SetFamily, FuncSetup.idealFamily] at *
       -- B ⊆ C
       have hBsub : B ⊆ C := by
         intro x hx
@@ -1272,7 +1274,7 @@ lemma ideal_sets_iff_sumProd
     rcases hx with ⟨A, B, hA, hB, rfl⟩
     -- `X = A ∪ B` に置き換わっている
     -- isOrderIdealOn の定義で示す
-    dsimp [SetFamily.sets, SetFamily, FuncSetup.idealFamily, orderIdealFamily] at *
+    dsimp [SetFamily.sets, SetFamily, FuncSetup.idealFamily] at *
     -- まず `A ⊆ I`, `B ⊆ C`
     have hAsubI : A ⊆ I := (And.left hA)
     have hBsubC : B ⊆ C := (And.left hB)
@@ -1447,7 +1449,7 @@ lemma ideal_sets_iff_sumProd
 
 /-- edgeFinset の一致（これが NDS 等式には十分） -/
 lemma ideal_edgeFinset_eq_sumProd
-  (S : SPO.FuncSetup α) (m : S.Elem) (hm : S.maximal m)
+  (S : FuncSetup α) (m : S.Elem) (hm : S.maximal m)
   (hpos : isPoset S) (notuniq : ¬ (∃! mm : S.Elem, S.maximal mm)) :
   let F  := S.idealFamily
   let F₁ := (restrictToIdeal S m hm).idealFamily
@@ -1471,7 +1473,7 @@ lemma ideal_edgeFinset_eq_sumProd
     exact (SetFamily.mem_edgeFinset_iff_sets (F := F) (A := X)).2 hset'
 
 lemma ideal_ground_eq_sumProd_ground
-  (S : SPO.FuncSetup α) (m : S.Elem) (hm : S.maximal m)
+  (S : FuncSetup α) (m : S.Elem) (hm : S.maximal m)
   (hpos : isPoset S) (notuniq : ¬ (∃! mm : S.Elem, S.maximal mm)) :
   let F  := S.idealFamily
   let F₁ := (restrictToIdeal S m hm).idealFamily
@@ -1496,7 +1498,7 @@ lemma ideal_ground_eq_sumProd_ground
   exact Eq.symm (ground_union_split S m hm hpos notuniq)
 
 lemma idealFamily_eq_sumProd_on_NDS
-  (S : SPO.FuncSetup α) (m : S.Elem) (hm : S.maximal m)
+  (S : FuncSetup α) (m : S.Elem) (hm : S.maximal m)
   (hpos : isPoset S) (notuniq : ¬ (∃! mm : S.Elem, S.maximal mm)) :
   let F  := S.idealFamily
   let F₁ := (restrictToIdeal S m hm).idealFamily
@@ -2524,7 +2526,7 @@ lemma NDS_sumProd_of_disjoint
           norm_cast
 
 /-- principal と coIdeal の台集合は素に交わる。 -/
-lemma disjoint_principal_coIdeal (S : SPO.FuncSetup α) (m : S.Elem) :
+lemma disjoint_principal_coIdeal (S : FuncSetup α) (m : S.Elem) :
   Disjoint (S.principalIdeal m.1 m.2) (coIdeal S m) := by
   classical
   -- `coIdeal = ground \ principal` より直ちに
@@ -2533,7 +2535,7 @@ lemma disjoint_principal_coIdeal (S : SPO.FuncSetup α) (m : S.Elem) :
 
 /-- 適用版：`restrictToIdeal` と `restrictToCoIdeal` の NDS 分解。 -/
 lemma NDS_restrict_sumProd_split
-  (S : SPO.FuncSetup α) (m : S.Elem) (hm : S.maximal m)
+  (S : FuncSetup α) (m : S.Elem) (hm : S.maximal m)
   (hpos : isPoset S) (notuniq : ¬ (∃! mm : S.Elem, S.maximal mm)) :
   let F₁ := (restrictToIdeal S m hm).idealFamily
   let F₂ := (restrictToCoIdeal S m hpos notuniq).idealFamily

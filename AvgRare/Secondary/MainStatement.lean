@@ -1,20 +1,18 @@
-import AvgRare.SPO.FuncSetup
+import AvgRare.Functional.FuncSetup
 import AvgRare.Basics.SetFamily
-import AvgRare.Basics.Trace.Common
---import AvgRare.SPO.Forest
-import AvgRare.PaperSync.IdealsTrace
-import AvgRare.Forests.DirectProduct
-import AvgRare.Forests.Induction
+import AvgRare.Basics.SetTrace
+import AvgRare.Reductions.Reduction
+import AvgRare.Secondary.DirectProduct
+import AvgRare.Secondary.Induction
 
 set_option maxHeartbeats 100000000
 
 universe u
 
 namespace AvgRare
-namespace PaperSync
+namespace MainStatement
 open Classical
-open SPO
-open DirectProduct
+--open DirectProduct
 open FuncSetup
 
 variable {α : Type u} [DecidableEq α]
@@ -93,7 +91,7 @@ lemma powerset_singleton (x : α) :
 
 /-- 台集合が1元なら `edgeFinset = {∅, ground}` -/
 lemma edgeFinset_of_card_one
-  (S : SPO.FuncSetup α)
+  (S : FuncSetup α)
   (hS : (S.idealFamily).ground.card = 1) :
   (S.idealFamily).edgeFinset
     = ({∅, (S.idealFamily).ground} : Finset (Finset α)) := by
@@ -293,7 +291,7 @@ lemma sizes_of_card_one
 
 /-- **main\_base\_case**：台集合が 1 のとき NDS = 0 -/
 lemma main_base_case
-  (S : SPO.FuncSetup α)
+  (S : FuncSetup α)
   (hS : (S.idealFamily).ground.card = 1) :
   (S.idealFamily).NDS = 0 := by
   -- 上で出したサイズ評価を使って定義に代入するだけ
@@ -310,21 +308,21 @@ lemma main_base_case
 ----------------------------------
 
 lemma antisymm_restrictToIdeal_of_isPoset
-  (S : SPO.FuncSetup α) (hpos : isPoset S) (m : S.Elem) (hm : S.maximal m) :
-  ∀ {u v : (restrictToIdeal S m hm).Elem},
-    (restrictToIdeal S m hm).le u v →
-    (restrictToIdeal S m hm).le v u →
+  (S : FuncSetup α) (hpos : isPoset S) (m : S.Elem) (hm : S.maximal m) :
+  ∀ {u v : (DirectProduct.restrictToIdeal S m hm).Elem},
+    (DirectProduct.restrictToIdeal S m hm).le u v →
+    (DirectProduct.restrictToIdeal S m hm).le v u →
     u = v := by
   classical
   intro u v huv hvu
   -- 元の S で反対称
-  have : S.le (liftFromIdeal S m hm u) (liftFromIdeal S m hm v) :=
-    le_lift_Ideal S m hm huv
-  have : (S.le (liftFromIdeal S m hm u) (liftFromIdeal S m hm v))
-       ∧ (S.le (liftFromIdeal S m hm v) (liftFromIdeal S m hm u)) := by
-    exact ⟨this, le_lift_Ideal S m hm hvu⟩
+  have : S.le (DirectProduct.liftFromIdeal S m hm u) (DirectProduct.liftFromIdeal S m hm v) :=
+    DirectProduct.le_lift_Ideal S m hm huv
+  have : (S.le (DirectProduct.liftFromIdeal S m hm u) (DirectProduct.liftFromIdeal S m hm v))
+       ∧ (S.le (DirectProduct.liftFromIdeal S m hm v) (DirectProduct.liftFromIdeal S m hm u)) := by
+    exact ⟨this, DirectProduct.le_lift_Ideal S m hm hvu⟩
   rcases this with ⟨h₁, h₂⟩
-  have h_eqS : liftFromIdeal S m hm u = liftFromIdeal S m hm v := by
+  have h_eqS : DirectProduct.liftFromIdeal S m hm u = DirectProduct.liftFromIdeal S m hm v := by
     exact hpos this h₂
   -- 値の等しさに落とし、Subtype.ext で戻す
   have : u.1 = v.1 :=by
@@ -334,21 +332,21 @@ lemma antisymm_restrictToIdeal_of_isPoset
   exact Subtype.ext this
 
 lemma antisymm_restrictToCoIdeal_of_isPoset
-  (S : SPO.FuncSetup α) (hpos : isPoset S) (m : S.Elem)
+  (S : FuncSetup α) (hpos : isPoset S) (m : S.Elem)
   (notuniq : ¬∃! mm, S.maximal mm) :
-  ∀ {u v : (restrictToCoIdeal S m hpos notuniq).Elem},
-    (restrictToCoIdeal S m hpos notuniq).le u v →
-    (restrictToCoIdeal S m hpos notuniq).le v u →
+  ∀ {u v : (DirectProduct.restrictToCoIdeal S m hpos notuniq).Elem},
+    (DirectProduct.restrictToCoIdeal S m hpos notuniq).le u v →
+    (DirectProduct.restrictToCoIdeal S m hpos notuniq).le v u →
     u = v := by
   classical
   intro u v huv hvu
-  have h₁ : S.le (liftFromCoIdeal S m hpos notuniq u) (liftFromCoIdeal S m hpos notuniq v) :=
-    le_lift_CoIdeal S m hpos notuniq huv
-  have h₂ : S.le (liftFromCoIdeal S m hpos notuniq v) (liftFromCoIdeal S m hpos notuniq u) :=
-    le_lift_CoIdeal S m hpos notuniq hvu
+  have h₁ : S.le (DirectProduct.liftFromCoIdeal S m hpos notuniq u) (DirectProduct.liftFromCoIdeal S m hpos notuniq v) :=
+    DirectProduct.le_lift_CoIdeal S m hpos notuniq huv
+  have h₂ : S.le (DirectProduct.liftFromCoIdeal S m hpos notuniq v) (DirectProduct.liftFromCoIdeal S m hpos notuniq u) :=
+    DirectProduct.le_lift_CoIdeal S m hpos notuniq hvu
   have h_eqS :
-      liftFromCoIdeal S m hpos notuniq u
-    = liftFromCoIdeal S m hpos notuniq v := by
+      DirectProduct.liftFromCoIdeal S m hpos notuniq u
+    = DirectProduct.liftFromCoIdeal S m hpos notuniq v := by
     exact hpos h₁ h₂
 
   have : u.1 = v.1 := by
@@ -368,13 +366,13 @@ lemma isPoset_posetTraceOfUnique
   have hm : S.maximal (Classical.choose hexu.exists) := Classical.choose_spec hexu.exists
   -- `isPoset_posetTraceCore` を適用
   dsimp [Induction.posetTraceOfUnique]
-  have pos': isPoset_excess S := by
-    exact isPoset_of_le_antisymm S hpos
+  have pos': Reduction.isPoset_excess S := by
+    exact Reduction.isPoset_of_le_antisymm S hpos
   let ipt := Induction.isPoset_posetTraceCore S hpos (m := Classical.choose hexu.exists)
   exact @ipt geq2
 
 lemma secondary_main_theorem
-  (S : SPO.FuncSetup α) [Fintype S.Elem]
+  (S : FuncSetup α) [Fintype S.Elem]
   (hpos : isPoset S) :
   (S.idealFamily).NDS ≤ 0 := by
 
@@ -481,16 +479,16 @@ lemma secondary_main_theorem
                 obtain ⟨m, hm⟩ :=
                   Induction.exists_maximal_of_finite (S := T) (hpos := hposT) (hne := hne)
                 -- 制限
-                let T₁ := restrictToIdeal T m hm
-                let T₂ := restrictToCoIdeal T m hposT-- (notuniq := by exact hexu)
+                let T₁ := DirectProduct.restrictToIdeal T m hm
+                let T₂ := DirectProduct.restrictToCoIdeal T m hposT-- (notuniq := by exact hexu)
                 -- どちらも台集合が真に小さい
                 have hlt₁ :
                   T₁.ground.card < T.ground.card :=
-                  restrictToIdeal_card_lt_of_not_unique
+                  DirectProduct.restrictToIdeal_card_lt_of_not_unique
                     (S := T) (m := m) (hm := hm) (hpos := hposT) (notconnected := by exact hexu)
                 have hlt₂ :
                   (T₂ hexu).ground.card < T.ground.card :=
-                  restrictToCoIdeal_card_lt
+                  DirectProduct.restrictToCoIdeal_card_lt
                     (S := T) (m := m) (hpos := hposT) (notconnected := by exact hexu)
                 -- poset 性（新補題で反対称性を確保）
                 have hpos₁ : isPoset T₁ := (antisymm_restrictToIdeal_of_isPoset (S := T) hposT m hm)
@@ -525,7 +523,7 @@ lemma secondary_main_theorem
                     =
                     (F₁.edgeFinset.product F₂.edgeFinset).image
                       (fun p : Finset α × Finset α => p.1 ∪ p.2) :=
-                  edgeFinset_sumProd F₁ F₂
+                  DirectProduct.edgeFinset_sumProd F₁ F₂
 
                 have hNDS_congr :
                 (T.idealFamily).NDS
@@ -540,7 +538,7 @@ lemma secondary_main_theorem
                     =
                   (F₂.numHyperedges : Int) * F₁.NDS
                   + (F₁.numHyperedges : Int) * F₂.NDS :=
-                    NDS_restrict_sumProd_split (S := T) (m := m) (hm := hm)
+                    DirectProduct.NDS_restrict_sumProd_split (S := T) (m := m) (hm := hm)
                     (hpos := hposT) (notuniq := by exact hexu)
 
                 -- 係数は非負、項は ≤ 0
@@ -577,15 +575,15 @@ lemma secondary_main_theorem
 /- 主定理（言明）：
     `f : V → V` から誘導された前順序のイデアル族の NDS は非正。 -/
 theorem main_nds_nonpos {α : Type u} [DecidableEq α]
-  (S : SPO.FuncSetup α) :
+  (S : FuncSetup α) :
   (S.idealFamily).NDS ≤ 0 := by
-  apply PaperSync.main_nds_nonpos_of_secondary
+  apply Reduction.main_nds_nonpos_of_secondary
   intro T hT
   have hT' : isPoset T := by
     dsimp [isPoset]
     dsimp [has_le_antisymm]
-    exact antisymm_of_isPoset T hT
+    exact Reduction.antisymm_of_isPoset T hT
   exact secondary_main_theorem T hT'
 
-end PaperSync
+end MainStatement
 end AvgRare

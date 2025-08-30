@@ -2,13 +2,14 @@ import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Powerset
 import Mathlib.Algebra.BigOperators.Finsupp.Basic
 import AvgRare.Basics.SetFamily
-import AvgRare.Basics.Trace.Common
-import AvgRare.SPO.FuncSetup
+import AvgRare.Basics.SetTrace
+import AvgRare.Functional.FuncSetup
 
 universe u
 
 namespace AvgRare
-namespace Trace
+namespace Reduction
+
 open scoped BigOperators
 open Classical
 
@@ -16,7 +17,7 @@ variable {α : Type u} [DecidableEq α]
 
 --idealsTrace.leanで、NDSの証明で使っている。
 lemma exists_parallel_partner_from_nontrivial
-    (S : SPO.FuncSetup α) {u : S.Elem}
+    (S : FuncSetup α) {u : S.Elem}
     (hx : S.nontrivialClass u) :
     ∃ v : α, v ≠ u.1 ∧ v ∈ S.ground ∧ (S.idealFamily).Parallel u.1 v := by
   classical
@@ -54,7 +55,7 @@ theorem diff_term_nonpos_of_Rare
 ---------------このあたりからrare性の証明か
 
 private lemma ideal_diff_simClass_is_ideal
-    (S : SPO.FuncSetup α)
+    (S : FuncSetup α)
     {u : S.Elem} {I : Finset α}
     (hmax : S.maximal u)
     (hI : (S.idealFamily).sets I) --(huI : u.1 ∈ I)
@@ -62,8 +63,8 @@ private lemma ideal_diff_simClass_is_ideal
     (S.idealFamily).sets (I \ S.simClass u) ∧ u.1 ∉ (I \ S.simClass u) := by
   classical
   -- isOrderIdealOn に展開
-  have hIdeal : isOrderIdealOn (S.leOn) S.ground I := by
-    change isOrderIdealOn (S.leOn) S.ground I
+  have hIdeal : SetFamily.isOrderIdealOn (S.leOn) S.ground I := by
+    change SetFamily.isOrderIdealOn (S.leOn) S.ground I
     exact (S.sets_iff_isOrderIdeal).1 hI
   -- (1) 包含 I\U ⊆ ground は I ⊆ ground から従う
   have hSub : (I \ S.simClass u) ⊆ S.ground := by
@@ -117,7 +118,7 @@ private lemma ideal_diff_simClass_is_ideal
     exact (Finset.mem_sdiff).2 ⟨hyI, hyNotU⟩
   -- 以上から I\U は isOrderIdealOn
   have hSet : (S.idealFamily).sets (I \ S.simClass u) := by
-    change isOrderIdealOn (S.leOn) S.ground (I \ S.simClass u)
+    change SetFamily.isOrderIdealOn (S.leOn) S.ground (I \ S.simClass u)
     exact And.intro hSub (by intro x hx; exact hDown hx)
   -- u は U に属するので u ∉ I\U
   have huNot : u.1 ∉ (I \ S.simClass u) := by
@@ -132,7 +133,7 @@ private lemma ideal_diff_simClass_is_ideal
   exact And.intro hSet huNot
 
 noncomputable def Phi
-    (S : SPO.FuncSetup α) (u : S.Elem) (hmax : S.maximal u) :
+    (S : FuncSetup α) (u : S.Elem) (hmax : S.maximal u) :
     {I // I ∈ (S.idealFamily).edgeFinset ∧ u.1 ∈ I} →
     {J // J ∈ (S.idealFamily).edgeFinset ∧ u.1 ∉ J} :=
   fun ⟨I, hIedge, _⟩ =>
@@ -145,7 +146,7 @@ noncomputable def Phi
 
 --IdealsTraceで引用されている。
 lemma Phi_injective
-    (S : SPO.FuncSetup α) {u : S.Elem} (hmax : S.maximal u) :
+    (S : FuncSetup α) {u : S.Elem} (hmax : S.maximal u) :
     Function.Injective (Phi S u hmax) := by
   classical
   intro a b hEq
@@ -412,3 +413,6 @@ lemma rare_of_injection_between_filters
   -- `rw` で逐次書換え
   rw [hDeg, hNum]
   exact h2
+
+end Reduction
+end AvgRare

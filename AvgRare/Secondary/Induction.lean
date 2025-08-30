@@ -3,11 +3,8 @@ import Mathlib.Data.Finset.Powerset
 import Mathlib.Algebra.BigOperators.Finsupp.Basic
 import Mathlib.Logic.Relation
 import Mathlib.Algebra.Order.Sub.Basic
---import Mathlib.SetTheory.Cardinal.Basic --おためし
 import AvgRare.Basics.SetFamily
-import AvgRare.SPO.FuncSetup
---import AvgRare.PaperSync.IdealsTrace
---import AvgRare.SPO.Forest
+import AvgRare.Functional.FuncSetup
 
 universe u
 
@@ -17,7 +14,6 @@ namespace Induction
 open Classical
 variable {α : Type u} [DecidableEq α]
 open AvgRare
-open SPO
 open FuncSetup
 
 --generalに移してもいいが、ここでしか使わないのでとりあえずここにおいておく。
@@ -78,7 +74,7 @@ private lemma iterate_has_collision
 /-- 反復に周期が出たら、反対称性により長さ 1 のサイクル（不動点）になる。 -/
 --使っている
 private lemma eventually_hits_fixpoint
-  (S : SPO.FuncSetup α) [Fintype S.Elem] (hpos : isPoset S)
+  (S : FuncSetup α) [Fintype S.Elem] (hpos : isPoset S)
   (x : S.Elem) :
   ∃ m : S.Elem, S.le x m ∧ S.cover m m := by
   classical
@@ -254,9 +250,9 @@ private lemma eventually_hits_fixpoint
       · exact xyle
       · exact this
 
---使っている
+--そとからも使っている。Funcsetupのposetファイルができたら移動。
 lemma exists_maximal_of_finite
-  (S : SPO.FuncSetup α) [Fintype S.Elem] (hpos : isPoset S)
+  (S : FuncSetup α) [Fintype S.Elem] (hpos : isPoset S)
   (hne : S.ground.Nonempty) :
   ∃ m : S.Elem, S.maximal m := by
   classical
@@ -278,7 +274,7 @@ lemma erase_nonempty(A:Finset α) (hA : A.card ≥ 2) (hu : u ∈ A) : (A.erase 
 
 --極大元に限ったposetTraceとして、のちにposetTraceOfUniqueが出てくる。
 --Traceしたものが非空であることを保証するためにgeq2が仮定されている。
-noncomputable def posetTraceCore (S : SPO.FuncSetup α) (m : S.Elem) (geq2: S.ground.card ≥ 2): SPO.FuncSetup α :=
+noncomputable def posetTraceCore (S : FuncSetup α) (m : S.Elem) (geq2: S.ground.card ≥ 2): FuncSetup α :=
 { ground := S.ground.erase m.1
   nonempty := by
    let en := erase_nonempty S.ground geq2 m.property
@@ -307,7 +303,7 @@ noncomputable def posetTraceCore (S : SPO.FuncSetup α) (m : S.Elem) (geq2: S.gr
 
 /- （定義から）`posetTraceCore` の台集合は `erase m`。 -/
 @[simp] lemma posetTraceCore_ground
-  (S : SPO.FuncSetup α) (m : S.Elem) (geq2: S.ground.card ≥ 2):
+  (S : FuncSetup α) (m : S.Elem) (geq2: S.ground.card ≥ 2):
   (posetTraceCore S m geq2).ground = S.ground.erase m.1 :=
 rfl
 
@@ -321,7 +317,7 @@ rfl
 --mは極大とは仮定されていない。
 /-- `S.cover x y` かつ `y ≠ m` なら、`posetTraceCore` でも同じ矢が残る。 -/
 private lemma cover_preserved_if_target_ne_m
-  (S : SPO.FuncSetup α) (m : S.Elem) (geq2: S.ground.card ≥ 2)
+  (S : FuncSetup α) (m : S.Elem) (geq2: S.ground.card ≥ 2)
   {x y : α}
   (hx : x ∈ S.ground.erase m.1) (hy : y ∈ S.ground.erase m.1)
   (hxy : S.cover ⟨x, (Finset.mem_erase.mp hx).2⟩ ⟨y, (Finset.mem_erase.mp hy).2⟩) :
@@ -361,7 +357,7 @@ private lemma cover_preserved_if_target_ne_m
 
 /-- 逆向き：`S.f x ≠ m` なら、`posetTraceCore` でのカバーは元のカバーに戻る。 -/
 private lemma cover_reflect_if_source_not_to_m
-  (S : SPO.FuncSetup α) (m : S.Elem) (geq2: S.ground.card ≥ 2)
+  (S : FuncSetup α) (m : S.Elem) (geq2: S.ground.card ≥ 2)
   {x y : α}
   (hx : x ∈ S.ground.erase m.1) (hy : y ∈ S.ground.erase m.1)
   (hfx_ne_m : S.f ⟨x, (Finset.mem_erase.mp hx).2⟩ ≠ m)
@@ -398,7 +394,7 @@ private lemma cover_reflect_if_source_not_to_m
     その元が `m` を指していないなら元のカバーに戻り，
     `m` を指しているなら自分自身への自ループに限られる。 -/
 private lemma cover_in_posetTraceCore_elim
-  (S : SPO.FuncSetup α) (m : S.Elem) (geq2: S.ground.card ≥ 2)
+  (S : FuncSetup α) (m : S.Elem) (geq2: S.ground.card ≥ 2)
   {x y : (posetTraceCore S m geq2).Elem}
   (hxy : (posetTraceCore S m geq2).cover x y) :
   y = x ∨
@@ -443,7 +439,7 @@ private lemma cover_in_posetTraceCore_elim
 /-- `S' = posetTraceCore S m` の到達関係は，
     自ループを捨てつつ 1 手ずつ元のカバーに戻すことで `S.le` へ写る。 -/
 private lemma le_reflect_to_S_posetTraceCore
-  (S : SPO.FuncSetup α) (m : S.Elem) (geq2: S.ground.card ≥ 2)
+  (S : FuncSetup α) (m : S.Elem) (geq2: S.ground.card ≥ 2)
   {x y : (posetTraceCore S m geq2).Elem}
   (hxy : Relation.ReflTransGen (posetTraceCore S m geq2).cover x y) :
   Relation.ReflTransGen S.cover
@@ -488,7 +484,7 @@ private lemma le_reflect_to_S_posetTraceCore
 /-- `S` が半順序なら `posetTraceCore S m` も半順序。 -/
 -- mは極大とは仮定されていない。
 lemma isPoset_posetTraceCore
-  (S : SPO.FuncSetup α) (hpos : isPoset S) (m : S.Elem) (geq2: S.ground.card ≥ 2) :
+  (S : FuncSetup α) (hpos : isPoset S) (m : S.Elem) (geq2: S.ground.card ≥ 2) :
   isPoset (posetTraceCore S m geq2)  := by
   -- 反対称性だけ示せば良い
   have :(posetTraceCore S m geq2).has_le_antisymm  := by
@@ -564,8 +560,8 @@ lemma principalOn_inj(S : FuncSetup α) {x y : S.Elem}
 
 --使われているが、FuncSetupにも同様な補題がある。
 lemma empty_isOrderIdealOn (S : FuncSetup α) :
-  isOrderIdealOn (S.leOn) S.ground (∅ : Finset α) := by
-  dsimp [isOrderIdealOn]
+  SetFamily.isOrderIdealOn (S.leOn) S.ground (∅ : Finset α) := by
+  dsimp [SetFamily.isOrderIdealOn]
   constructor
   · -- ∅ ⊆ ground
     intro x hx; cases hx
@@ -577,7 +573,7 @@ lemma principalIdeal_mem_edge (S : FuncSetup α) (x : S.Elem) :
   S.principalIdeal x.1 x.2 ∈ (S.idealFamily).edgeFinset := by
   -- `sets ↔ isOrderIdealOn` を使って示す
   have hI :
-    isOrderIdealOn (S.leOn) S.ground (S.principalIdeal x.1 x.2) :=
+    SetFamily.isOrderIdealOn (S.leOn) S.ground (S.principalIdeal x.1 x.2) :=
     principalIdeal_isOrderIdealOn (S := S) x.2
   have hxSets :
     (S.idealFamily).sets (S.principalIdeal x.1 x.2) := by
@@ -594,7 +590,7 @@ lemma principalIdeal_mem_edge (S : FuncSetup α) (x : S.Elem) :
 lemma empty_mem_edge (S : FuncSetup α) :
   (∅ : Finset α) ∈ (S.idealFamily).edgeFinset := by
   -- 空集合が ideal であることから
-  have hI : isOrderIdealOn (S.leOn) S.ground (∅ : Finset α) :=
+  have hI : SetFamily.isOrderIdealOn (S.leOn) S.ground (∅ : Finset α) :=
     empty_isOrderIdealOn S
   have hSets : (S.idealFamily).sets (∅ : Finset α) := by
     have := (S.sets_iff_isOrderIdeal (I := (∅ : Finset α)))
@@ -746,7 +742,7 @@ lemma ideals_card_ge_ground_card_succ
 
 --使っている
 private lemma lift_le_to_traceCore_if_not_m_below
-  (S : SPO.FuncSetup α) (m : S.Elem) (geq2: S.ground.card ≥ 2)
+  (S : FuncSetup α) (m : S.Elem) (geq2: S.ground.card ≥ 2)
   (hpos : isPoset S) (hmax : S.maximal m)
   {a b : (posetTraceCore S m geq2).Elem}
   (h : Relation.ReflTransGen S.cover
@@ -838,7 +834,7 @@ private lemma edgeFinset_trace_eq_filter_not_mem
   (S : FuncSetup α) [Fintype S.Elem]
   (m : S.Elem) (geq2: S.ground.card ≥ 2)
   (hKeep :
-    ∀ I : Finset α, isOrderIdealOn (S.leOn) S.ground I →
+    ∀ I : Finset α, SetFamily.isOrderIdealOn (S.leOn) S.ground I →
       m.1 ∉ I →
       ((posetTraceCore S m geq2).idealFamily).sets I)
   (hBack :
@@ -878,7 +874,7 @@ private lemma edgeFinset_trace_eq_filter_not_mem
     have hA_sets : F.sets A :=
       (SetFamily.mem_edgeFinset_iff_sets (F := F) (A := A)).1 hA_edge
     -- F 側 ideal
-    have hA_ideal : isOrderIdealOn (S.leOn) S.ground A :=
+    have hA_ideal : SetFamily.isOrderIdealOn (S.leOn) S.ground A :=
       (S.sets_iff_isOrderIdeal (I := A)).1 hA_sets
     -- 行きの保存で F'.sets A
     have hA_sets' : F'.sets A := hKeep A hA_ideal hm_not
@@ -890,7 +886,7 @@ private lemma edge_card_trace_eq_filter_not_mem
   (S : FuncSetup α) [Fintype S.Elem]
   (m : S.Elem) (geq2: S.ground.card ≥ 2)
   (hKeep :
-    ∀ I : Finset α, isOrderIdealOn (S.leOn) S.ground I →
+    ∀ I : Finset α, SetFamily.isOrderIdealOn (S.leOn) S.ground I →
       m.1 ∉ I →
       ((posetTraceCore S m geq2).idealFamily).sets I)
   (hBack :
@@ -919,8 +915,8 @@ private lemma no_m_in_Fprime_ideal
   -- I ⊆ ground.erase m (trace の台) に反する、で矛盾
   -- （`posetTraceCore` の台が `erase m` であることを使います）
   classical
-  have hI'Ideal : isOrderIdealOn ((posetTraceCore S m geq2).leOn) ((posetTraceCore S m geq2).ground) I := by
-    change isOrderIdealOn _ _ I
+  have hI'Ideal : SetFamily.isOrderIdealOn ((posetTraceCore S m geq2).leOn) ((posetTraceCore S m geq2).ground) I := by
+    change SetFamily.isOrderIdealOn _ _ I
     exact ((posetTraceCore S m geq2).sets_iff_isOrderIdeal (I := I)).1 hI'
   -- `I ⊆ ground.erase m`
   have hIsub : I ⊆ (posetTraceCore S m geq2).ground := (by exact hI'Ideal.1)
@@ -1015,7 +1011,7 @@ private lemma hOnlyTop_of_uniqueMax
   (hpos  : isPoset S)
   (hexu  : ∃! m : S.Elem, S.maximal m)
   {I : Finset α}
-  (hI   : isOrderIdealOn (S.leOn) S.ground I)
+  (hI   : SetFamily.isOrderIdealOn (S.leOn) S.ground I)
   (hmI  : (Classical.choose hexu.exists).1 ∈ I) :
   I = S.ground := by
 
@@ -1043,11 +1039,11 @@ private lemma hOnlyTop_of_uniqueMax
 
 private lemma keep_sets_from_trace_at_without_m
   (S : FuncSetup α) (m : S.Elem) (geq2: S.ground.card ≥ 2) {I : Finset α}
-  (hI  : isOrderIdealOn (S.leOn) S.ground I)
+  (hI  : SetFamily.isOrderIdealOn (S.leOn) S.ground I)
   (hmI : m.1 ∉ I) :
   ((posetTraceCore S m geq2).idealFamily).sets I := by
   -- `sets` ↔ `isOrderIdealOn`
-  change isOrderIdealOn ((posetTraceCore S m geq2).leOn) ((posetTraceCore S m geq2).ground) I
+  change SetFamily.isOrderIdealOn ((posetTraceCore S m geq2).leOn) ((posetTraceCore S m geq2).ground) I
   -- 2 条件：`I ⊆ ground'` と下方閉
   constructor
   · intro x hx
@@ -1126,8 +1122,8 @@ private lemma back_sets_from_trace_at_max_sets
   (S.idealFamily).sets I := by
   classical
   -- S' 側 ideal に展開
-  have hI' : isOrderIdealOn ((posetTraceCore S m geq2).leOn) ((posetTraceCore S m geq2).ground) I := by
-    change isOrderIdealOn _ _ I
+  have hI' : SetFamily.isOrderIdealOn ((posetTraceCore S m geq2).leOn) ((posetTraceCore S m geq2).ground) I := by
+    change SetFamily.isOrderIdealOn _ _ I
     exact ((posetTraceCore S m geq2).sets_iff_isOrderIdeal (I := I)).1 hI
 
   -- I ⊆ erase m から I ⊆ ground
@@ -1139,8 +1135,8 @@ private lemma back_sets_from_trace_at_max_sets
     exact hxG
 
   -- S 側 ideal を作る
-  have hIdealS : isOrderIdealOn (S.leOn) S.ground I := by
-    dsimp [isOrderIdealOn]
+  have hIdealS : SetFamily.isOrderIdealOn (S.leOn) S.ground I := by
+    dsimp [SetFamily.isOrderIdealOn]
     constructor
     · exact hIsubS
     · intro x hxI y hyG hleOn
@@ -1209,8 +1205,8 @@ by
     back_sets_from_trace_at_max_sets (S := S) (hpos := hpos) (m := m) (hm := hm) (hI := hI)
   -- `m ∉ I` は台が `erase m` から
   have hI' :
-      isOrderIdealOn ((posetTraceCore S m geq2).leOn) ((posetTraceCore S m geq2).ground) I := by
-    change isOrderIdealOn _ _ I
+      SetFamily.isOrderIdealOn ((posetTraceCore S m geq2).leOn) ((posetTraceCore S m geq2).ground) I := by
+    change SetFamily.isOrderIdealOn _ _ I
     exact ((posetTraceCore S m geq2).sets_iff_isOrderIdeal (I := I)).1 hI
   have hSub' : I ⊆ (posetTraceCore S m geq2).ground := hI'.1
   have hm_not : m.1 ∉ I := by
@@ -1328,12 +1324,12 @@ lemma arith_reduce (V n t : Nat) (hV : 1 ≤ V) :
 
 --使っている
 private lemma numHyperedges_trace_pred_of_max
-  (S : SPO.FuncSetup α) [Fintype S.Elem]
+  (S : FuncSetup α) [Fintype S.Elem]
   (m : S.Elem)(geq2: S.ground.card ≥ 2)
   (hOnlyTop :
-    ∀ I : Finset α, isOrderIdealOn (S.leOn) S.ground I → m.1 ∈ I → I = S.ground)
+    ∀ I : Finset α, SetFamily.isOrderIdealOn (S.leOn) S.ground I → m.1 ∈ I → I = S.ground)
   (hKeep :
-    ∀ I : Finset α, isOrderIdealOn (S.leOn) S.ground I → m.1 ∉ I →
+    ∀ I : Finset α, SetFamily.isOrderIdealOn (S.leOn) S.ground I → m.1 ∉ I →
       ((posetTraceCore S m geq2).idealFamily).sets I)
   -- “帰り”：`posetTraceCore` 側 ideal ⇒ S 側 ideal ∧ `m∉I`
   (hBack :
@@ -1359,7 +1355,7 @@ private lemma numHyperedges_trace_pred_of_max
     · intro A hA
       have hA_edge : A ∈ F.edgeFinset := (Finset.mem_filter.mp hA).1
       have hmA    : m.1 ∈ A           := (Finset.mem_filter.mp hA).2
-      have hA_ideal : isOrderIdealOn (S.leOn) S.ground A :=
+      have hA_ideal : SetFamily.isOrderIdealOn (S.leOn) S.ground A :=
         (S.sets_iff_isOrderIdeal (I := A)).1
           ((SetFamily.mem_edgeFinset_iff_sets (F := F) (A := A)).1 hA_edge)
       exact Finset.mem_singleton.mpr (hOnlyTop A hA_ideal hmA)
@@ -1367,7 +1363,7 @@ private lemma numHyperedges_trace_pred_of_max
       have hAeq : A = S.ground := Finset.mem_singleton.mp hA
       have hGroundSets : F.sets S.ground :=
         (S.sets_iff_isOrderIdeal (I := S.ground)).2
-          (by dsimp [isOrderIdealOn]; exact And.intro (by intro x hx; exact hx)
+          (by dsimp [SetFamily.isOrderIdealOn]; exact And.intro (by intro x hx; exact hx)
                 (by intro x hx y hy _; exact hy))
       have hGroundEdge : S.ground ∈ F.edgeFinset :=
         (SetFamily.mem_edgeFinset_iff_sets (F := F) (A := S.ground)).2 hGroundSets
@@ -1414,9 +1410,9 @@ private lemma totalHyperedgeSize_trace_sub_card_ground_of_max
   (S : FuncSetup α) [Fintype S.Elem]
   (m : S.Elem)(geq2: S.ground.card ≥ 2)
   (hOnlyTop :
-    ∀ I : Finset α, isOrderIdealOn (S.leOn) S.ground I → m.1 ∈ I → I = S.ground)
+    ∀ I : Finset α, SetFamily.isOrderIdealOn (S.leOn) S.ground I → m.1 ∈ I → I = S.ground)
   (hKeep :
-    ∀ I : Finset α, isOrderIdealOn (S.leOn) S.ground I → m.1 ∉ I →
+    ∀ I : Finset α, SetFamily.isOrderIdealOn (S.leOn) S.ground I → m.1 ∉ I →
       ((posetTraceCore S m geq2).idealFamily).sets I)
   (hBack :
     ∀ I : Finset α, ((posetTraceCore S m geq2).idealFamily).sets I →
@@ -1439,7 +1435,7 @@ private lemma totalHyperedgeSize_trace_sub_card_ground_of_max
     · intro A hA
       have hA_edge : A ∈ F.edgeFinset := (Finset.mem_filter.mp hA).1
       have hmA    : m.1 ∈ A           := (Finset.mem_filter.mp hA).2
-      have hA_ideal : isOrderIdealOn (S.leOn) S.ground A :=
+      have hA_ideal : SetFamily.isOrderIdealOn (S.leOn) S.ground A :=
         (S.sets_iff_isOrderIdeal (I := A)).1
           ((SetFamily.mem_edgeFinset_iff_sets (F := F) (A := A)).1 hA_edge)
       exact Finset.mem_singleton.mpr (hOnlyTop A hA_ideal hmA)
@@ -1447,7 +1443,7 @@ private lemma totalHyperedgeSize_trace_sub_card_ground_of_max
       have hAeq : A = S.ground := Finset.mem_singleton.mp hA
       have hGroundSets : F.sets S.ground :=
         (S.sets_iff_isOrderIdeal (I := S.ground)).2
-          (by dsimp [isOrderIdealOn]; exact And.intro (by intro x hx; exact hx)
+          (by dsimp [SetFamily.isOrderIdealOn]; exact And.intro (by intro x hx; exact hx)
                 (by intro x hx y hy _; exact hy))
       have hGroundEdge : S.ground ∈ F.edgeFinset :=
         (SetFamily.mem_edgeFinset_iff_sets (F := F) (A := S.ground)).2 hGroundSets
@@ -1474,7 +1470,7 @@ private lemma totalHyperedgeSize_trace_sub_card_ground_of_max
           have hGround : S.ground ∈ F.edgeFinset := by
             have hGroundSets : F.sets S.ground :=
               (S.sets_iff_isOrderIdeal (I := S.ground)).2
-                (by dsimp [isOrderIdealOn]; exact And.intro (by intro x hx; exact hx)
+                (by dsimp [SetFamily.isOrderIdealOn]; exact And.intro (by intro x hx; exact hx)
                       (by intro x hx y hy _; exact hy))
             exact (SetFamily.mem_edgeFinset_iff_sets (F := F) (A := S.ground)).2 hGroundSets
           cases hAeq; exact hGround
@@ -1482,7 +1478,7 @@ private lemma totalHyperedgeSize_trace_sub_card_ground_of_max
       by_cases hmA : m.1 ∈ A
       · -- ground 側
         have hA_sets : F.sets A := (SetFamily.mem_edgeFinset_iff_sets (F := F) (A := A)).1 hA
-        have hA_ideal : isOrderIdealOn (S.leOn) S.ground A :=
+        have hA_ideal : SetFamily.isOrderIdealOn (S.leOn) S.ground A :=
           (S.sets_iff_isOrderIdeal (I := A)).1 hA_sets
         have hAeq : A = S.ground := hOnlyTop A hA_ideal hmA
         exact Finset.mem_union.mpr (Or.inr (by cases hAeq; exact Finset.mem_singleton_self _))
@@ -1551,10 +1547,10 @@ private lemma nds_diff_eq_root_delete_identity_of_max
   (m : S.Elem) (geq2: S.ground.card ≥ 2)
   -- 「m を含む ideal は ground」
   (hOnlyTop :
-    ∀ I : Finset α, isOrderIdealOn (S.leOn) S.ground I → m.1 ∈ I → I = S.ground)
+    ∀ I : Finset α, SetFamily.isOrderIdealOn (S.leOn) S.ground I → m.1 ∈ I → I = S.ground)
   -- 「m を含まない ideal は trace 後も残る」
   (hKeep :
-    ∀ I : Finset α, isOrderIdealOn (S.leOn) S.ground I → m.1 ∉ I →
+    ∀ I : Finset α, SetFamily.isOrderIdealOn (S.leOn) S.ground I → m.1 ∉ I →
       ((posetTraceCore S m geq2).idealFamily).sets I)
   -- “帰り”：`posetTraceCore` 側 ideal ⇒ S 側 ideal ∧ `m∉I`
   (hBack :
@@ -1659,13 +1655,13 @@ private theorem nds_diff_eq_root_delete_identity_uniqueMax
 
   -- 「m を含む ideal は ground」
   have hOnlyTop :
-    ∀ I : Finset α, isOrderIdealOn (S.leOn) S.ground I → m.1 ∈ I → I = S.ground :=
+    ∀ I : Finset α, SetFamily.isOrderIdealOn (S.leOn) S.ground I → m.1 ∈ I → I = S.ground :=
     fun I hI hmI =>
       hOnlyTop_of_uniqueMax (S := S) (hpos := hpos) (hexu := hexu) (hI := hI) (hmI := hmI)
 
   -- 「m を含まない ideal は trace 後も ideal」（一般補題）
   have hKeep :
-    ∀ I : Finset α, isOrderIdealOn (S.leOn) S.ground I → m.1 ∉ I →
+    ∀ I : Finset α, SetFamily.isOrderIdealOn (S.leOn) S.ground I → m.1 ∉ I →
       ((posetTraceCore S m geq2).idealFamily).sets I :=
     fun I hI hnot =>
       keep_sets_from_trace_at_without_m (S := S) (m := m) (geq2 := geq2) (hI := hI) (hmI := hnot)

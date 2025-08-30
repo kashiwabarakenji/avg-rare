@@ -2,7 +2,6 @@ import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Powerset
 import Mathlib.Algebra.BigOperators.Finsupp.Basic
 import AvgRare.Basics.SetFamily
-import AvgRare.Basics.Ideals
 import LeanCopilot
 
 /-
@@ -10,9 +9,6 @@ Common.lean — Trace と汎用補助
 
 このファイルでは
 * 1点トレース `Trace.traceAt`
-* 並行性 `Trace.Parallel`
-* その場で使える小補助
-
 -/
 
 universe u
@@ -20,8 +16,7 @@ open Classical
 open scoped BigOperators
 
 namespace AvgRare
-namespace Trace
-open SetFamily
+namespace SetFamily
 
 variable {α : Type u} [DecidableEq α]
 
@@ -1073,6 +1068,6 @@ classical
             exact Eq.symm (Nat.cast_sum (traceAt u F).edgeFinset Finset.card)
   exact add_sub_assoc' (traceAt u F).NDS (2 * ↑(F.degree u)) ↑F.numHyperedges
 
-end Trace
+end SetFamily
 
 end AvgRare
