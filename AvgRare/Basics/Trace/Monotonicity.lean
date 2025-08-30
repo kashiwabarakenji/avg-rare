@@ -14,8 +14,7 @@ open Classical
 
 variable {α : Type u} [DecidableEq α]
 
-
---NDSの証明で使っている。
+--idealsTrace.leanで、NDSの証明で使っている。
 lemma exists_parallel_partner_from_nontrivial
     (S : SPO.FuncSetup α) {u : S.Elem}
     (hx : S.nontrivialClass u) :
@@ -32,7 +31,7 @@ lemma exists_parallel_partner_from_nontrivial
     exact S.parallel_of_sim_coe hsim
 
 --すぐ下で使っている。
-lemma two_deg_le_num_int_of_Rare
+private lemma two_deg_le_num_int_of_Rare
     (F : SetFamily α) (x : α) (hR : F.Rare x) :
     (2 * (F.degree x : Int) ≤ (F.numHyperedges : Int)) := by
   -- Nat の不等式を Int に持ち上げる
@@ -42,8 +41,8 @@ lemma two_deg_le_num_int_of_Rare
   -- 表記を (· : Int) に戻す
   exact this
 
---NDSの証明で使っている。
-lemma diff_term_nonpos_of_Rare
+--外のファイルからNDSの証明で使っている。
+theorem diff_term_nonpos_of_Rare
     (F : SetFamily α) (x : α) (hR : F.Rare x) :
     2 * (F.degree x : Int) - (F.numHyperedges : Int) ≤ 0 := by
   -- a - b ≤ 0 ↔ a ≤ b
@@ -52,41 +51,9 @@ lemma diff_term_nonpos_of_Rare
   -- `sub_nonpos.mpr` は「a ≤ b」を「a - b ≤ 0」にする
   exact Int.sub_nonpos_of_le hx
 
---   C) 等式＋非正 ⇒ 片側の ≤ へ
+---------------このあたりからrare性の証明か
 
---一般的な補題なので移動してもいい。TraceFunctionalとか。
-lemma le_of_eq_add_of_nonpos {a b t : Int}
-    (h : a = b + t) (ht : t ≤ 0) : a ≤ b := by
-  -- 目標を h で書き換え
-  rw [h]
-  -- b + t ≤ b + 0
-  have h1 : b + t ≤ b + 0 := add_le_add_left ht b
-  -- 右の 0 を消す
-  -- `rw [add_zero]` で十分
-  -- （tactic スタイルを用いて `simpa` は使わない）
-  have h2 := h1
-  -- 書き換え
-  -- ここは tactic ブロックで簡潔に
-  have : b + t ≤ b := by
-    -- 右辺の `+ 0` を消す
-    -- `rw` は許容されている想定（`simpa using` を避けるため）
-    -- 直接 h1 を上書きして使う
-    -- 以降、この小ブロックでのみ tactic を使います
-    -- (Lean では `by` ブロック内で `rw` を使えます)
-    -- 変数 h1 を上書きしてもよいのですが、ここではローカルコピー h2 を書換えます
-    have h2' := h2
-    -- `rw [add_zero] at h2'`
-    -- tactic:
-    -- (ここで実際のコードでは `rw [add_zero] at h2'` と一行書きます)
-    -- 仕上げとして h2' を返す想定です
-    -- ただしこの大域ブロックでは term モードのため、最終形を直接返します：
-    -- 手短に：`by have h := h1; rwa [add_zero] at h` でもOK
-    exact (add_le_iff_nonpos_right b).mpr ht
-
-  exact this
-
-
-lemma ideal_diff_simClass_is_ideal
+private lemma ideal_diff_simClass_is_ideal
     (S : SPO.FuncSetup α)
     {u : S.Elem} {I : Finset α}
     (hmax : S.maximal u)
@@ -164,11 +131,6 @@ lemma ideal_diff_simClass_is_ideal
     exact hu_pair.2 huU
   exact And.intro hSet huNot
 
-/- ===========================================================
-   4)  単射 Φ : {I | イデアル ∧ u∈I} → {J | イデアル ∧ u∉J}
-       （I ↦ I \ U）が単射
-   =========================================================== -/
-
 noncomputable def Phi
     (S : SPO.FuncSetup α) (u : S.Elem) (hmax : S.maximal u) :
     {I // I ∈ (S.idealFamily).edgeFinset ∧ u.1 ∈ I} →
@@ -181,6 +143,7 @@ noncomputable def Phi
       (SetFamily.mem_edgeFinset_iff_sets (F := S.idealFamily) (A := I \ S.simClass u)).2 h.1
     ⟨ I \ S.simClass u, hJedge, h.2 ⟩
 
+--IdealsTraceで引用されている。
 lemma Phi_injective
     (S : SPO.FuncSetup α) {u : S.Elem} (hmax : S.maximal u) :
     Function.Injective (Phi S u hmax) := by
@@ -258,13 +221,13 @@ lemma Phi_injective
           apply Subtype.ext
           exact hIJ_eq
 
+----Rare性の証明
+--section RareByInjection
 
-
-section RareByInjection
-
-variable {α : Type*} [DecidableEq α]
+--variable {α : Type*} [DecidableEq α]
 
 /-- 単射 `Φ : {A | A∈E ∧ x∈A} → {B | B∈E ∧ x∉B}` があれば `Rare x`。 -/
+--そとから引用されている。単射が存在すればrare。
 lemma rare_of_injection_between_filters
   (F : SetFamily α) (x : α)
   (Φ : {A // A ∈ F.edgeFinset ∧ x ∈ A} →
@@ -389,7 +352,7 @@ lemma rare_of_injection_between_filters
   -- さらに `|pin| + |pout| = |s|`
   have hSplit :
       pin.card + pout.card = s.card := by
-    exact SetFamily.card_filter_add_card_filter_not s fun A => x ∈ A
+    exact card_filter_add_card_filter_not s fun A => x ∈ A
 
   -- 目標：2 * degree ≤ numHyperedges
   -- `2*|pin| ≤ |s|` を示せばよい
@@ -449,5 +412,3 @@ lemma rare_of_injection_between_filters
   -- `rw` で逐次書換え
   rw [hDeg, hNum]
   exact h2
-
-end RareByInjection

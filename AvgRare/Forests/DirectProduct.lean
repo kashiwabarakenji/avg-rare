@@ -5,8 +5,6 @@ import Mathlib.Logic.Relation
 import Mathlib.Tactic.Ring
 import AvgRare.Basics.SetFamily
 import AvgRare.SPO.FuncSetup
-import AvgRare.SPO.Forest
-import AvgRare.Forests.Induction
 
 universe u
 namespace AvgRare
@@ -16,7 +14,6 @@ variable {α : Type u} [DecidableEq α]
 open AvgRare
 open SPO
 open FuncSetup
-open PaperSync
 
 /-- `coIdeal m := ground \ principalIdeal m` -/
 noncomputable def coIdeal (S : SPO.FuncSetup α)(m : S.Elem) : Finset α :=
@@ -235,7 +232,7 @@ lemma coIdeal_nonempty_of_two_maximal (S : SPO.FuncSetup α)
     have ⟨hmG, hm'le⟩ :=
       (S.mem_principalIdeal_iff (a := m.1) (y := m'.1) (ha := m.2)).1 hmem
     have hmle' : S.le m m' := hm' hm'le
-    have : m = m' := antisymm_of_isPoset (S := S) hpos hmle' hm'le
+    have : m = m' := by exact hpos (hm' hm'le) hm'le
     exact hne this
   -- よって `m' ∈ coIdeal m`
   have hm'G : m'.1 ∈ S.ground := m'.2
@@ -573,14 +570,14 @@ lemma unique_maximal_above (S : SPO.FuncSetup α)
     have h₂ : S.le m₁ m₂ := by cases hj; exact h₁
     -- 極大性で逆向きも
     have h₃ : S.le m₂ m₁ := hm₁ h₂
-    exact antisymm_of_isPoset (S := S) hpos h₂ h₃
+    exact hpos (hm₂ (hm₁ h₂)) h₃
   · -- 対称
     have hji : j ≤ i := le_of_not_ge hij
     have hchain := le_between_iter S x hji
     have h₁ : S.le m₂ ((S.f^[i]) x) := by cases hj; exact hchain
     have h₂ : S.le m₂ m₁ := by cases hi; exact h₁
     have h₃ : S.le m₁ m₂ := hm₂ h₂
-    exact antisymm_of_isPoset (S := S) hpos h₃ h₂
+    exact hpos (hm₂ (hm₁ h₃)) h₂
 
 /-- まとめ：各 `x` には「上にある極大元」が存在一意。 -/
 lemma exists_unique_maxAbove (S : SPO.FuncSetup α)
@@ -705,9 +702,9 @@ lemma antisymm_restrictToIdeal_of_isPoset
        ∧ (S.le (liftFromIdeal S m hm v) (liftFromIdeal S m hm u)) := by
     exact ⟨this, le_lift_Ideal S m hm hvu⟩
   rcases this with ⟨h₁, h₂⟩
-  have h_eqS : liftFromIdeal S m hm u = liftFromIdeal S m hm v :=
-    antisymm_of_isPoset (S := S) hpos h₁ h₂
-  -- 値の等しさに落とし、Subtype.ext で戻す
+  have h_eqS : liftFromIdeal S m hm u = liftFromIdeal S m hm v := by
+    exact hpos this h₂
+      -- 値の等しさに落とし、Subtype.ext で戻す
   have : u.1 = v.1 :=by
     simp_all only [le_iff_leOn_val]
     injection h_eqS
@@ -729,8 +726,8 @@ lemma antisymm_restrictToCoIdeal_of_isPoset
     le_lift_CoIdeal S m hpos notuniq hvu
   have h_eqS :
       liftFromCoIdeal S m hpos notuniq u
-    = liftFromCoIdeal S m hpos notuniq v :=
-    antisymm_of_isPoset (S := S) hpos h₁ h₂
+    = liftFromCoIdeal S m hpos notuniq v := by
+    exact hpos h₁ h₂
   have : u.1 = v.1 := by
     apply congrArg Subtype.val
     simp_all only [le_iff_leOn_val]

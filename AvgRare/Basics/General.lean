@@ -29,7 +29,7 @@ variable {α : Type u} [DecidableEq α]
 /- 技術：`∑ f = |s|` かつ `∀ i∈s, 1 ≤ f i` なら各項が 1。 -/
 
 lemma sum_one_eq_card {ι : Type u} [DecidableEq ι]
-  (s : Finset ι) : ∑ i ∈ s, (1 : Nat) = s.card := by
+  (s : Finset ι) : ∑ _ ∈ s, (1 : Nat) = s.card := by
   classical
   refine Finset.induction_on s ?h0 ?hstep
   · simp
@@ -136,3 +136,167 @@ lemma card_eq_blocks_iff_all_blocks_card_one
     -- `rw [hsum, hx, hsum1]`
     subst hcover
     simp_all only [ne_eq, le_refl, implies_true, Finset.sum_const, smul_eq_mul, mul_one]
+
+section CountLemmas
+
+variable {β : Type*}
+
+/-- `card (s.filter p) + card (s.filter (¬p)) = card s`。 -/
+lemma card_filter_add_card_filter_not (s : Finset β) (p : β → Prop) [DecidablePred p] :
+    (s.filter p).card + (s.filter (fun b => ¬ p b)).card = s.card := by
+  classical
+  refine Finset.induction_on s ?h0 ?hstep
+  · simp
+  · intro a s ha ih
+    by_cases hpa : p a
+    · -- p a
+      -- 左辺： (insert a (filter p s)).card + (filter ¬p s).card
+      have hfi_p :
+          (insert a s).filter p = insert a (s.filter p) := by
+        have := Finset.filter_insert (s := s) (p := p) a
+        simpa [hpa] using this
+      have hfi_np :
+          (insert a s).filter (fun b => ¬ p b) = (s.filter (fun b => ¬ p b)) := by
+        have := Finset.filter_insert (s := s) (p := fun b => ¬ p b) a
+        -- ここでは `¬ p a = false`
+        have : ¬ p a = False := by simp_all only [not_true_eq_false, ↓reduceIte, eq_iff_iff, iff_false, not_false_eq_true]
+        -- false ケース
+        simp_all only [not_true_eq_false, ↓reduceIte, eq_iff_iff, iff_false, not_false_eq_true]
+      have hnot : a ∉ s.filter p := by
+        intro ha'
+        have : a ∈ s := (Finset.mem_of_subset (Finset.filter_subset _ _) ha')
+        exact ha this
+      have hcard_insert :
+          (insert a (s.filter p)).card = (s.filter p).card + 1 :=
+        Finset.card_insert_of_notMem hnot
+      calc
+        ((insert a s).filter p).card + ((insert a s).filter (fun b => ¬ p b)).card
+            = (insert a (s.filter p)).card + (s.filter (fun b => ¬ p b)).card := by
+                rw [hfi_p, hfi_np]
+        _ = (s.filter p).card + 1 + (s.filter (fun b => ¬ p b)).card := by
+                rw [hcard_insert]
+        _ = (s.filter p).card + (s.filter (fun b => ¬ p b)).card + 1 := by
+                exact Nat.add_right_comm (Finset.filter p s).card 1 {b ∈ s | ¬p b}.card
+        _ = s.card + 1 := by
+                rw [ih]
+        _ = (insert a s).card := by
+                -- `card_insert_of_not_mem`
+                have := Finset.card_insert_of_notMem ha
+                -- `card (insert a s) = card s + 1`
+                exact this.symm
+    · -- p a = false
+      -- 対称な議論
+      have hfi_p :
+          (insert a s).filter p = (s.filter p) := by
+        have := Finset.filter_insert (s := s) (p := p) a
+        simpa [hpa] using this
+      have hfi_np :
+          (insert a s).filter (fun b => ¬ p b) = insert a (s.filter (fun b => ¬ p b)) := by
+        have := Finset.filter_insert (s := s) (p := fun b => ¬ p b) a
+        -- ここでは `¬ p a = true`
+        have : (¬ p a) = True := by simp_all only [not_false_eq_true, ↓reduceIte]
+        -- true ケース
+        simp_all only [↓reduceIte, eq_iff_iff, iff_true]
+      have hnot : a ∉ s.filter (fun b => ¬ p b) := by
+        intro ha'
+        have : a ∈ s := (Finset.mem_of_subset (Finset.filter_subset _ _) ha')
+        exact ha this
+      have hcard_insert :
+          (insert a (s.filter (fun b => ¬ p b))).card
+          = (s.filter (fun b => ¬ p b)).card + 1 :=
+        Finset.card_insert_of_notMem hnot
+      calc
+        ((insert a s).filter p).card + ((insert a s).filter (fun b => ¬ p b)).card
+            = (s.filter p).card + (insert a (s.filter (fun b => ¬ p b))).card := by
+                rw [hfi_p, hfi_np]
+        _ = (s.filter p).card + (s.filter (fun b => ¬ p b)).card + 1 := by
+                rw [hcard_insert]
+                exact rfl
+        _ = s.card + 1 := by
+                rw [ih]
+        _ = (insert a s).card := by
+                have := Finset.card_insert_of_notMem ha
+                exact this.symm
+
+--trace関係ないし、SetFamilyも出てきてないので、generalでもいいかも。
+-- 補助：S.filter p = S.filter q ↔ ∀ x∈S, p x ↔ q x
+lemma filter_eq_iff_on {β} [DecidableEq β]
+  {S : Finset β} {p q : β → Prop}
+  [DecidablePred p] [DecidablePred q] :
+  S.filter p = S.filter q ↔ (∀ x ∈ S, p x ↔ q x) := by
+  constructor
+  · intro h x hx
+    -- 等式の両辺で x の帰属が同値
+    have := congrArg (fun (T : Finset β) => x ∈ T) h
+    -- x∈S を仮定して filter の展開
+    simpa [Finset.mem_filter, hx] using this
+  · intro h
+    ext x; constructor <;> intro hx
+    · rcases (Finset.mem_filter).1 hx with ⟨hxS, hpx⟩
+      have : q x := (h x hxS).1 hpx
+      exact (Finset.mem_filter).2 ⟨hxS, this⟩
+    · rcases (Finset.mem_filter).1 hx with ⟨hxS, hqx⟩
+      have : p x := (h x hxS).2 hqx
+      exact (Finset.mem_filter).2 ⟨hxS, this⟩
+
+end CountLemmas
+
+lemma exists_pair_with_same_image_of_card_image_lt
+  {α β : Type u} [DecidableEq α] [DecidableEq β]
+  (s : Finset α) (f : α → β)
+  (h : (s.image f).card < s.card) :
+  ∃ x ∈ s, ∃ y ∈ s, x ≠ y ∧ f x = f y := by
+
+  classical
+  by_contra hno
+  -- hno : ¬ ∃ x ∈ s, ∃ y ∈ s, x ≠ y ∧ f x = f y
+  have hinj : ∀ x ∈ s, ∀ y ∈ s, f x = f y → x = y := by
+    intro x hx y hy hxy
+    by_cases hxy' : x = y
+    · exact hxy'
+    · have : ∃ x ∈ s, ∃ y ∈ s, x ≠ y ∧ f x = f y :=
+        ⟨x, hx, y, hy, hxy', hxy⟩
+      exact False.elim (hno this)
+  have hcard : (s.image f).card = s.card := by
+    -- `card_image_iff` は「像の濃度＝元の濃度 ↔ injOn」。
+    -- Finset 版はこの形で使えます。
+    exact Finset.card_image_iff.mpr hinj
+  -- これで `h : (s.image f).card < s.card` と矛盾
+  have : s.card < s.card := by
+    -- `rw` で書き換えて矛盾を顕在化
+    -- （simpa using は使わない）
+    have hh := h
+    rw [hcard] at hh
+    exact hh
+  exact (lt_irrefl _ this).elim
+
+--一般的な補題なので移動してもいい。TraceFunctionalとか。
+lemma le_of_eq_add_of_nonpos {a b t : Int}
+    (h : a = b + t) (ht : t ≤ 0) : a ≤ b := by
+  -- 目標を h で書き換え
+  rw [h]
+  -- b + t ≤ b + 0
+  have h1 : b + t ≤ b + 0 := add_le_add_left ht b
+  -- 右の 0 を消す
+  -- `rw [add_zero]` で十分
+  -- （tactic スタイルを用いて `simpa` は使わない）
+  have h2 := h1
+  -- 書き換え
+  -- ここは tactic ブロックで簡潔に
+  have : b + t ≤ b := by
+    -- 右辺の `+ 0` を消す
+    -- `rw` は許容されている想定（`simpa using` を避けるため）
+    -- 直接 h1 を上書きして使う
+    -- 以降、この小ブロックでのみ tactic を使います
+    -- (Lean では `by` ブロック内で `rw` を使えます)
+    -- 変数 h1 を上書きしてもよいのですが、ここではローカルコピー h2 を書換えます
+    have h2' := h2
+    -- `rw [add_zero] at h2'`
+    -- tactic:
+    -- (ここで実際のコードでは `rw [add_zero] at h2'` と一行書きます)
+    -- 仕上げとして h2' を返す想定です
+    -- ただしこの大域ブロックでは term モードのため、最終形を直接返します：
+    -- 手短に：`by have h := h1; rwa [add_zero] at h` でもOK
+    exact (add_le_iff_nonpos_right b).mpr ht
+
+  exact this

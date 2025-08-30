@@ -3,17 +3,17 @@ import Mathlib.Algebra.BigOperators.Finsupp.Basic
 import Mathlib.Algebra.Order.GroupWithZero.Unbundled.Defs
 import Mathlib.Algebra.Order.Sub.Basic
 import AvgRare.Basics.SetFamily
-import AvgRare.Basics.Ideals
+--import AvgRare.Basics.Ideals
 import AvgRare.SPO.FuncSetup
 import AvgRare.SPO.TraceFunctional
-import AvgRare.Basics.Trace.Common   -- Trace.traceAt / Trace.Parallel / Trace.eraseMap
+import AvgRare.Basics.Trace.Common
 import AvgRare.Basics.Trace.Monotonicity
-import LeanCopilot
 
 /-
 IdealsTrace.lean — 「functional preorder × ideals × trace」の結合層（論文 §3）
 
 論文で出てくるような高レベル補題の言明と、主定理から準主定理への帰着まで
+引用されるのは、Secondary.leanからのみ。
 -/
 
 universe u
@@ -32,9 +32,9 @@ variable {α : Type u} [DecidableEq α]
 --idealFamilyの定義は、FuncSetupで与える。
 
 --Lemma 2.4（カードを使わない形）：
--- 目標：非自明同値類 ⇒ 極大
---ここも{α}が必要。下の定理で使っている。
-theorem maximal_of_nontrivialClass {α : Type u} [DecidableEq α]
+--非自明同値類 ⇒ 極大
+--ここも{α}が必要。下の定理で使っているがこのファイル内なのでprivateにした。
+private theorem maximal_of_nontrivialClass {α : Type u} [DecidableEq α]
     (S : SPO.FuncSetup α) {x : S.Elem}
     (hx : S.nontrivialClass x) : S.maximal x := by
   -- 非自明同値類 ⇒ パラレル相手 y と x≠y を取る
@@ -105,8 +105,8 @@ theorem maximal_of_nontrivialClass {α : Type u} [DecidableEq α]
 
 /-- 論文 Lemma 3.1（言明）：
 S の極大元 `u` は，`idealFamily S` において rare。 -/
-
-lemma rare_of_maximal {α : Type u} [DecidableEq α]
+--重要補題で、下で使っているがこのファイル内なのでprivateにした。
+private theorem rare_of_maximal {α : Type u} [DecidableEq α]
   (S : SPO.FuncSetup α) {u : S.Elem} (hmax : S.maximal u) :
   (S.idealFamily).Rare u.1 := by
   classical
@@ -120,7 +120,8 @@ lemma rare_of_maximal {α : Type u} [DecidableEq α]
           (F := S.idealFamily) (x := u.1) Φ hΦ
 
 /- 論文 Lemma 3.6(1) の言明：-/
-lemma NDS_le_trace_of_nontrivialClass {α : Type u} [DecidableEq α]
+--大きさ2以上の同値類をtraceすると増えることがない。このファイルのみで引用なのでprivateに。
+private theorem NDS_le_trace_of_nontrivialClass {α : Type u} [DecidableEq α]
   (S : SPO.FuncSetup α) {u : S.Elem}
   (hx : S.nontrivialClass u) :
   (S.idealFamily).NDS ≤ (traceAt u.1 (S.idealFamily)).NDS := by
@@ -156,64 +157,15 @@ lemma NDS_le_trace_of_nontrivialClass {α : Type u} [DecidableEq α]
   exact le_of_eq_add_of_nonpos hEq hnonpos
 
 
-------------------------
 
-/- principal idealがIdealであること？ -/
---現状ではどこからも使ってないが、後半使うかも。そのときは、半順序かも。
---FuncSetupに移動するのも、ideal関係だしへん。principal Idealの話は、IdealsかForestに移動かも？
-lemma idealFamily_mem_principal
-  (S : FuncSetup α) (x : S.Elem) :
-  isOrderIdealOn (le := S.leOn) (V := S.ground) (S.principalIdeal x.1 x.2)  := by
-  dsimp [FuncSetup.principalIdeal]
-  simp
-  dsimp [isOrderIdealOn]
-  simp
-  constructor
-  · obtain ⟨val, property⟩ := x
-    intro x hx
-    simp_all only [Finset.mem_map, Finset.mem_filter, Finset.mem_attach, true_and, Function.Embedding.coeFn_mk,
-      Subtype.exists, exists_and_right, exists_eq_right]
-    obtain ⟨w, h⟩ := hx
-    simp_all only
 
-  · intro xx hx lexy y hy leyx
-    constructor
-    · exact FuncSetup.leOn_trans S leyx hx
-    · exact hy
-
-def isPoset (S : FuncSetup α) : Prop :=
+--def excessは、commonで定義されている。isPosetの議論もCommon等に移動してもよい。
+--isPosetは、普通にantisymmpetryで定義して、excess=0は定理のほうがいいかも。
+def isPoset_excess (S : FuncSetup α) : Prop :=
   excess (S.idealFamily) = 0
 
-lemma exists_pair_with_same_image_of_card_image_lt
-  {α β : Type u} [DecidableEq α] [DecidableEq β]
-  (s : Finset α) (f : α → β)
-  (h : (s.image f).card < s.card) :
-  ∃ x ∈ s, ∃ y ∈ s, x ≠ y ∧ f x = f y := by
-
-  classical
-  by_contra hno
-  -- hno : ¬ ∃ x ∈ s, ∃ y ∈ s, x ≠ y ∧ f x = f y
-  have hinj : ∀ x ∈ s, ∀ y ∈ s, f x = f y → x = y := by
-    intro x hx y hy hxy
-    by_cases hxy' : x = y
-    · exact hxy'
-    · have : ∃ x ∈ s, ∃ y ∈ s, x ≠ y ∧ f x = f y :=
-        ⟨x, hx, y, hy, hxy', hxy⟩
-      exact False.elim (hno this)
-  have hcard : (s.image f).card = s.card := by
-    -- `card_image_iff` は「像の濃度＝元の濃度 ↔ injOn」。
-    -- Finset 版はこの形で使えます。
-    exact Finset.card_image_iff.mpr hinj
-  -- これで `h : (s.image f).card < s.card` と矛盾
-  have : s.card < s.card := by
-    -- `rw` で書き換えて矛盾を顕在化
-    -- （simpa using は使わない）
-    have hh := h
-    rw [hcard] at hh
-    exact hh
-  exact (lt_irrefl _ this).elim
-
-  lemma exists_nontrivialClass_of_excess_pos {α : Type u} [DecidableEq α]
+--excessが正ならば非自明同値類がある。
+private lemma exists_nontrivialClass_of_excess_pos {α : Type u} [DecidableEq α]
   (S : FuncSetup α)
   (hpos : 0 < excess (S.idealFamily)) :
   ∃ u : S.Elem, S.nontrivialClass u := by
@@ -319,10 +271,10 @@ lemma exists_pair_with_same_image_of_card_image_lt
   intro a_1
   simp_all only [not_true_eq_false]
 
-/-- （前半の結論）準主定理を仮定して主定理を導く：強い帰納法版。 -/
+/-- （論文の前半の結論）準主定理を仮定して主定理を導く：強い帰納法を使う。 このファイルの主定理-/
 theorem main_nds_nonpos_of_secondary {α : Type u} [DecidableEq α]
   (secondary_nds_nonpos :
-    ∀ (T : FuncSetup α), isPoset T → (T.idealFamily).NDS ≤ 0)
+    ∀ (T : FuncSetup α), isPoset_excess T → (T.idealFamily).NDS ≤ 0)
   (S : FuncSetup α) :
   (S.idealFamily).NDS ≤ 0 := by
   classical
@@ -338,7 +290,7 @@ theorem main_nds_nonpos_of_secondary {α : Type u} [DecidableEq α]
   · intro k IH T hk
     cases k with
     | zero =>
-      have hposet : isPoset T := hk
+      have hposet : isPoset_excess T := hk
       exact secondary_nds_nonpos T hposet
     | succ k' =>
       -- 0 < excess(T)
@@ -416,12 +368,12 @@ theorem main_nds_nonpos_of_secondary {α : Type u} [DecidableEq α]
         _   ≤ 0 := hIH_T'
 
 ---ここからは、isPosetのときに、本当にposetになっていることを示す。証明の一部はSetFunctionに。
-
-
+---ファイル前半の議論はあんまり使ってないのでisPosetの定義とともにFuncSetupの分離ファイルと同じレベルに移動は可能かも。
+---内容的には分割可能だが、このファイルの分量がそこまで多くないので保留。
 
 /- `isPoset`（≡ excess=0）なら `|ground| = #classes`。 -/
-lemma ground_card_eq_numClasses_of_isPoset
-  (S : FuncSetup α) (h : isPoset S) :
+private lemma ground_card_eq_numClasses_of_isPoset
+  (S : FuncSetup α) (h : isPoset_excess S) :
   (S.idealFamily).ground.card = numClasses (S.idealFamily) := by
   classical
   -- excess = |ground| − #classes = 0 ⇒ |ground| ≤ #classes
@@ -443,8 +395,8 @@ lemma ground_card_eq_numClasses_of_isPoset
   exact Nat.le_antisymm hle₁ hle₂
 
 /- `isPoset S` なら `classSet (S.idealFamily)` の各クラスの大きさは 1。 -/
-lemma classes_card_one_of_isPoset
-  (S : FuncSetup α) (h : isPoset S) :
+private lemma classes_card_one_of_isPoset
+  (S : FuncSetup α) (h : isPoset_excess S) :
   ∀ C ∈ classSet (S.idealFamily), C.card = 1 := by
   classical
   let F := S.idealFamily
@@ -471,10 +423,9 @@ lemma classes_card_one_of_isPoset
     -- 1 行：`exact (Iff.mp hiff hcard)`
     exact (Iff.mp hiff hcard))
 
-
-
+--Posetがantisymmであること。たくさん使われている。
 lemma antisymm_of_isPoset
-  (S : FuncSetup α) (h : isPoset S) :
+  (S : FuncSetup α) (h : isPoset_excess S) :
   ∀ {u v : S.Elem}, S.le u v → S.le v u → u = v := by
   classical
   intro u v hxy hyx
@@ -486,7 +437,7 @@ lemma antisymm_of_isPoset
   -- 3) を適用
   exact FuncSetup.eq_of_sim_of_all_classes_card_one S hall1 hsim
 
-instance functional_poset (S : FuncSetup α) (h : isPoset S) :
+instance functional_poset (S : FuncSetup α) (h : isPoset_excess S) :
    PartialOrder S.Elem := by
   refine { le := S.le,
            le_refl := fun a => by exact FuncSetup.le_refl S a,
@@ -494,19 +445,20 @@ instance functional_poset (S : FuncSetup α) (h : isPoset S) :
            le_antisymm := fun a b hab hba => by exact antisymm_of_isPoset S h hab hba }
 
 --逆にFuncSetupがすべての同値類のサイズが1のときに、isPosetになる。
-lemma isPoset_of_classes_card_one (S : FuncSetup α) (h : ∀ C ∈ classSet (S.idealFamily), C.card = 1) :
-  isPoset S := by
+private lemma isPoset_of_classes_card_one (S : FuncSetup α) (h : ∀ C ∈ classSet (S.idealFamily), C.card = 1) :
+  isPoset_excess S := by
   classical
-  dsimp [isPoset]
+  dsimp [isPoset_excess]
   dsimp [excess]
   dsimp [SetFamily.numClasses]
   --dsimp [SetFamily.classSet]
-  rw [card_ground_eq_sum_card_classes]
+  rw [SetFamily.card_ground_eq_sum_card_classes]
   simp_all only [Finset.sum_const, smul_eq_mul, mul_one, tsub_self]
 
 --FuncSetupのleがanti-symmetricなときに、isPosetになる。
+--そとから使われている。
 lemma isPoset_of_le_antisymm (S : FuncSetup α) (h : ∀ {u v : S.Elem}, S.le u v → S.le v u → u = v) :
-  isPoset S := by
+  isPoset_excess S := by
   --任意のsimClassが1要素集合であることを示す。
   have : ∀ (x : S.Elem), (S.simClass x).card  = 1 := by
     intro x
@@ -542,14 +494,40 @@ lemma isPoset_of_le_antisymm (S : FuncSetup α) (h : ∀ {u v : S.Elem}, S.le u 
     rw [Finset.mem_image] at hC
     obtain ⟨a,ha⟩ := hC
     let sf :=  SPO.FuncSetup.simClass_eq_parallelClass S (S.toElem! ha.1)
-    simp at sf
-    rw [←sf] at ha
-    specialize this (S.toElem! ha.1)
-    have :(S.idealFamily.ParallelClass (S.toElem! ha.1)).card = 1:= by
-      simp_all only [FuncSetup.le_iff_leOn_val, Subtype.forall, Subtype.mk.injEq, FuncSetup.toElem!_val]
-    simp_all only [FuncSetup.le_iff_leOn_val, Subtype.forall, Subtype.mk.injEq, FuncSetup.toElem!_val]
+    --simp at sf
+    simp_all only [FuncSetup.le_iff_leOn_val, Subtype.forall, Subtype.mk.injEq, FuncSetup.simClass_eq_parallelClass,
+    Finset.coe_mem]
+    obtain ⟨left, right⟩ := ha
+    subst right
+    exact this _ left
 
   exact isPoset_of_classes_card_one S this
 
 end PaperSync
 end AvgRare
+
+------------------------
+/-
+/- principal idealがIdealであること -/
+--使われてない。同様のことが改めて証明されているかも。
+--FuncSetupに移動するのも、ideal関係だしへん。principal Idealの話は、IdealsかForestに移動かも？
+lemma idealFamily_mem_principal
+  (S : FuncSetup α) (x : S.Elem) :
+  isOrderIdealOn (le := S.leOn) (V := S.ground) (S.principalIdeal x.1 x.2)  := by
+  dsimp [FuncSetup.principalIdeal]
+  simp
+  dsimp [isOrderIdealOn]
+  simp
+  constructor
+  · obtain ⟨val, property⟩ := x
+    intro x hx
+    simp_all only [Finset.mem_map, Finset.mem_filter, Finset.mem_attach, true_and, Function.Embedding.coeFn_mk,
+      Subtype.exists, exists_and_right, exists_eq_right]
+    obtain ⟨w, h⟩ := hx
+    simp_all only
+
+  · intro xx hx lexy y hy leyx
+    constructor
+    · exact FuncSetup.leOn_trans S leyx hx
+    · exact hy
+-/

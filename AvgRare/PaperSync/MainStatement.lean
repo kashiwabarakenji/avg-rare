@@ -1,7 +1,7 @@
 import AvgRare.SPO.FuncSetup
 import AvgRare.Basics.SetFamily
 import AvgRare.Basics.Trace.Common
-import AvgRare.SPO.Forest
+--import AvgRare.SPO.Forest
 import AvgRare.PaperSync.IdealsTrace
 import AvgRare.Forests.DirectProduct
 import AvgRare.Forests.Induction
@@ -324,8 +324,8 @@ lemma antisymm_restrictToIdeal_of_isPoset
        ∧ (S.le (liftFromIdeal S m hm v) (liftFromIdeal S m hm u)) := by
     exact ⟨this, le_lift_Ideal S m hm hvu⟩
   rcases this with ⟨h₁, h₂⟩
-  have h_eqS : liftFromIdeal S m hm u = liftFromIdeal S m hm v :=
-    antisymm_of_isPoset (S := S) hpos h₁ h₂
+  have h_eqS : liftFromIdeal S m hm u = liftFromIdeal S m hm v := by
+    exact hpos this h₂
   -- 値の等しさに落とし、Subtype.ext で戻す
   have : u.1 = v.1 :=by
     simp_all only [le_iff_leOn_val]
@@ -348,8 +348,9 @@ lemma antisymm_restrictToCoIdeal_of_isPoset
     le_lift_CoIdeal S m hpos notuniq hvu
   have h_eqS :
       liftFromCoIdeal S m hpos notuniq u
-    = liftFromCoIdeal S m hpos notuniq v :=
-    antisymm_of_isPoset (S := S) hpos h₁ h₂
+    = liftFromCoIdeal S m hpos notuniq v := by
+    exact hpos h₁ h₂
+
   have : u.1 = v.1 := by
     apply congrArg Subtype.val
     simp_all only [le_iff_leOn_val]
@@ -357,6 +358,20 @@ lemma antisymm_restrictToCoIdeal_of_isPoset
     (expose_names; exact Subtype.eq val_eq)
   exact Subtype.ext this
 
+/-- `posetTraceOfUnique` は `isPoset` を保つ。 -/
+--このファイル内では使ってない。準主定理の帰納法で使う。
+lemma isPoset_posetTraceOfUnique
+  (S : FuncSetup α) [Fintype S.Elem] (geq2: S.ground.card ≥ 2)
+  (hpos : isPoset S) (hexu : ∃! m : S.Elem, S.maximal m) :
+  isPoset (Induction.posetTraceOfUnique S geq2 hexu ) := by
+  classical
+  have hm : S.maximal (Classical.choose hexu.exists) := Classical.choose_spec hexu.exists
+  -- `isPoset_posetTraceCore` を適用
+  dsimp [Induction.posetTraceOfUnique]
+  have pos': isPoset_excess S := by
+    exact isPoset_of_le_antisymm S hpos
+  let ipt := Induction.isPoset_posetTraceCore S hpos (m := Classical.choose hexu.exists)
+  exact @ipt geq2
 
 lemma secondary_main_theorem
   (S : SPO.FuncSetup α) [Fintype S.Elem]
@@ -408,7 +423,7 @@ lemma secondary_main_theorem
               ·
                 let T' := Induction.posetTraceOfUnique T hge2 hexu
                 have hpos' : isPoset T' :=
-                  Induction.isPoset_posetTraceOfUnique (S := T) (geq2 := hge2)
+                  isPoset_posetTraceOfUnique (S := T) (geq2 := hge2)
                     (hpos := hposT) (hexu := hexu)
                 have hdec : T'.ground.card = T.ground.card - 1 :=
                   Induction.ground_card_after_trace_of_max (S := T)
@@ -478,10 +493,8 @@ lemma secondary_main_theorem
                   restrictToCoIdeal_card_lt
                     (S := T) (m := m) (hpos := hposT) (notconnected := by exact hexu)
                 -- poset 性（新補題で反対称性を確保）
-                have hpos₁ : isPoset T₁ :=
-                  isPoset_of_le_antisymm (S:= T₁) (antisymm_restrictToIdeal_of_isPoset (S := T) hposT m hm)
-                have hpos₂ : isPoset (T₂ hexu):=
-                  isPoset_of_le_antisymm (S:= (T₂ hexu)) (antisymm_restrictToCoIdeal_of_isPoset (S := T) hposT m (notuniq := by exact hexu))
+                have hpos₁ : isPoset T₁ := (antisymm_restrictToIdeal_of_isPoset (S := T) hposT m hm)
+                have hpos₂ : isPoset (T₂ hexu):=  (antisymm_restrictToCoIdeal_of_isPoset (S := T) hposT m (notuniq := by exact hexu))
                 -- 帰納法を両方に適用
                 have hcard1: T₁.ground.card < n := by
                   subst hcard
@@ -567,7 +580,12 @@ theorem main_nds_nonpos {α : Type u} [DecidableEq α]
   (S : SPO.FuncSetup α) :
   (S.idealFamily).NDS ≤ 0 := by
   apply PaperSync.main_nds_nonpos_of_secondary
-  exact fun T a => secondary_main_theorem T a
+  intro T hT
+  have hT' : isPoset T := by
+    dsimp [isPoset]
+    dsimp [has_le_antisymm]
+    exact antisymm_of_isPoset T hT
+  exact secondary_main_theorem T hT'
 
 end PaperSync
 end AvgRare

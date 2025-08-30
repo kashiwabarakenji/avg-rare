@@ -2,10 +2,12 @@ import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Powerset
 import Mathlib.Algebra.BigOperators.Finsupp.Basic
 import Mathlib.Logic.Relation
+import Mathlib.Algebra.Order.Sub.Basic
 --import Mathlib.SetTheory.Cardinal.Basic --おためし
 import AvgRare.Basics.SetFamily
 import AvgRare.SPO.FuncSetup
-import AvgRare.SPO.Forest
+--import AvgRare.PaperSync.IdealsTrace
+--import AvgRare.SPO.Forest
 
 universe u
 
@@ -17,7 +19,6 @@ variable {α : Type u} [DecidableEq α]
 open AvgRare
 open SPO
 open FuncSetup
-open PaperSync
 
 --generalに移してもいいが、ここでしか使わないのでとりあえずここにおいておく。
 private lemma iterate_has_collision
@@ -168,7 +169,7 @@ private lemma eventually_hits_fixpoint
         exact back
 
       have : S.f y = y := by
-        exact antisymm_of_isPoset S hpos fy_le_y y_le_fy
+        exact hpos fy_le_y y_le_fy
 
       use y
       dsimp [cover]
@@ -245,7 +246,7 @@ private lemma eventually_hits_fixpoint
         exact back
 
       have : S.f y = y := by
-        exact antisymm_of_isPoset S hpos fy_le_y y_le_fy
+        exact hpos fy_le_y y_le_fy
 
       use y
       dsimp [cover]
@@ -506,8 +507,9 @@ lemma isPoset_posetTraceCore
     -- ここで `antisymm_of_isPoset` を使う
 
     have : (⟨x.1, (Finset.mem_erase.mp x.2).2⟩ : S.Elem)
-         = (⟨y.1, (Finset.mem_erase.mp y.2).2⟩ : S.Elem) :=
-      antisymm_of_isPoset (S := S) hpos H₁ H₂
+         = (⟨y.1, (Finset.mem_erase.mp y.2).2⟩ : S.Elem) := by
+      exact hpos H₁ H₂
+
     -- 値成分が等しいので，S' の要素としても等しい
     apply Subtype.ext
     apply congrArg Subtype.val
@@ -517,7 +519,8 @@ lemma isPoset_posetTraceCore
     simp_all only [posetTraceCore_ground]
     exact rfl
 
-  exact isPoset_of_le_antisymm (posetTraceCore S m geq2) this
+  dsimp [isPoset]
+  simp_all only
 
 --pricipal idealに関することはFuncSetup+idealのファイルを作った時にそちらに移動してもいい。
 --でもこれはPreorderでなくてposetに関することなので、一緒にしないほうがいいかも。
@@ -557,7 +560,7 @@ lemma principalOn_inj(S : FuncSetup α) {x y : S.Elem}
   obtain ⟨hx, hxh⟩ := (S.mem_principalIdeal_iff x.2).1 hy_in_x
   have hyx_le: S.le y x := by exact hxh
     -- 反対称律で結論
-  exact (antisymm_of_isPoset S hpos) hxy_le hyx_le
+  exact hpos hhy hxh
 
 --使われているが、FuncSetupにも同様な補題がある。
 lemma empty_isOrderIdealOn (S : FuncSetup α) :
@@ -651,7 +654,7 @@ lemma ideals_card_ge_ground_card_succ
               --   `exact (by simpa [hA0] using hE)`
               -- を避けているだけです
               subst hA0
-              simp_all only [SetFamily.mem_edgeFinset, Ideals.isOrderIdealOn_empty, Finset.empty_subset, sets_iff_isOrderIdeal,
+              simp_all only [SetFamily.mem_edgeFinset, Finset.empty_subset, sets_iff_isOrderIdeal,
                 and_self, Finset.union_singleton, Finset.mem_insert, Finset.mem_image, Finset.mem_attach, true_and, Subtype.exists,
                 true_or, Finset.mem_singleton, P]
 
@@ -785,8 +788,8 @@ private lemma lift_le_to_traceCore_if_not_m_below
       -- 極大性から b ≤ m
       have hbm : S.le ⟨b.1, (Finset.mem_erase.mp b.2).2⟩ m := hmax hmb
       -- 反対称で b = m、しかし値が異なる
-      have heq : ⟨b.1, (Finset.mem_erase.mp b.2).2⟩ = m :=
-        (antisymm_of_isPoset S hpos) hbm hmb
+      have heq : ⟨b.1, (Finset.mem_erase.mp b.2).2⟩ = m := by
+        exact hpos (hmax hmb) hmb
       have : b.1 = m.1 := congrArg Subtype.val heq
       exact hb_ne this
     -- c が erase 上にあること
@@ -856,14 +859,14 @@ private lemma edgeFinset_trace_eq_filter_not_mem
     intro A hA
     -- A ∈ F'.edge ⇒ F'.sets A
     have hA_sets' : F'.sets A :=
-      (SetFamily.mem_edgeFinset_iff (F := F') (A := A)).1 hA
+      (SetFamily.mem_edgeFinset_iff_sets (F := F') (A := A)).1 hA
     -- 逆方向の保存で、F側の sets と m∉A を得る
     have hback := hBack A hA_sets'
     have hA_sets : F.sets A := hback.1
     have hm_not : m.1 ∉ A := hback.2
     -- F.edge へ
     have hA_edge : A ∈ F.edgeFinset :=
-      (SetFamily.mem_edgeFinset_iff (F := F) (A := A)).2 hA_sets
+      (SetFamily.mem_edgeFinset_iff_sets (F := F) (A := A)).2 hA_sets
     -- filter へ
     exact Finset.mem_filter.mpr ⟨hA_edge, hm_not⟩
   · -- ⊇：F.edge.filter (¬ m∈) ⊆ F'.edge
@@ -873,14 +876,14 @@ private lemma edgeFinset_trace_eq_filter_not_mem
     have hm_not  : m.1 ∉ A           := (Finset.mem_filter.mp hA).2
     -- F.sets A
     have hA_sets : F.sets A :=
-      (SetFamily.mem_edgeFinset_iff (F := F) (A := A)).1 hA_edge
+      (SetFamily.mem_edgeFinset_iff_sets (F := F) (A := A)).1 hA_edge
     -- F 側 ideal
     have hA_ideal : isOrderIdealOn (S.leOn) S.ground A :=
       (S.sets_iff_isOrderIdeal (I := A)).1 hA_sets
     -- 行きの保存で F'.sets A
     have hA_sets' : F'.sets A := hKeep A hA_ideal hm_not
     -- F'.edge へ
-    exact (SetFamily.mem_edgeFinset_iff (F := F') (A := A)).2 hA_sets'
+    exact (SetFamily.mem_edgeFinset_iff_sets (F := F') (A := A)).2 hA_sets'
 
 --使っている。edgeFinset_trace_eq_filter_not_memを使って証明。
 private lemma edge_card_trace_eq_filter_not_mem
@@ -944,17 +947,8 @@ noncomputable def posetTraceOfUnique
   FuncSetup α :=
   posetTraceCore S (Classical.choose (hexu).exists) geq2
 
-/-- `posetTraceOfUnique` は `isPoset` を保つ。 -/
---このファイル内では使ってない。準主定理の帰納法で使う。
-lemma isPoset_posetTraceOfUnique
-  (S : FuncSetup α) [Fintype S.Elem] (geq2: S.ground.card ≥ 2)
-  (hpos : isPoset S) (hexu : ∃! m : S.Elem, S.maximal m) :
-  isPoset (posetTraceOfUnique S geq2 hexu ) := by
-  classical
-  have hm : S.maximal (Classical.choose hexu.exists) := Classical.choose_spec hexu.exists
-  -- `isPoset_posetTraceCore` を適用
-  dsimp [posetTraceOfUnique]
-  exact isPoset_posetTraceCore (S := S) (geq2 := geq2) (hpos := hpos) (m := Classical.choose hexu.exists)
+
+
 
 /-
 /-- すべての要素が `m` の下にあれば，`m` を含む ideal は ground に等しい -/
@@ -974,8 +968,8 @@ lemma onlyTop_from_allBelow
   exact Finset.Subset.antisymm hI_sub hground_sub
 -/
 
---使っている。
-lemma fixpoint_is_maximal
+--使っている。posetの一般的な議論のファイルがあれば移動しても良い。
+private lemma fixpoint_is_maximal
   (S : FuncSetup α) {p : S.Elem} (hfix : S.cover p p) :
   S.maximal p := by
   -- cover p p ↔ f p = p
@@ -990,7 +984,7 @@ lemma fixpoint_is_maximal
   exact Relation.ReflTransGen.refl
 
 --使っている。
-lemma all_below_unique_maximal
+private lemma all_below_unique_maximal
   (S : FuncSetup α) [Fintype S.Elem]
   (hpos : isPoset S) (hexu : ∃! m : S.Elem, S.maximal m) :
   ∀ u : S.Elem, S.le u (Classical.choose hexu.exists) := by
@@ -1016,7 +1010,7 @@ lemma all_below_unique_maximal
   exact hup
 
 --使っている。極大を含むidealは、全体集合のみ。
-lemma hOnlyTop_of_uniqueMax
+private lemma hOnlyTop_of_uniqueMax
   (S : FuncSetup α) [Fintype S.Elem]
   (hpos  : isPoset S)
   (hexu  : ∃! m : S.Elem, S.maximal m)
@@ -1047,7 +1041,7 @@ lemma hOnlyTop_of_uniqueMax
   -- 互いの包含で等号
   exact Eq.symm (Finset.Subset.antisymm hG_sub_I hI_sub)
 
-lemma keep_sets_from_trace_at_without_m
+private lemma keep_sets_from_trace_at_without_m
   (S : FuncSetup α) (m : S.Elem) (geq2: S.ground.card ≥ 2) {I : Finset α}
   (hI  : isOrderIdealOn (S.leOn) S.ground I)
   (hmI : m.1 ∉ I) :
@@ -1122,8 +1116,9 @@ lemma keep_sets_from_trace_at_uniqueMax
       (m := Classical.choose hexu.exists) geq2 (hI := hI) (hmI := hnot)
 -/
 
---back_sets_from_trace_at_max_sets'を証明するのにつかっている。
-lemma back_sets_from_trace_at_max_sets
+--極大なもののtraceで、traceしたあとの集合族は、元の集合族に含まれる。
+--back_sets_from_trace_at_max_sets'を証明するのにつかっている。たくさん使われている。
+private lemma back_sets_from_trace_at_max_sets
   (S : FuncSetup α) [Fintype S.Elem]
   (hpos : isPoset S) (m : S.Elem) (geq2: S.ground.card ≥ 2)(hm : S.maximal m)
   {I : Finset α}
@@ -1161,7 +1156,7 @@ lemma back_sets_from_trace_at_max_sets
         have h_yx : S.le ⟨y, hyG⟩ ⟨x, hxG⟩ := (leOn_iff S hyG hxG).mp hleOn
         have hmx : S.le m ⟨x, hxG⟩ := by cases hy_eq; exact h_yx
         have hxm : S.le ⟨x, hxG⟩ m := hm hmx
-        have : (⟨x, hxG⟩ : S.Elem) = m := (antisymm_of_isPoset S hpos) hxm hmx
+        have : (⟨x, hxG⟩ : S.Elem) = m := by exact hpos (hm hmx) hmx
         have : x = m.1 := congrArg Subtype.val this
         have : False := hx_ne_m this
         exact this.elim
@@ -1225,6 +1220,7 @@ by
     exact heq rfl
   exact And.intro hSets hm_not
 
+--一般的な変形なのでGeneral.leanに移動してもよい。
 lemma arith_reduce (V n t : Nat) (hV : 1 ≤ V) :
   ((V : Int)
     + (-(V : Int)
@@ -1330,10 +1326,8 @@ lemma arith_reduce (V n t : Nat) (hV : 1 ≤ V) :
   -- 左右を突き合わせて終了
   exact hL.trans hR.symm
 
-
---- isConnected不要版
-
-lemma numHyperedges_trace_pred_of_max
+--使っている
+private lemma numHyperedges_trace_pred_of_max
   (S : SPO.FuncSetup α) [Fintype S.Elem]
   (m : S.Elem)(geq2: S.ground.card ≥ 2)
   (hOnlyTop :
@@ -1367,7 +1361,7 @@ lemma numHyperedges_trace_pred_of_max
       have hmA    : m.1 ∈ A           := (Finset.mem_filter.mp hA).2
       have hA_ideal : isOrderIdealOn (S.leOn) S.ground A :=
         (S.sets_iff_isOrderIdeal (I := A)).1
-          ((SetFamily.mem_edgeFinset_iff (F := F) (A := A)).1 hA_edge)
+          ((SetFamily.mem_edgeFinset_iff_sets (F := F) (A := A)).1 hA_edge)
       exact Finset.mem_singleton.mpr (hOnlyTop A hA_ideal hmA)
     · intro A hA
       have hAeq : A = S.ground := Finset.mem_singleton.mp hA
@@ -1376,7 +1370,7 @@ lemma numHyperedges_trace_pred_of_max
           (by dsimp [isOrderIdealOn]; exact And.intro (by intro x hx; exact hx)
                 (by intro x hx y hy _; exact hy))
       have hGroundEdge : S.ground ∈ F.edgeFinset :=
-        (SetFamily.mem_edgeFinset_iff (F := F) (A := S.ground)).2 hGroundSets
+        (SetFamily.mem_edgeFinset_iff_sets (F := F) (A := S.ground)).2 hGroundSets
       have hmG : m.1 ∈ S.ground := m.2
       have h0 : S.ground ∈ F.edgeFinset.filter (fun A => m.1 ∈ A) :=
         Finset.mem_filter.mpr ⟨hGroundEdge, hmG⟩
@@ -1415,7 +1409,8 @@ lemma numHyperedges_trace_pred_of_max
   exact Nat.sub_add_cancel nhg
 
 /-- ② サイズ和：ちょうど `|V|` 減る（`isConnected` 不要版）。 -/
-lemma totalHyperedgeSize_trace_sub_card_ground_of_max
+--使っている。
+private lemma totalHyperedgeSize_trace_sub_card_ground_of_max
   (S : FuncSetup α) [Fintype S.Elem]
   (m : S.Elem)(geq2: S.ground.card ≥ 2)
   (hOnlyTop :
@@ -1446,7 +1441,7 @@ lemma totalHyperedgeSize_trace_sub_card_ground_of_max
       have hmA    : m.1 ∈ A           := (Finset.mem_filter.mp hA).2
       have hA_ideal : isOrderIdealOn (S.leOn) S.ground A :=
         (S.sets_iff_isOrderIdeal (I := A)).1
-          ((SetFamily.mem_edgeFinset_iff (F := F) (A := A)).1 hA_edge)
+          ((SetFamily.mem_edgeFinset_iff_sets (F := F) (A := A)).1 hA_edge)
       exact Finset.mem_singleton.mpr (hOnlyTop A hA_ideal hmA)
     · intro A hA
       have hAeq : A = S.ground := Finset.mem_singleton.mp hA
@@ -1455,7 +1450,7 @@ lemma totalHyperedgeSize_trace_sub_card_ground_of_max
           (by dsimp [isOrderIdealOn]; exact And.intro (by intro x hx; exact hx)
                 (by intro x hx y hy _; exact hy))
       have hGroundEdge : S.ground ∈ F.edgeFinset :=
-        (SetFamily.mem_edgeFinset_iff (F := F) (A := S.ground)).2 hGroundSets
+        (SetFamily.mem_edgeFinset_iff_sets (F := F) (A := S.ground)).2 hGroundSets
       have hmG : m.1 ∈ S.ground := m.2
       have h0 : S.ground ∈ F.edgeFinset.filter (fun A => m.1 ∈ A) :=
         Finset.mem_filter.mpr ⟨hGroundEdge, hmG⟩
@@ -1470,7 +1465,7 @@ lemma totalHyperedgeSize_trace_sub_card_ground_of_max
       cases Finset.mem_union.mp hA with
       | inl h1 =>
           have : A ∈ F.edgeFinset.filter (fun B => m.1 ∉ B) := by
-            simp_all only [Ideals.isOrderIdealOn_univ, Finset.coe_mem, sets_iff_isOrderIdeal, posetTraceCore_ground,
+            simp_all only [ sets_iff_isOrderIdeal, posetTraceCore_ground,
               Finset.union_singleton, Finset.mem_insert, Finset.mem_filter, SetFamily.mem_edgeFinset, not_false_eq_true, and_self,
               F', F]
           exact Finset.mem_of_mem_filter A this
@@ -1481,12 +1476,12 @@ lemma totalHyperedgeSize_trace_sub_card_ground_of_max
               (S.sets_iff_isOrderIdeal (I := S.ground)).2
                 (by dsimp [isOrderIdealOn]; exact And.intro (by intro x hx; exact hx)
                       (by intro x hx y hy _; exact hy))
-            exact (SetFamily.mem_edgeFinset_iff (F := F) (A := S.ground)).2 hGroundSets
+            exact (SetFamily.mem_edgeFinset_iff_sets (F := F) (A := S.ground)).2 hGroundSets
           cases hAeq; exact hGround
     · intro hA
       by_cases hmA : m.1 ∈ A
       · -- ground 側
-        have hA_sets : F.sets A := (SetFamily.mem_edgeFinset_iff (F := F) (A := A)).1 hA
+        have hA_sets : F.sets A := (SetFamily.mem_edgeFinset_iff_sets (F := F) (A := A)).1 hA
         have hA_ideal : isOrderIdealOn (S.leOn) S.ground A :=
           (S.sets_iff_isOrderIdeal (I := A)).1 hA_sets
         have hAeq : A = S.ground := hOnlyTop A hA_ideal hmA
@@ -1495,7 +1490,7 @@ lemma totalHyperedgeSize_trace_sub_card_ground_of_max
         have hFilt : A ∈ F.edgeFinset.filter (fun B => m.1 ∉ B) :=
           Finset.mem_filter.mpr ⟨hA, hmA⟩
         have : A ∈ F'.edgeFinset := by
-          simp_all only [Ideals.isOrderIdealOn_univ, Finset.coe_mem, sets_iff_isOrderIdeal, posetTraceCore_ground,
+          simp_all only [sets_iff_isOrderIdeal, posetTraceCore_ground,
             SetFamily.mem_edgeFinset, Finset.mem_filter, not_false_eq_true, and_self, F', F]
         exact Finset.mem_union.mpr (Or.inl this)
 
@@ -1504,7 +1499,7 @@ lemma totalHyperedgeSize_trace_sub_card_ground_of_max
     intro A hA hA0
     have hAeq : A = S.ground := Finset.mem_singleton.mp hA0
     have hAsets' : F'.sets A :=
-      (SetFamily.mem_edgeFinset_iff (F := F') (A := A)).1 hA
+      (SetFamily.mem_edgeFinset_iff_sets (F := F') (A := A)).1 hA
     have hm_not : m.1 ∉ A := (hBack A hAsets').2
     have hmG : m.1 ∈ S.ground := m.2
     cases hAeq; exact (hm_not hmG).elim
@@ -1519,8 +1514,8 @@ lemma totalHyperedgeSize_trace_sub_card_ground_of_max
               + (∑ A ∈ ({S.ground} : Finset (Finset α)), A.card) :=
       Finset.sum_union hDisj
     -- `hUnion` で台を置換
-    simp_all only [Ideals.isOrderIdealOn_univ, Finset.coe_mem, sets_iff_isOrderIdeal, posetTraceCore_ground,
-      Finset.union_singleton, Finset.disjoint_singleton_right, Finset.mem_filter, SetFamily.mem_edgeFinset, and_true,
+    simp_all only [ Finset.coe_mem, sets_iff_isOrderIdeal, posetTraceCore_ground,
+      Finset.union_singleton, Finset.disjoint_singleton_right, Finset.mem_filter, SetFamily.mem_edgeFinset,
       not_true_eq_false, and_false, not_false_eq_true, Finset.sum_singleton,  F', F]
 
   have hSingleton :
@@ -1535,7 +1530,8 @@ lemma totalHyperedgeSize_trace_sub_card_ground_of_max
     _   = (∑ A ∈ F'.edgeFinset, A.card) + S.ground.card := by
             exact congrArg (fun n => (∑ A ∈ F'.edgeFinset, A.card) + n) hSingleton
 
-/-- ③ 台集合：ちょうど 1 減る（`isConnected` 不要版）。 -/
+/- ③ 台集合：ちょうど 1 減る -/
+--外から参照していた。
 lemma ground_card_after_trace_of_max
   (S : FuncSetup α) [Fintype S.Elem]
   (m : S.Elem)(geq2: S.ground.card ≥ 2) :
@@ -1547,9 +1543,9 @@ lemma ground_card_after_trace_of_max
   exact Nat.eq_sub_of_add_eq h
 
 
-/-- ④ NDS の差の恒等式（`isConnected` を仮定しない主張）。 -/
+/- ④ NDS の差の恒等式 -/
 --仮定から条件を抜いた版で使用。
-lemma nds_diff_eq_root_delete_identity_of_max
+private lemma nds_diff_eq_root_delete_identity_of_max
   (S : FuncSetup α) [Fintype S.Elem]
   --(hpos : isPoset S)
   (m : S.Elem) (geq2: S.ground.card ≥ 2)
@@ -1636,7 +1632,7 @@ lemma nds_diff_eq_root_delete_identity_of_max
             = S.ground.card - (F'.numHyperedges + 1) + 1 :=
         (congrArg (fun n : Nat => S.ground.card - n + 1) hNum.symm)
       norm_cast
-      simp_all only [Ideals.isOrderIdealOn_univ, Finset.coe_mem, sets_iff_isOrderIdeal, posetTraceCore_ground,
+      simp_all only [ Finset.coe_mem, sets_iff_isOrderIdeal, posetTraceCore_ground,
         Finset.card_erase_of_mem, Nat.cast_add, Nat.cast_inj, SetFamily.NDS_def, F', S', F]
 
     have hToZ :
@@ -1647,10 +1643,8 @@ lemma nds_diff_eq_root_delete_identity_of_max
 
   exact hCalc.trans hRight.symm
 
-
-
 /-- NDS 差の恒等式（唯一極大元版：`hOnlyTop` と `hKeep` は不要）。 -/
-lemma nds_diff_eq_root_delete_identity_uniqueMax
+private theorem nds_diff_eq_root_delete_identity_uniqueMax
   (S : FuncSetup α) [Fintype S.Elem] (geq2: S.ground.card ≥ 2)
   (hpos : isPoset S) (hexu : ∃! m : S.Elem, S.maximal m) :
   let S' := posetTraceOfUnique S geq2 hexu
@@ -1767,702 +1761,6 @@ lemma nds_trace_nondecreasing_uniqueMax
 
   exact this
 
-
-/-
-/-- エッジ数：ちょうど 1 減る（唯一極大元版）。 -/
---結果的に使ってない。
-lemma numHyperedges_trace_pred_uniqueMax
-  (S : FuncSetup α) [Fintype S.Elem] (geq2: S.ground.card ≥ 2)
-  (hpos : isPoset S) (hexu : ∃! m : S.Elem, S.maximal m)
-  (hOnlyTop :
-    ∀ I : Finset α, isOrderIdealOn (S.leOn) S.ground I →
-      (Classical.choose hexu.exists).1 ∈ I → I = S.ground)
-  (hKeep :
-    ∀ I : Finset α, isOrderIdealOn (S.leOn) S.ground I →
-      (Classical.choose hexu.exists).1 ∉ I →
-      ((posetTraceOfUnique S geq2 hexu).idealFamily).sets I) :
-  ((posetTraceOfUnique S geq2 hexu).idealFamily).numHyperedges + 1
-    = (S.idealFamily).numHyperedges := by
-  classical
-  set m := Classical.choose hexu.exists
-  have hm : S.maximal m := Classical.choose_spec hexu.exists
-  -- 「帰り」
-  have hBack :
-      ∀ I, ((posetTraceCore S m geq2).idealFamily).sets I → (S.idealFamily).sets I ∧ m.1 ∉ I :=
-    fun I hI => back_sets_from_trace_at_max_sets' (S := S) (hpos := hpos) (m := m) (hm := hm) (hI := hI)
-  -- 先に作った「m をパラメータに取る版」を適用
-  exact
-    numHyperedges_trace_pred_of_max
-      (S := S) (m := m)
-      (hOnlyTop := by intro I hI hmI; exact hOnlyTop I hI hmI)
-      (hKeep := by
-        intro I hI hmI
-        -- `posetTraceOfUnique = posetTraceCore S m`
-        dsimp [posetTraceOfUnique] at *
-        exact hKeep I hI hmI)
-      (hBack := hBack)
-
-/-- サイズ総和：ちょうど `|ground|` 減る（唯一極大元版）。 -/
---結果的に使ってない。
-lemma totalHyperedgeSize_trace_sub_card_ground_uniqueMax
-  (S : FuncSetup α) [Fintype S.Elem](geq2: S.ground.card ≥ 2)
-  (hpos : isPoset S) (hexu : ∃! m : S.Elem, S.maximal m)
-  (hOnlyTop :
-    ∀ I : Finset α, isOrderIdealOn (S.leOn) S.ground I →
-      (Classical.choose hexu.exists).1 ∈ I → I = S.ground)
-  (hKeep :
-    ∀ I : Finset α, isOrderIdealOn (S.leOn) S.ground I →
-      (Classical.choose hexu.exists).1 ∉ I →
-      ((posetTraceOfUnique S geq2 hexu).idealFamily).sets I) :
-  (S.idealFamily).totalHyperedgeSize
-    = ((posetTraceOfUnique S geq2 hexu).idealFamily).totalHyperedgeSize
-      + S.ground.card := by
-  classical
-  set m := Classical.choose hexu.exists
-  have hm : S.maximal m := Classical.choose_spec hexu.exists
-  -- 「帰り」
-  have hBack :
-      ∀ I, ((posetTraceCore S m geq2).idealFamily).sets I → (S.idealFamily).sets I ∧ m.1 ∉ I :=
-    fun I hI => back_sets_from_trace_at_max_sets' (S := S) (hpos := hpos) (m := m) (hm := hm) (hI := hI)
-  -- 先に作った「m をパラメータに取る版」を適用
-  have := totalHyperedgeSize_trace_sub_card_ground_of_max
-    (S := S) (m := m)
-    (hOnlyTop := by intro I hI hmI; exact hOnlyTop I hI hmI)
-    (hKeep := by
-      intro I hI hmI
-      dsimp [posetTraceOfUnique] at *
-      exact hKeep I hI hmI)
-    (hBack := hBack)
-  -- `posetTraceOfUnique = posetTraceCore S m` で書換え
-  simpa [posetTraceOfUnique] using this
-
-/-
-/-- 台集合：ちょうど 1 減る（唯一極大元版）。 -/
---ground_card_after_trace_of_maxとかぶっているので必要ない。
-lemma ground_card_after_trace_uniqueMax
-  (S : FuncSetup α) [Fintype S.Elem]
-  (hexu : ∃! m : S.Elem, S.maximal m) :
-  ((posetTraceOfUnique S hexu).ground).card
-    = S.ground.card - 1 := by
-  classical
-  -- ここは `isPoset` を使わないので `?_` は不要だが、引数の並びに倣うなら省略可。
-  set m := Classical.choose hexu.exists
-  -- 既存の `ground_card_after_trace_of_max`
-  have := ground_card_after_trace_of_max (S := S) (m := m)
-  exact this
--/
-
-/-
-/-- NDS 差の恒等式（唯一極大元版）。 -/
---仮定を入れない言明に書き直したのでコメントアウト
-lemma nds_diff_eq_root_delete_identity_uniqueMax
-  (S : FuncSetup α) [Fintype S.Elem] (geq2: S.ground.card ≥ 2)
-  (hpos : isPoset S) (hexu : ∃! m : S.Elem, S.maximal m)
-  (hne : S.ground.Nonempty)
-  (hOnlyTop :
-    ∀ I : Finset α, isOrderIdealOn (S.leOn) S.ground I →
-      (Classical.choose hexu.exists).1 ∈ I → I = S.ground)
-  (hKeep :
-    ∀ I : Finset α, isOrderIdealOn (S.leOn) S.ground I →
-      (Classical.choose hexu.exists).1 ∉ I →
-      ((posetTraceOfUnique S geq2 hexu).idealFamily).sets I) :
-  let S' := posetTraceOfUnique S geq2 hexu
-  (S.idealFamily).NDS
-    = (S'.idealFamily).NDS
-      + (S.ground.card - (S.idealFamily).numHyperedges + 1 : Int) := by
-  classical
-  intro S'
-  -- 略記
-  set F  := S.idealFamily
-  set F' := S'.idealFamily
-  -- 3本の基本等式（unique 版）
-  have hNum : F'.numHyperedges + 1 = F.numHyperedges :=
-    numHyperedges_trace_pred_uniqueMax (S := S) (geq2 := geq2)  (hpos := hpos) (hexu := hexu)
-      (hOnlyTop := hOnlyTop) (hKeep := hKeep)
-  have hSize :
-    F.totalHyperedgeSize = F'.totalHyperedgeSize + S.ground.card :=
-    totalHyperedgeSize_trace_sub_card_ground_uniqueMax
-      (S := S) (geq2 := geq2)  (hpos := hpos) (hexu := hexu)
-      (hOnlyTop := hOnlyTop) (hKeep := hKeep)
-  have hV :
-    S'.ground.card = S.ground.card - 1 :=
-    by
-      -- 上の ground_card_after_trace_uniqueMax を `posetTraceOfUnique` に合わせて
-      set m := Classical.choose hexu.exists
-      have := ground_card_after_trace_of_max (S := S) (m := m) geq2
-      exact this
-
-  -- あとは前と同じ算術整理
-  have hNumZ :
-      (F.numHyperedges : Int) = ((F'.numHyperedges + 1 : Nat) : Int) :=
-    (congrArg (fun n : Nat => (n : Int)) hNum.symm)
-  have hSizeZ :
-      (F.totalHyperedgeSize : Int)
-        = ((F'.totalHyperedgeSize + S.ground.card : Nat) : Int) :=
-    (congrArg (fun n : Nat => (n : Int)) hSize)
-  have hVZ :
-      (F'.ground.card : Int) = ((S.ground.card - 1 : Nat) : Int) :=
-    (congrArg (fun n : Nat => (n : Int)) hV)
-
-  have hCalc :
-      F.NDS
-        = (2 * (F'.totalHyperedgeSize : Int)
-              - (F'.numHyperedges : Int) * ((S.ground.card - 1 : Nat) : Int))
-          + ((S.ground.card : Int) - (F'.numHyperedges : Int)) := by
-    dsimp [SetFamily.NDS]
-    rw [hSizeZ, hNumZ]
-    have hCastAdd₁ :
-        ((F'.totalHyperedgeSize + S.ground.card : Nat) : Int)
-          = (F'.totalHyperedgeSize : Int) + (S.ground.card : Int) :=
-      (Nat.cast_add _ _)
-    have hCastAdd₂ :
-        ((F'.numHyperedges + 1 : Nat) : Int)
-          = (F'.numHyperedges : Int) + 1 :=
-      (Nat.cast_add _ _)
-    simp [mul_add, add_mul, two_mul, add_comm, add_left_comm,
-          add_assoc, sub_eq_add_neg]
-    have hVpos : 1 ≤ S.ground.card := Nat.succ_le_of_lt (Finset.card_pos.mpr hne)
-    exact arith_reduce (V := S.ground.card) (n := F'.numHyperedges)
-                       (t := F'.totalHyperedgeSize) (hV := hVpos)
-
-  have hRight :
-      F'.NDS + (S.ground.card - F.numHyperedges + 1 : Int)
-        = (2 * (F'.totalHyperedgeSize : Int)
-              - (F'.numHyperedges : Int) * ((S.ground.card - 1 : Nat) : Int))
-          + ((S.ground.card : Int) - (F'.numHyperedges : Int)) := by
-    dsimp [SetFamily.NDS]
-    rw [hVZ]
-    have hNatRew :
-        (S.ground.card - F.numHyperedges + 1 : Int)
-          = (S.ground.card - (F'.numHyperedges + 1) + 1 : Int) := by
-      have hNat :
-          S.ground.card - F.numHyperedges + 1
-            = S.ground.card - (F'.numHyperedges + 1) + 1 :=
-        (congrArg (fun n : Nat => S.ground.card - n + 1) hNum.symm)
-      simp_all only [Ideals.isOrderIdealOn_univ, Finset.coe_mem, sets_iff_isOrderIdeal, Nat.cast_add, Finset.one_le_card,
-        Nat.cast_sub, Nat.cast_one, SetFamily.NDS_def,  add_left_inj, sub_right_inj, F', S', F]
-      exact congrArg Nat.cast (id (Eq.symm hNum))
-
-    have hToZ :
-        (S.ground.card - (F'.numHyperedges + 1) + 1 : Int)
-          = (S.ground.card : Int) - (F'.numHyperedges : Int) := by
-      simp [sub_eq_add_neg, add_comm, add_left_comm]
-    rw [hNatRew, hToZ]
-
-  exact hCalc.trans hRight.symm
-
-/-! ### 自動版（極大元を一意に選んで消す）：`posetTrace` -/
--/
--/
---------------------------------------------
---ここからisConnected版。将来的には消して良いかも。
----------------------------------------------
-/-- 連結な functional 半順序では極大元はちょうど 1 つ存在。 -/
-theorem exists_unique_maximal_of_connected
-  (S : SPO.FuncSetup α) [Fintype S.Elem]
-  (hpos : isPoset S) (hconn : isConnected S)
-  (hne : S.ground.Nonempty) :
-  ∃! m : S.Elem, S.maximal m := by
-  -- 存在
-  obtain ⟨m, hm⟩ := exists_maximal_of_finite S hpos hne
-  -- 一意性：既証明の unique_maximal_of_connected
-  refine ⟨m, hm, ?uniq⟩
-  intro m' hm'
-  -- 連結性の下で極大は高々1つ
-  have : m = m' :=
-    unique_maximal_of_connected (S := S) (hpos := hpos) (hconn := hconn) (hu := hm) (hv := hm')
-  exact this.symm ▸ rfl
-
-noncomputable def posetTrace (S : FuncSetup α) [Fintype S.Elem] (geq2: S.ground.card ≥ 2)
-  (hpos : isPoset S) (hconn : isConnected S) (hne : S.ground.Nonempty) :
-  FuncSetup α :=
-by
-  classical
-  let mhm := exists_unique_maximal_of_connected (S := S)
-                (hpos := hpos) (hconn := hconn) (hne := hne)
-  -- `m` を取り出す（証明部分は `Classical.choose_spec mhm` で必要なら後から参照）
-  let m : {x // x ∈ S.ground} := Classical.choose mhm
-
-  -- ここでは m の存在さえ使えればよいので、そのままコアを呼ぶ
-  exact posetTraceCore S m geq2
-
-noncomputable def theMaxElem
-  (S : FuncSetup α) [Fintype S.Elem]
-  (hpos : isPoset S) (hconn : isConnected S) (hne : S.ground.Nonempty) : S.Elem :=
-  Classical.choose (exists_unique_maximal_of_connected (S := S)
-                    (hpos := hpos) (hconn := hconn) (hne := hne)).exists
-
-
-lemma theMaxElem_is_maximal
-  (S : FuncSetup α) [Fintype S.Elem]
-  (hpos : isPoset S) (hconn : isConnected S) (hne : S.ground.Nonempty) :
-  S.maximal (theMaxElem S hpos hconn hne) := by
-  -- ∃! から ∃ を取り出す
-  have hexu := exists_unique_maximal_of_connected (S := S)
-                  (hpos := hpos) (hconn := hconn) (hne := hne)
-  have hExists : ∃ m : S.Elem, S.maximal m := (hexu).exists
-  -- 定義を展開して choose_spec をそのまま適用
-  dsimp [theMaxElem]
-  exact Classical.choose_spec hExists
-
-lemma numHyperedges_trace_pred
-  (S : FuncSetup α) [Fintype S.Elem] (geq2: S.ground.card ≥ 2)
-  (hpos : isPoset S) (hconn : isConnected S) (hne : S.ground.Nonempty)
-  (hOnlyTop :
-    ∀ I : Finset α, isOrderIdealOn (S.leOn) S.ground I →
-      (theMaxElem S hpos hconn hne).1 ∈ I → I = S.ground)
-  (hKeep :
-    ∀ I : Finset α, isOrderIdealOn (S.leOn) S.ground I →
-      (theMaxElem S  hpos hconn hne).1 ∉ I →
-      ((posetTraceCore S (theMaxElem S hpos hconn hne) geq2).idealFamily).sets I) :
-  ((posetTraceCore S (theMaxElem S hpos hconn hne) geq2).idealFamily).numHyperedges + 1
-    = (S.idealFamily).numHyperedges := by
-  classical
-  -- 略記
-  set m := theMaxElem S hpos hconn hne
-  set F  := S.idealFamily
-  set F' := (posetTraceCore S m geq2).idealFamily
-
-  -- まず：F で「m を含む edge」はちょうど {ground}
-  have h_onlyTop_filter :
-    (F.edgeFinset.filter (fun A => m.1 ∈ A)) = {S.ground} := by
-  -- 等式 ←→ 互いの包含
-    apply Finset.Subset.antisymm_iff.mpr
-    constructor
-    · -- ⊆ : filter ⊆ {ground}
-      intro A hA
-      -- A ∈ edge ∧ m∈A
-      have hA_edge : A ∈ F.edgeFinset := (Finset.mem_filter.mp hA).1
-      have hmA    : m.1 ∈ A           := (Finset.mem_filter.mp hA).2
-      -- A は ideal
-      have hA_sets : F.sets A :=
-        (SetFamily.mem_edgeFinset_iff (F := F) (A := A)).1 hA_edge
-      have hA_ideal : isOrderIdealOn (S.leOn) S.ground A :=
-        (S.sets_iff_isOrderIdeal (I := A)).1 hA_sets
-      -- 「極大を含む ideal は ground」の仮定から A=ground
-      have hAeq : A = S.ground := hOnlyTop A hA_ideal hmA
-      -- 単集合の会員
-      exact Finset.mem_singleton.mpr hAeq
-    · -- ⊇ : {ground} ⊆ filter
-      intro A hA
-      -- A = ground を取り出す
-      have hAeq : A = S.ground := Finset.mem_singleton.mp hA
-      -- ground が edge で、かつ m∈ground
-      have hGroundIdeal : isOrderIdealOn (S.leOn) S.ground S.ground := by
-        dsimp [isOrderIdealOn]; constructor
-        · intro x hx; exact hx
-        · intro x hx y hy _; exact hy
-      have hGroundSets : F.sets S.ground :=
-        (S.sets_iff_isOrderIdeal (I := S.ground)).2 hGroundIdeal
-      have hGroundEdge : S.ground ∈ F.edgeFinset :=
-        (SetFamily.mem_edgeFinset_iff (F := F) (A := S.ground)).2 hGroundSets
-      have hmG : m.1 ∈ S.ground := m.2
-      -- まず ground ∈ filter
-      have h0 : S.ground ∈ F.edgeFinset.filter (fun A => m.1 ∈ A) :=
-        Finset.mem_filter.mpr ⟨hGroundEdge, hmG⟩
-      -- 目標は A ∈ filter。A=ground で書き換え
-      -- `simpa [hAeq]` は使わず、`subst` で置換
-      subst hAeq
-      exact h0
-
-
-  -- つぎ：`m` を含まない edge は trace 後もそのまま残る（hKeep）
-  have h_keep_subset :
-      (F.edgeFinset.filter (fun A => m.1 ∉ A)) ⊆ F'.edgeFinset := by
-    intro A hA
-    -- A∈edge, m∉A
-    have hA_edge : A ∈ F.edgeFinset := (Finset.mem_filter.mp hA).1
-    have hm_not : m.1 ∉ A := (Finset.mem_filter.mp hA).2
-    -- A は理想
-    have hA_sets : F.sets A :=
-      (SetFamily.mem_edgeFinset_iff (F := F) (A := A)).1 hA_edge
-    have hA_ideal : isOrderIdealOn (S.leOn) S.ground A :=
-      (S.sets_iff_isOrderIdeal (I := A)).1 hA_sets
-    -- hKeep で S' の sets
-    have hA_sets' : F'.sets A := hKeep A hA_ideal hm_not
-    -- edge へ
-    exact
-      (SetFamily.mem_edgeFinset_iff (F := F') (A := A)).2 hA_sets'
-
-  -- ここからカード計算。
-  -- `filter (m∈)` が単集合なので、その補集合の filter は「edge の個数 - 1」。
-  have h_split :
-      (F.edgeFinset.filter (fun A => m.1 ∉ A)).card
-      = F.edgeFinset.card - 1 := by
-    -- `filter_card + filter_neg_card = card` の恒等式を使う
-    have hsum :
-      (F.edgeFinset.filter (fun A => m.1 ∈ A)).card
-      + (F.edgeFinset.filter (fun A => m.1 ∉ A)).card
-      = F.edgeFinset.card :=
-      Finset.filter_card_add_filter_neg_card_eq_card _
-    -- 左辺第1項は {ground} のカード = 1
-    have hleft :
-      (F.edgeFinset.filter (fun A => m.1 ∈ A)).card = 1 := by
-      -- `= {ground}` から直ちに
-      -- `Finset.card_singleton`
-      -- `by rw [h_onlyTop_filter]; exact Finset.card_singleton _`
-      -- 「simpa using」回避のため、`rw` を段階的に使います
-      have := h_onlyTop_filter
-      -- `rw [this]`
-      -- 仕上げ
-      -- exact Finset.card_singleton _
-      -- ここでは一行で：
-      exact by
-        -- この行は環境によっては `rw` が必要です
-        -- `simp [h_onlyTop_filter]`
-        -- 「simp」は使っていないので、`rw` → `exact` に分解してもOK
-        -- 最終的な値は 1
-        exact by
-          -- 直接書く：単集合のサイズは 1
-          -- （多数の環境で `by decide` は通りません）
-          -- ここは既知補題 `Finset.card_singleton` を使います
-          have : Finset.card (Singleton.singleton S.ground) = 1 := Finset.card_singleton _
-          -- `filter = {ground}` を使う
-          -- `rw [h_onlyTop_filter]` して返す
-          -- again、`rw` を当てにくければ `calc` で：
-          --   (filter...).card = ({ground}).card = 1
-          calc
-            (F.edgeFinset.filter (fun A => m.1 ∈ A)).card
-                = Finset.card (Singleton.singleton S.ground) := by
-                      -- `rw [h_onlyTop_filter]`
-                      exact congrArg Finset.card h_onlyTop_filter
-            _ = 1 := this
-    -- 以上から等式を移項
-    -- `hleft + ... = card` ⇒ `... = card - hleft = card - 1`
-    -- 自然数の減算（この場合常に ≥）はそのまま書けます
-    -- ここでは `Nat.add_comm` 等で整理して締めます
-    -- 仕上げ：
-    have : (F.edgeFinset.filter (fun A => m.1 ∉ A)).card
-            = F.edgeFinset.card - (F.edgeFinset.filter (fun A => m.1 ∈ A)).card := by
-      -- 標準の変形：`a + b = c` から `b = c - a`
-      -- いったん `Nat` の引き算の基本補題を使わずとも、
-      -- 環境の `Nat.add_comm` / `Nat.add_left_cancel` で書けますが、
-      -- ここは最終形だけ出します。
-      -- （エディタ側で `exact` の代わりに `linarith` などでも可）
-      -- 簡素化のため、`hsum` からの結論として採用します。
-      -- 以降、最終行にまとめます。
-      exact Nat.eq_sub_of_add_eq' hsum
-    -- 上の式に `hleft = 1` を代入
-    exact by
-      -- `rw` で代入して終了
-      -- `rw [this, hleft]`
-      -- `= card - 1`
-      simp_all only [Ideals.isOrderIdealOn_univ, Finset.coe_mem, sets_iff_isOrderIdeal, posetTraceCore_ground,
-    Finset.card_singleton, m, F', F]
-
-  -- つぎに、`h_keep_subset` から
-  -- `F'.edge.card ≥ (F.edge.filter (¬ m∈)).card` が従う（単調性）
-  have h_ge :
-      F'.edgeFinset.card ≥ (F.edgeFinset.filter (fun A => m.1 ∉ A)).card := by
-    exact Finset.card_le_card h_keep_subset
-
-  -- 一方で、F' の edge は台が `ground.erase m` なので、`m ∉ A` は自明。
-  -- さらに（ここで一般の保存補題を使わずに）カードだけ必要なので、
-  -- `F'.edge.card ≤ (F.edge.filter (¬ m∈)).card` も成り立つことを示します。
-  -- これは、`F'.edge ⊆ F.ground.powerset` かつ `m ∉ A` より、
-  -- それぞれの A をそのまま `F.edge` 側に入れるには `sets` が要るのですが、
-  -- 既に `hKeep` は「S 側 ideal → S' 側 sets」しか使っていません。
-  -- ここでは、カード等式に必要な分だけ、`F'.edge` の要素を
-  -- `F.edge.filter (¬ m∈)` で数える「上界」を与えるため、
-  -- あなたの環境にある `edgeFinset_traceAt_eq_image_erase`
-  --   (trace で edge が `erase m` の像になる）
-  -- を使うのが最短です。
-  -- これを `F' = traceAt m.1 F` と組み合わせると：
-  --   `F'.edge = F.edge.image (erase m.1)`
-  -- で、像が「`m` を含まない部分は固定、`ground` は `ground.erase m` に重なる」ため
-  -- ちょうど 1 減ることが直ちに従います。
-  -- 以下、その計数部分だけを書きます。
-
-  -- （trace の像であることを使う計数）
-  have h_card_eq :
-      F'.edgeFinset.card = (F.edgeFinset.filter (fun A => m.1 ∉ A)).card :=
-    edge_card_trace_eq_filter_not_mem
-      (S := S) (m := m)
-      (hKeep := hKeep)
-      -- ここで “帰り” の仮定を渡す
-      (hBack := ?hBack)
-
-  -- 以上をまとめて：
-  --   `F'.edge.card = (F.edge.filter (¬m∈)).card = F.edge.card - 1`
-  -- よって主張
-  have : F'.edgeFinset.card = F.edgeFinset.card - 1 := by
-    -- `rw [h_card_eq, h_split]`
-    simp_all only [Ideals.isOrderIdealOn_univ, Finset.coe_mem, sets_iff_isOrderIdeal, posetTraceCore_ground, ge_iff_le,
-    tsub_le_iff_right, m, F', F]
-
-  -- numHyperedges へ戻す
-  -- `Nat` の等式を左右に +1 して反転
-  -- 目標：F' のカード + 1 = F のカード
-  -- 仕上げ
-  exact by
-    -- `have h := this`
-    -- `rw` 展開して閉じます
-    -- `Nat.succ_pred_eq_of_pos` 等の補題に依存せず、素直に rewrite で十分です
-    -- ここでは最終的な形だけ置きます
-    -- （エディタでは `exact Nat.add_right_cancel ...` 等で閉じられます）
-    show F'.numHyperedges + 1 = F.numHyperedges
-    dsimp [SetFamily.numHyperedges]
-    let arc := @Nat.add_right_cancel F'.edgeFinset.card 1 (F.edgeFinset.card - 1)
-    rw [this]
-
-    have :F.edgeFinset.card ≥ 1 := by
-      exact S.numHyperedges_ge_one
-
-    simp_all [m, F', F]
-
-  show  ∀ (I : Finset α), (posetTraceCore S m geq2).idealFamily.sets I → S.idealFamily.sets I ∧ ↑m ∉ I
-  intro I hI
-  constructor
-  · --dsimp [posetTraceCore] at hI
-    apply back_sets_from_trace_at_max_sets S hpos m
-    dsimp [m]
-    exact theMaxElem_is_maximal S hpos hconn hne
-    exact hI
-
-  · exact no_m_in_Fprime_ideal S m geq2 hI
-
-open Classical
-
-lemma totalHyperedgeSize_trace_sub_card_ground
-  (S : FuncSetup α) [Fintype S.Elem] (geq2: S.ground.card ≥ 2)
-  (hpos : isPoset S) (hconn : isConnected S) (hne : S.ground.Nonempty)
-  (hOnlyTop :
-    ∀ I : Finset α, isOrderIdealOn (S.leOn) S.ground I →
-      (theMaxElem S hpos hconn hne).1 ∈ I → I = S.ground)
-  (hKeep :
-    ∀ I : Finset α, isOrderIdealOn (S.leOn) S.ground I →
-      (theMaxElem S hpos hconn hne).1 ∉ I →
-      ((posetTraceCore S (theMaxElem S hpos hconn hne) geq2).idealFamily).sets I) :
-  (S.idealFamily).totalHyperedgeSize
-    = ((posetTraceCore S (theMaxElem S hpos hconn hne) geq2).idealFamily).totalHyperedgeSize
-      + S.ground.card := by
-  classical
-  -- 略記
-  set m  := theMaxElem S hpos hconn hne
-  set F  := S.idealFamily
-  set F' := (posetTraceCore S m geq2).idealFamily
-
-  -- “帰り”：F' 側の理想 ⇒ F 側の理想 ∧ m∉I（極大＋反対称を使用）
-  have hm : S.maximal m := theMaxElem_is_maximal (S := S) (hpos := hpos) (hconn := hconn) (hne := hne)
-  have hBack :
-      ∀ I : Finset α, F'.sets I → F.sets I ∧ m.1 ∉ I :=
-    by
-      intro I hI
-      -- 前に作った「帰り」補題（sets 版）を使う
-      have hSets : F.sets I :=
-        back_sets_from_trace_at_max_sets
-          (S := S) (hpos := hpos) (m := m) (hm := hm) (hI := hI)
-      -- m∉I は台 inclusion（erase m）から直ちに
-      have hI' : isOrderIdealOn ((posetTraceCore S m geq2).leOn) ((posetTraceCore S m geq2).ground) I := by
-        change isOrderIdealOn _ _ I
-        exact (SPO.FuncSetup.sets_iff_isOrderIdeal (S := (posetTraceCore S m geq2)) (I := I)).1 hI
-      have hSub' : I ⊆ (posetTraceCore S m geq2).ground := hI'.1
-      have hm_not : m.1 ∉ I := by
-        intro hmI
-        have : m.1 ∈ (posetTraceCore S m geq2).ground := hSub' hmI
-        -- ground' = erase m.1 なので矛盾
-        rcases Finset.mem_erase.mp (by change m.1 ∈ S.ground.erase m.1; simpa) with ⟨hne', _⟩
-        exact hne' rfl
-      exact And.intro hSets hm_not
-
-  -- F' のエッジはちょうど「F のエッジで m を含まない」もの
-  have hEdgeEq :
-      F'.edgeFinset = F.edgeFinset.filter (fun A => m.1 ∉ A) :=
-    edgeFinset_trace_eq_filter_not_mem
-      (S := S) (m := m) (hKeep := hKeep) (hBack := hBack)
-
-  -- いっぽう、F で「m を含むエッジ」は {ground} だけ
-  have h_onlyTop_filter :
-      (F.edgeFinset.filter (fun A => m.1 ∈ A)) = {S.ground} := by
-    apply Finset.Subset.antisymm_iff.mpr
-    constructor
-    · intro A hA
-      have hA_edge : A ∈ F.edgeFinset := (Finset.mem_filter.mp hA).1
-      have hmA    : m.1 ∈ A           := (Finset.mem_filter.mp hA).2
-      have hA_sets : F.sets A :=
-        (SetFamily.mem_edgeFinset_iff (F := F) (A := A)).1 hA_edge
-      have hA_ideal : isOrderIdealOn (S.leOn) S.ground A :=
-        (S.sets_iff_isOrderIdeal (I := A)).1 hA_sets
-      have hAeq : A = S.ground := hOnlyTop A hA_ideal hmA
-      exact Finset.mem_singleton.mpr hAeq
-    · intro A hA
-      have hAeq : A = S.ground := Finset.mem_singleton.mp hA
-      -- ground が edge、かつ m ∈ ground
-      have hGroundIdeal : isOrderIdealOn (S.leOn) S.ground S.ground := by
-        dsimp [isOrderIdealOn]; constructor
-        · intro x hx; exact hx
-        · intro x hx y hy _; exact hy
-      have hGroundSets : F.sets S.ground :=
-        (S.sets_iff_isOrderIdeal (I := S.ground)).2 hGroundIdeal
-      have hGroundEdge : S.ground ∈ F.edgeFinset :=
-        (SetFamily.mem_edgeFinset_iff (F := F) (A := S.ground)).2 hGroundSets
-      have hmG : m.1 ∈ S.ground := m.2
-      have h0 : S.ground ∈ F.edgeFinset.filter (fun A => m.1 ∈ A) :=
-        Finset.mem_filter.mpr ⟨hGroundEdge, hmG⟩
-      -- A=ground で書換え
-      cases hAeq
-      exact h0
-
-  -- これより：F'.edge ∪ {ground} = F.edge
-  have hUnion : F'.edgeFinset ∪ {S.ground} = F.edgeFinset := by
-    apply Finset.ext
-    intro A
-    constructor
-    · intro hA
-      cases Finset.mem_union.mp hA with
-      | inl h1 =>
-          -- A ∈ F'.edge ⇒ A ∈ F.edge.filter (¬ m∈) ⇒ A ∈ F.edge
-          have : A ∈ F.edgeFinset.filter (fun B => m.1 ∉ B) := by
-            -- `hEdgeEq` で書換え
-            have := h1
-            -- `simpa` を避け、congrArg で書換える
-            -- ここはそのまま代入でも OK
-            exact (by
-              -- 直接：`h1 : A ∈ F'.edge`，`hEdgeEq : F'.edge = F.edge.filter _`
-              -- 目標：A ∈ F.edge.filter …
-              -- `rw [hEdgeEq]` と同等の操作
-              have e := hEdgeEq;
-              simp_all only [Ideals.isOrderIdealOn_univ, Finset.coe_mem, sets_iff_isOrderIdeal, posetTraceCore_ground,
-                FuncSetup.maximal_iff, le_iff_leOn_val, Subtype.forall, Finset.union_singleton, Finset.mem_insert,
-                Finset.mem_filter, SetFamily.mem_edgeFinset, not_false_eq_true, and_self, m, F', F]
-            )
-          exact (Finset.mem_filter.mp this).1
-      | inr h0 =>
-          -- A = ground ⇒ ground ∈ F.edge
-          have hAeq : A = S.ground := Finset.mem_singleton.mp h0
-          have hGround : S.ground ∈ F.edgeFinset := ground_mem_ideal_edge S
-          -- 書換え
-          cases hAeq
-          exact hGround
-    · intro hA
-      -- A ∈ F.edge。m∈A か否かで分岐
-      by_cases hmA : m.1 ∈ A
-      · -- m∈A ⇒ A = ground ⇒ {ground} 側に入る
-        have hA_sets : F.sets A := (SetFamily.mem_edgeFinset_iff (F := F) (A := A)).1 hA
-        have hA_ideal : isOrderIdealOn (S.leOn) S.ground A :=
-          (S.sets_iff_isOrderIdeal (I := A)).1 hA_sets
-        have hAeq : A = S.ground := hOnlyTop A hA_ideal hmA
-        exact Finset.mem_union.mpr (Or.inr (by
-          -- A=ground を使って {ground} に入れる
-          have : S.ground ∈ ({S.ground} : Finset (Finset α)) :=
-            Finset.mem_singleton_self S.ground
-          -- 書換え
-          cases hAeq
-          exact this))
-      · -- m∉A ⇒ A は filter (¬m∈) に居る ⇒ F'.edge に入る
-        have hFilt : A ∈ F.edgeFinset.filter (fun B => m.1 ∉ B) :=
-          Finset.mem_filter.mpr ⟨hA, hmA⟩
-        have hAinF' : A ∈ F'.edgeFinset := by
-          -- `rw [hEdgeEq]` 相当
-          have e := hEdgeEq
-          simp_all only [Ideals.isOrderIdealOn_univ, Finset.coe_mem, sets_iff_isOrderIdeal, posetTraceCore_ground,
-            FuncSetup.maximal_iff, le_iff_leOn_val, Subtype.forall, SetFamily.mem_edgeFinset, Finset.mem_filter,
-            not_false_eq_true, and_self, m, F', F]
-
-        exact Finset.mem_union.mpr (Or.inl hAinF')
-
-  -- また、F'.edge と {ground} は互いに素
-  have hDisj : Disjoint F'.edgeFinset ({S.ground} : Finset (Finset α)) := by
-    refine Finset.disjoint_left.mpr ?_
-    intro A hA hA0
-    have hAeq : A = S.ground := Finset.mem_singleton.mp hA0
-    -- F' 側 sets から m∉A を取り、A=ground と矛盾させる
-    have hAsets' : F'.sets A :=
-      (SetFamily.mem_edgeFinset_iff (F := F') (A := A)).1 hA
-    have hm_not : m.1 ∉ A := (hBack A hAsets').2
-    have hmG : m.1 ∈ S.ground := m.2
-    -- A=ground で書換え
-    have : False := hm_not (by cases hAeq; exact hmG)
-    exact this.elim
-
-  -- 和の分割：F.edge = F'.edge ∪ {ground}
-  have hSumSplit :
-      (∑ A ∈ F.edgeFinset, A.card)
-        = (∑ A ∈ F'.edgeFinset, A.card)
-          + (∑ A ∈ ({S.ground} : Finset (Finset α)), A.card) := by
-    -- まず union に書換え
-    have h1 :
-        (∑ A ∈ F.edgeFinset, A.card)
-          = (∑ A ∈ (F'.edgeFinset ∪ ({S.ground} : Finset (Finset α))), A.card) := by
-      -- `congrArg` で和の台を置換
-      have e := congrArg
-        (fun (s : Finset (Finset α)) => s.sum (fun A => A.card)) hUnion.symm
-      -- 述語付き和の記法に合わせてそのまま使える
-      exact e
-    -- `sum_union`（互いに素）で分割
-    have h2 :
-        (∑ A ∈ (F'.edgeFinset ∪ ({S.ground} : Finset (Finset α))), A.card)
-          = (∑ A ∈ F'.edgeFinset, A.card)
-            + (∑ A ∈ ({S.ground} : Finset (Finset α)), A.card) :=
-      Finset.sum_union hDisj
-    exact h1.trans h2
-
-  -- 単集合の和は ground.card
-  have hSingleton :
-      (∑ A ∈ ({S.ground} : Finset (Finset α)), A.card) = S.ground.card := by
-    -- ここは `simp` で一発
-    simp
-
-  -- 仕上げ：定義に戻して等式を並べ替え
-  dsimp [SetFamily.totalHyperedgeSize] at *
-  -- hSumSplit と hSingleton を代入
-  calc
-    (∑ A ∈ F.edgeFinset, A.card)
-        = (∑ A ∈ F'.edgeFinset, A.card)
-          + (∑ A ∈ ({S.ground} : Finset (Finset α)), A.card) := hSumSplit
-    _   = (∑ A ∈ F'.edgeFinset, A.card) + S.ground.card := by
-            -- 単集合和を ground.card に置換
-            exact congrArg (fun n => (∑ A ∈ F'.edgeFinset, A.card) + n) hSingleton
-
-lemma ground_card_after_trace
-  (S : FuncSetup α) [Fintype S.Elem] (geq2: S.ground.card ≥ 2)
-  (hpos : isPoset S) (hconn : isConnected S) (hne : S.ground.Nonempty) :
-  ((posetTraceCore S (theMaxElem S hpos hconn hne) geq2).ground).card
-    = S.ground.card - 1 := by
-  classical
-  -- 省略名
-  set m := theMaxElem S hpos hconn hne
-
-  -- posetTraceCore の台は erase
-  have hground : ((posetTraceCore S m geq2).ground) = S.ground.erase m.1 := rfl
-
-  -- m は ground の元
-  have hmem : m.1 ∈ S.ground := m.2
-
-  -- card (erase a) = card - 1（`card_erase_add_one` から）
-  let fce := (Finset.card_erase_add_one (s := S.ground) (a := m.1) hmem)
-  have hcard_sub :
-      (S.ground.erase m.1).card = S.ground.card - 1 :=
-    by
-      apply Nat.eq_sub_of_add_eq'
-      simp_all only [posetTraceCore_ground, Finset.card_erase_of_mem, Finset.one_le_card,
-        add_tsub_cancel_of_le, m]
-
-  -- 仕上げ：台の等式でカードを書き換える
-  calc
-    ((posetTraceCore S m geq2).ground).card
-        = (S.ground.erase m.1).card := by
-              exact congrArg Finset.card hground
-    _   = S.ground.card - 1 := hcard_sub
-
---posetTraceした結果も半順序であることを示す補題
-lemma isPoset_posetTrace
-  (S : FuncSetup α) [Fintype S.Elem] (geq2: S.ground.card ≥ 2)
-  (hpos : isPoset S) (hconn : isConnected S) (hne : S.ground.Nonempty) :
-  isPoset (posetTrace S geq2 (hpos := hpos) (hconn := hconn) (hne := hne)) := by
-  classical
-  -- 定義から取り出した極大 `m` に対して `isPoset_posetTraceCore` を適用するだけ
-  obtain ⟨m, hm, _huniq⟩ :=
-    exists_unique_maximal_of_connected (S := S)
-      (hpos := hpos) (hconn := hconn) (hne := hne)
-  -- `posetTrace` の定義を展開
-
-  --change isPoset (posetTraceCore S m geq2)
-
-  let ipt := isPoset_posetTraceCore (S := S) (hpos := hpos) (m := m)
-  dsimp [posetTrace]
-  let c := (choose (exists_unique_maximal_of_connected S hpos hconn hne))
-  exact isPoset_posetTraceCore S hpos c geq2
 
 end Induction
 end AvgRare

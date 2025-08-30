@@ -14,10 +14,11 @@ namespace AvgRare
 /-
 SetFamily.lean  —  基本集合族とNDS。
 
-集合族に関する基本的な定義と計数を行う。
-- ここでは poset/ideal など順序に依存する概念は扱いません（Ideals 側へ）。
+集合族に関する基本的な定義と補題。
+- ここでは ideal など順序に依存する概念も移動してくる予定。
 - トレースは Commonへ。
 - FuncSetup が出てくるものは、FuncSetupへ。
+- パラレル関係は後半に集めてある。
 -/
 
 variable {α : Type u} [DecidableEq α]
@@ -36,38 +37,24 @@ namespace SetFamily
 
 variable (F : SetFamily α)
 
-attribute [simp] SetFamily.ground
+--attribute [simp] SetFamily.ground
 
 instance instDecidablePred_sets (F : SetFamily α) : DecidablePred F.sets :=
   F.decSets
-
 
 /-- 列挙用：族のメンバ全体を `powerset` から述語で filter して得る Finset。 -/
 def edgeFinset : Finset (Finset α) :=
   F.ground.powerset.filter (fun A => decide (F.sets A))
 
 /-- `edgeFinset` の要素は台集合に含まれる。 -/
+--一箇所使われているだけ。その補題もつかわれてない。
 lemma subset_ground_of_mem_edge {A : Finset α}
     (hA : A ∈ F.edgeFinset) : A ⊆ F.ground := by
   classical
   rcases Finset.mem_filter.mp hA with ⟨hPow, _⟩
   exact Finset.mem_powerset.mp hPow
 
-/-- `edgeFinset` と述語 `sets` の一致。以後の計数で便利。 -/
-lemma mem_edgeFinset_iff {A : Finset α} :
-    A ∈ F.edgeFinset ↔ F.sets A := by
-  classical
-  constructor
-  · intro h
-    rcases Finset.mem_filter.mp h with ⟨hPow, hDec⟩
-    -- decide (F.sets A) = true から F.sets A を回収
-    simp_all only [Finset.mem_powerset, decide_eq_true_eq]
-  · intro hA
-    have hSub : A ⊆ F.ground := F.inc_ground hA
-    have hPow : A ∈ F.ground.powerset := Finset.mem_powerset.mpr hSub
-    have hDec : decide (F.sets A) = true := by simp_all only [Finset.mem_powerset, decide_true]
 
-    exact Finset.mem_filter.mpr ⟨hPow, hDec⟩
 
 /-- ハイパーエッジ数。 -/
 def numHyperedges : Nat :=
@@ -98,7 +85,7 @@ noncomputable def sumProd {α} [DecidableEq α]
           (by exact hAsub.trans (Finset.subset_union_left))
           (by exact hBsub.trans (Finset.subset_union_right))
 
-
+--ここからNDS関連
 /-- NDS（正規化された次数和）：
 `2 * (サイズ総和) - (エッジ数) * (台集合の大きさ)` を `Int` で定義。 -/
 def NDS (F : SetFamily α) : Int :=
@@ -115,6 +102,7 @@ variable (F : SetFamily α)
              - (F.numHyperedges : Int) * (F.ground.card : Int) := rfl
 
 /-- `degree` を「含むエッジの個数」として書き直した版。 -/
+--数箇所使われている。
 lemma degree_eq_card_filter (x : α) :
     F.degree x = (F.edgeFinset.filter (fun A => x ∈ A)).card := by
   classical
@@ -130,30 +118,14 @@ lemma degree_eq_card_filter (x : α) :
   simp_all only [Finset.sum_boole, Nat.cast_id, Finset.sum_const, smul_eq_mul, mul_one]
 
 /-- `edgeFinset` は powerset の部分集合。 -/
+--現状では使われてない。
 lemma edgeFinset_subset_powerset :
     F.edgeFinset ⊆ F.ground.powerset := by
   classical
   intro A hA
   exact (Finset.mem_filter.mp hA).1
 
-/-- `edgeFinset` 上のメンバは台集合に含まれる（便利な再掲）。 -/
-lemma mem_edgeFinset_subset_ground {A : Finset α}
-    (hA : A ∈ F.edgeFinset) : A ⊆ F.ground :=
-  F.subset_ground_of_mem_edge hA
-
-/-- 台集合の制限。ハイパーエッジは元のエッジの部分集合で、かつ `U` に含まれるもの。 -/
---どこで必要なのか考える。
-noncomputable def restrict (U : Finset α) : SetFamily α := by
-  classical
-  refine
-  { ground := U
-    , sets   := fun B => ∃ A : Finset α, F.sets A ∧ B ⊆ A ∧ B ⊆ U
-    , decSets := Classical.decPred _
-    , inc_ground := ?_ }
-  intro B hB
-  rcases hB with ⟨A, hA, hBsubA, hBsubU⟩
-  exact hBsubU
-
+--たくさん使われている。
 @[simp] lemma mem_edgeFinset :
   A ∈ F.edgeFinset ↔ A ⊆ F.ground ∧ F.sets A := by
   classical
@@ -170,7 +142,27 @@ noncomputable def restrict (U : Finset α) : SetFamily α := by
     have hPow : A ∈ F.ground.powerset := Finset.mem_powerset.mpr hSub
     have hDec : decide (F.sets A) = true := by simpa using hSets
     exact Finset.mem_filter.mpr ⟨hPow, hDec⟩
+/-
+/-- `edgeFinset` と述語 `sets` の一致。以後の計数で便利。 -/
+--たくさん使われているように見えて、使われているのは、mem_edgeFinset_iff_setsのほう。
+--でもこっちも少し使われている。統合したい。名前をそのまま変えればいいだけか。
+lemma mem_edgeFinset_iff {A : Finset α} :
+    A ∈ F.edgeFinset ↔ F.sets A := by
+  classical
+  constructor
+  · intro h
+    rcases Finset.mem_filter.mp h with ⟨hPow, hDec⟩
+    -- decide (F.sets A) = true から F.sets A を回収
+    simp_all only [Finset.mem_powerset, decide_eq_true_eq]
+  · intro hA
+    have hSub : A ⊆ F.ground := F.inc_ground hA
+    have hPow : A ∈ F.ground.powerset := Finset.mem_powerset.mpr hSub
+    have hDec : decide (F.sets A) = true := by simp_all only [Finset.mem_powerset, decide_true]
 
+    exact Finset.mem_filter.mpr ⟨hPow, hDec⟩
+-/
+
+--たくさん使われている。
 @[simp] lemma mem_edgeFinset_iff_sets : (A ∈ F.edgeFinset) ↔ F.sets A := by
   classical
   constructor
@@ -178,37 +170,8 @@ noncomputable def restrict (U : Finset α) : SetFamily α := by
   · intro h; have : A ⊆ F.ground := F.inc_ground h
     exact (F.mem_edgeFinset (A := A)).2 ⟨this, h⟩
 
-/- `F.sets A` は `A ∈ F.edgeFinset` と同値。
-    `edgeFinset = ground.powerset.filter (decide ∘ F.sets)` なので自動化できます。 -/
-/-
-@[simp] --上と同じだった。
-lemma sets_iff_mem_edge (F : SetFamily α) {A : Finset α} :
-  F.sets A ↔ A ∈ F.edgeFinset := by
-  -- A が ground に含まれることと `filter (decide ∘ F.sets)` の会員判定を往復
-  have : A ⊆ F.ground ↔ A ∈ F.ground.powerset := by
-    exact Iff.symm Finset.mem_powerset
-  constructor
-  · intro hA
-    have hAsub : A ⊆ F.ground := F.inc_ground hA
-    -- powerset ∧ filter
-    simp [edgeFinset, this.mp hAsub, hA]
-
-  · intro hA
-    -- filter に入っているなら `F.sets A` が真
-    have : A ∈ F.ground.powerset ∧ decide (F.sets A) := by
-      simpa [edgeFinset] using (Finset.mem_filter.mp hA)
-    have hsets : F.sets A := by
-     simp_all only [iff_true, mem_edgeFinset, true_and, Finset.mem_powerset, decide_true, and_self]
-
-    exact hsets
--/
-
-/-- 並行性：族 `F` において「`u` を含むエッジの集合」と
-「`v` を含むエッジの集合」が一致する。 -/
---uやvが、F.ground外のときにはパラレルになってしまう。
---1. u、vをサブタイプにする。
---2. u in F.ground,v in F.groundという条件をつける。
---3. SetFamilyに全体集合をもつことを要求する。
+---------------------------------------------------------
+-- parallel 関係の定義と基本補題
 @[simp] def Parallel (F : SetFamily α) (u v : α) : Prop :=
   {A : Finset α | F.sets A ∧ u ∈ A} = {A : Finset α | F.sets A ∧ v ∈ A}
 
@@ -233,6 +196,7 @@ def Parallel_edge (F : SetFamily α) (u v : α) : Prop :=
   F.edgeFinset.filter (fun A => v ∈ A)
 
 /-- あなたの `Parallel`（集合内包での等式）と `Parallel_edge` は同値。 -/
+--そこで使っている。
 lemma Parallel_edge_iff_Parallel (F : SetFamily α) (u v : α) :
   Parallel_edge F u v ↔ Parallel F u v := by
   -- どちらも「`F.sets A` かつ `u∈A`（/`v∈A`）」という同じ性質を
@@ -282,12 +246,7 @@ noncomputable def ParallelClass (F : SetFamily α) (a : α) : Finset α :=
     classical
     exact F.ground.filter (fun b => Parallel F a b)
 
-noncomputable def classSet (F : SetFamily α) : Finset (Finset α) :=
-  -- 「同値類の集合」を代表元写像の像で実装
-  by
-    classical
-    exact F.ground.image (fun a => ParallelClass F a)
-
+--現状使われてない。
 lemma ParallelClass_subset_ground (F : SetFamily α) {a : α} :
   ParallelClass F a ⊆ F.ground := by
   classical
@@ -295,6 +254,7 @@ lemma ParallelClass_subset_ground (F : SetFamily α) {a : α} :
   have hx' := Finset.mem_filter.mp hx
   exact hx'.1
 
+--現状使われてない。
 lemma ParallelClass_nonempty (F : SetFamily α) {a : α} (ha : a ∈ F.ground) :
   (ParallelClass F a).Nonempty := by
   classical
@@ -302,39 +262,10 @@ lemma ParallelClass_nonempty (F : SetFamily α) {a : α} (ha : a ∈ F.ground) :
   -- a ∈ ground ∧ Parallel F a a
   exact Finset.mem_filter.mpr (And.intro ha (by rfl))
 
-lemma mem_classSet_iff (F : SetFamily α) {C : Finset α} :
-  C ∈ classSet F ↔ ∃ a ∈ F.ground, C = ParallelClass F a := by
-  classical
-  unfold classSet
-  constructor
-  · intro h
-    -- h : C ∈ F.ground.image (λ a, ParallelClass F a)
-    rcases Finset.mem_image.mp h with ⟨a, ha, hC⟩
-    exact ⟨a,ha,hC.symm⟩
-  · intro h
-    rcases h with ⟨a, ha, hC⟩
-    -- C = imageの値 なので像に入る
-    have : ParallelClass F a ∈ F.ground.image (fun a => ParallelClass F a) :=
-      Finset.mem_image.mpr ⟨a, ha, rfl⟩
-    -- 書き換え
-    rw [Finset.mem_image]
-    rw [Finset.mem_image] at this
-    obtain ⟨a,ha⟩  := this
-    use a
-    subst hC
-    simp_all only [and_self]
 
---lemma pairwiseDisjoint_classSet (F : SetFamily α) :
---  (classSet F).PairwiseDisjoint id :=
---  sorry
-
-
-noncomputable def numClasses (F : SetFamily α) : ℕ :=
-  (classSet F).card
-
---方針を変えたが新方針でも使う。
 /-- `ParallelClass` の代表を取り替えても同一。 -/
-lemma parallelClass_eq_of_parallel
+--現状このファイル内のみから。
+private lemma parallelClass_eq_of_parallel
   (F : SetFamily α) {a b : α}
   (hab : Parallel F a b) :
   ParallelClass F a = ParallelClass F b := by
@@ -360,8 +291,59 @@ lemma parallelClass_eq_of_parallel
       exact parallel_trans hab hbx
     exact Finset.mem_filter.mpr ⟨hxg, hax⟩
 
+  /-- 会員判定の基本形：`x ∈ ParallelClass F a` を「台集合所属＋平行」へ展開。 -/
+--よく使われている。
+@[simp] lemma mem_ParallelClass_iff
+  (F : SetFamily α) (a x : α) :
+  x ∈ ParallelClass F a ↔ (x ∈ F.ground ∧ Parallel F a x) := by
+  classical
+  unfold ParallelClass
+  -- ground.filter _
+  have : x ∈ F.ground.filter (fun b => Parallel F a b)
+       ↔ (x ∈ F.ground ∧ Parallel F a x) :=
+    by
+      constructor
+      · intro hx
+        exact Finset.mem_filter.mp hx
+      · intro hx
+        exact Finset.mem_filter.mpr hx
+  exact this
 
---方針を変えたので、使わない方向と思ったが使うかも.
+---ここからしばらくclassSetの話。
+
+-- 「同値類の集合」を代表元写像の像で実装
+--そとからも使われている。
+noncomputable def classSet (F : SetFamily α) : Finset (Finset α) :=
+  by
+    classical
+    exact F.ground.image (fun a => ParallelClass F a)
+
+--結果的に使われてない。
+lemma mem_classSet_iff (F : SetFamily α) {C : Finset α} :
+  C ∈ classSet F ↔ ∃ a ∈ F.ground, C = ParallelClass F a := by
+  classical
+  unfold classSet
+  constructor
+  · intro h
+    -- h : C ∈ F.ground.image (λ a, ParallelClass F a)
+    rcases Finset.mem_image.mp h with ⟨a, ha, hC⟩
+    exact ⟨a,ha,hC.symm⟩
+  · intro h
+    rcases h with ⟨a, ha, hC⟩
+    -- C = imageの値 なので像に入る
+    have : ParallelClass F a ∈ F.ground.image (fun a => ParallelClass F a) :=
+      Finset.mem_image.mpr ⟨a, ha, rfl⟩
+    -- 書き換え
+    rw [Finset.mem_image]
+    rw [Finset.mem_image] at this
+    obtain ⟨a,ha⟩  := this
+    use a
+    subst hC
+    simp_all only [and_self]
+
+
+--同値類のdisjoint性
+--少し使われている。
 lemma classSet_disjoint_of_ne
   (F : SetFamily α) {C D : Finset α}
   (hC : C ∈ classSet F) (hD : D ∈ classSet F) (hne : C ≠ D) :
@@ -411,7 +393,7 @@ lemma classSet_disjoint_of_ne
     simp_all only [Parallel]
   exact (hne this).elim
 
---方針を変えたので、使わない方向。と思ったが使う。
+--少し使われている。
 /-- ground はクラスの不交和（被覆）。 -/
 lemma ground_eq_biUnion_classSet (F : SetFamily α) :
   F.ground = Finset.biUnion (classSet F) (fun C => C) := by
@@ -466,7 +448,7 @@ classical
     exact hsub haC
 
 
---方針を変えたので、使わないが、外から使っている。
+--外から使っている。
 lemma card_ground_eq_sum_card_classes (F : SetFamily α) :
   F.ground.card = ∑ C ∈ classSet F, C.card := by
   classical
@@ -493,155 +475,6 @@ lemma card_ground_eq_sum_card_classes (F : SetFamily α) :
   -- ここでは最終行だけ出します：
   simp_all only [ne_eq]
 
---方針を変えたので使わない方向
-lemma sum_card_sub_one_add_card
-  (s : Finset (Finset α)) :
-  (∑ C ∈ s, ((C.card:Int) - 1)) + s.card = ∑ C ∈ s, C.card := by
-  classical
-  refine Finset.induction_on s ?h0 ?hstep
-  · -- 空集合
-    simp
-  · -- 挿入ステップ
-    intro C s hC ih
-    -- `sum_insert`, `card_insert` を展開
-    -- `Nat.succ_eq_add_one` を使って整形
-    have h1 :
-        (∑ D ∈ insert C s, ((D.card:Int) - 1))
-          = ((C.card:Int) - 1) + ∑ D ∈ s, ((D.card:Int) - 1) := by
-
-      exact Finset.sum_insert (by exact hC)
-    have h2 :
-        (∑ D ∈ insert C s, D.card)
-          = C.card + ∑ D ∈ s, D.card := by
-      exact Finset.sum_insert (by exact hC)
-    have h3 : (insert C s).card = s.card + 1 := by
-      -- `Finset.card_insert` と `Nat.succ_eq_add_one`
-      simp_all only [not_false_eq_true, Finset.sum_insert, Finset.card_insert_of_notMem]
-
-    -- 目標を両辺とも `h1, h2, h3` で書換えてから整理
-    -- LHS
-    --   = ((C.card - 1) + ∑(…)) + (s.card + 1)
-    --   = (C.card + ∑(…)) + s.card
-    -- RHS
-    --   = C.card + ∑(…)
-    -- となるので、結局 `ih` を使って一致
-    -- 実装は `simp` と結合法則で十分
-    -- 展開
-
-    calc
-      (∑ D ∈ insert C s, ((D.card:Int) - 1)) + (insert C s).card
-          = (((C.card:Int) - 1) + ∑ D ∈ s, ((D.card:Int) - 1)) + (s.card + 1) := by
-            rw [h1, h3]
-            exact rfl
-      _   = (C.card + ∑ D ∈ s, ((D.card:Int) - 1)) + s.card := by
-            -- `(C.card - 1) + (s.card + 1) = C.card + s.card`
-            -- を使って整理
-            -- ℕ なので可換群の道具は使わず、書換＋結合法則で
-            -- `(a - 1) + (b + 1) = a + b`
-            -- ここは `Nat.add_comm` 系で整理
-            have : ((C.card:Int) - 1) + (s.card + 1) = C.card + s.card := by
-              -- `Nat` では `a - 1 + 1 = a`、さらに `+ s.card` を付ける
-              -- 形式的整形を `Nat.add_comm`/`Nat.add_assoc` で行う
-              -- ここは計算補題として扱い、最終形だけ置きます
-              -- 実務的には `cases C.card` で場合分けでも可
-
-              simp_all only [Finset.sum_sub_distrib, Finset.sum_const, Int.nsmul_eq_mul, mul_one, sub_add_cancel, Nat.cast_sum,
-                not_false_eq_true, Finset.sum_insert, Nat.cast_add, Nat.cast_one,
-                Finset.card_insert_of_notMem, sub_add_add_cancel]
-
-            -- 置換してから結合法則
-            -- （実務では `simp [Nat.add_assoc, Nat.add_comm, this]` で十分）
-            simp_all only [not_false_eq_true, Finset.sum_insert, Finset.card_insert_of_notMem]
-            simp_all only [Finset.sum_sub_distrib, Finset.sum_const, Int.nsmul_eq_mul, mul_one, sub_add_cancel, Nat.cast_sum,
-               sub_add_add_cancel]
-            omega
-      _   = C.card + (∑ D ∈ s, ((D.card:Int) - 1) + s.card) := by
-            -- 結合法則
-            exact Int.add_assoc (↑C.card) (∑ D ∈ s, (↑D.card - 1)) ↑s.card
-      _   = C.card + (∑ D ∈ s, D.card) := by
-            -- 帰納法の仮定
-            -- `ih : (∑ (… - 1)) + s.card = ∑ (…)`
-            -- を使用
-            -- 実務では `rw [← ih]` 等
-            simp_all only [Finset.sum_sub_distrib, Finset.sum_const, Int.nsmul_eq_mul, mul_one, sub_add_cancel, Nat.cast_sum,
-              not_false_eq_true, Finset.sum_insert, Nat.cast_add, Nat.cast_one, Finset.card_insert_of_notMem]
-      _   = (∑ D ∈ insert C s, D.card) := by
-            -- `h2` で戻す
-            rw [h2]
-            exact rfl
-
---方針を変えたので、使わない方向
-/-- 「∑1 = 個数」の基本補題。 -/
-lemma sum_one_eq_card (s : Finset (Finset α)) :
-  ∑ _ ∈ s, (1 : Nat) = s.card := by
-  classical
-  refine Finset.induction_on s ?h0 ?hstep
-  · simp
-  · intro C s hC ih
-    -- `sum_insert` と `card_insert`
-    have h1 := Finset.sum_insert (by exact hC) (f := fun _ => (1 : Nat))
-    simp_all only [Finset.sum_const, smul_eq_mul, mul_one, not_false_eq_true, Finset.card_insert_of_notMem]
-
---方針を変えたので、使わない方向
-/-- 各クラスは非空なので、∑ card ≥ 個数。 -/
-lemma classes_card_le_sum_cards (F : SetFamily α) :
-  (classSet F).card ≤ ∑ C ∈ classSet F, C.card := by
-  classical
-  -- 各クラス `C` について `1 ≤ C.card`
-  have h1 : ∀ C ∈ classSet F, 1 ≤ C.card := by
-    intro C hC
-    -- 代表元 a を取って `C = ParallelClass F a` に直す
-    unfold classSet at hC
-    rcases Finset.mem_image.mp hC with ⟨a, ha, hCa⟩
-    -- クラスは非空
-    have hne : (ParallelClass F a).Nonempty :=
-      ParallelClass_nonempty (F := F) ha
-    have : 0 < (ParallelClass F a).card :=
-      Finset.card_pos.mpr hne
-    -- `Nat.succ_le_of_lt`
-    have : 1 ≤ (ParallelClass F a).card := Nat.succ_le_of_lt this
-    -- `C = ParallelClass F a` で置換
-    -- 実務では `rw [hCa]` の 1 行
-    (expose_names; exact le_of_le_of_eq this_1 (congrArg Finset.card hCa))
-  -- ∑1 ≤ ∑card
-  have hsumle :
-      ∑ C ∈ classSet F, (1 : Nat) ≤ ∑ C ∈ classSet F, C.card := by
-    refine Finset.sum_le_sum ?hpoint
-    intro C hC
-    exact h1 C hC
-  -- ∑1 = 個数
-  have hleft : ∑ C ∈ classSet F, (1 : Nat) = (classSet F).card :=
-    sum_one_eq_card (s := classSet F)
-  -- 仕上げ
-  -- `≤` に左辺を書換
-  -- 実運用では `rw [hleft] at hsumle; exact hsumle`
-  exact by
-    -- 書換後にそのまま出す
-    -- ここでは最終形だけ：
-    -- `have := hsumle; rw [hleft] at this; exact this`
-    exact le_of_eq_of_le (id (Eq.symm hleft)) hsumle
-
-
-/- 上ですでに証明ずみ
-/-- `Parallel a b` ならクラス等号。 -/
-lemma parallelClass_eq_of_parallel
-  (F : SetFamily α) {a b : α} (h : Parallel F a b) :
-  ParallelClass F a = ParallelClass F b := by
-  classical
-  apply Finset.ext
-  intro x; constructor
-  · intro hx
-    have hxg := (Finset.mem_filter.mp hx).1
-    have hax := (Finset.mem_filter.mp hx).2
-    have hba : Parallel F b a := parallel_symm h
-    have hbx : Parallel F b x := parallel_trans hba hax
-    exact Finset.mem_filter.mpr (And.intro hxg hbx)
-  · intro hx
-    have hxg := (Finset.mem_filter.mp hx).1
-    have hbx := (Finset.mem_filter.mp hx).2
-    have hax : Parallel F a x := parallel_trans h hbx
-    exact Finset.mem_filter.mpr (And.intro hxg hax)
--/
 
 /-- `classSet` の任意の要素は非空。 -/
 lemma classSet_nonempty (F : SetFamily α) :
@@ -660,7 +493,12 @@ lemma classSet_nonempty (F : SetFamily α) :
     simp_all only [Finset.mem_image]
     ⟩
 
-/- 画像は元集合以下：`numClasses ≤ |ground|`。 -/
+--ここからすこしnumClasses関連
+
+noncomputable def numClasses (F : SetFamily α) : ℕ :=
+  (classSet F).card
+
+/- 同値類の数は元集合以下：`numClasses ≤ |ground|`。 -/
 lemma numClasses_le_ground_card (F : SetFamily α) :
   numClasses F ≤ F.ground.card := by
   classical
@@ -669,107 +507,16 @@ lemma numClasses_le_ground_card (F : SetFamily α) :
   exact Finset.card_image_le
 
 
-/-
---上ですでに証明済みだがこちらのほうが短い？でも通ってないのでコメントアウト。
-/-- `classSet` の異なる 2 クラスは互いに素。 -/
-lemma classSet_disjoint_of_ne
-  (F : SetFamily α) {C D : Finset α}
-  (hC : C ∈ classSet F) (hD : D ∈ classSet F) (hne : C ≠ D) :
-  Disjoint C D := by
-  classical
-  unfold classSet at hC hD
-  rcases Finset.mem_image.mp hC with ⟨a, ha, hCa⟩
-  rcases Finset.mem_image.mp hD with ⟨b, hb, hDb⟩
-  refine Finset.disjoint_left.mpr ?_
-  intro x hxC hxD
-  have hxC' : x ∈ ParallelClass F a := by
-    -- 実ファイルでは `rw [hCa] at hxC; exact hxC`
-    exact hxC
-  have hxD' : x ∈ ParallelClass F b := by
-    exact hxD
-  have hax : Parallel F a x := (Finset.mem_filter.mp hxC').2
-  have hbx : Parallel F b x := (Finset.mem_filter.mp hxD').2
-  have hba : Parallel F b a := parallel_trans hbx (parallel_symm hax)
-  have hab : Parallel F a b := parallel_symm hba
-  have hEq : ParallelClass F a = ParallelClass F b :=
-    parallelClass_eq_of_parallel (F := F) hab
-  have : C = D := Eq.trans hCa (Eq.trans hEq (Eq.symm hDb))
-  exact (hne this).elim
--/
---ここから新方針
---すでに証明だった。
-/-- `ground` はクラスの被覆。 -/
-/-
-lemma ground_eq_biUnion_classSet (F : SetFamily α) :
-  F.ground = Finset.biUnion (classSet F) (fun C => C) := by
-  classical
-  apply Finset.Subset.antisymm_iff.mp
-  constructor
-  · intro a ha
-    have hmem : a ∈ ParallelClass F a :=
-      Finset.mem_filter.mpr (And.intro ha (parallel_refl F a))
-    have hC : ParallelClass F a ∈ classSet F := by
-      unfold classSet; exact Finset.mem_image.mpr ⟨a, ha, rfl⟩
-    exact Finset.mem_biUnion.mpr ⟨ParallelClass F a, hC, hmem⟩
-  · intro a ha
-    rcases Finset.mem_biUnion.mp ha with ⟨C, hC, haC⟩
-    unfold classSet at hC
-    rcases Finset.mem_image.mp hC with ⟨x, hx, hCx⟩
-    have : ParallelClass F x ⊆ F.ground := by
-      intro y hy; exact (Finset.mem_filter.mp hy).1
-    -- a ∈ C = ParallelClass F x ⊆ ground
-    exact this (by
-      -- 実ファイルでは `rw [hCx] at haC; exact haC`
-      exact haC)
--/
-------
+--numClasses関連はここまで
 
 -- 「w を含むエッジの集合」を Finset で：
+--すぐ下で使っているだけ。
 def withElem (E : Finset (Finset α)) (w : α) : Finset (Finset α) :=
   E.filter (fun A => w ∈ A)
 
-lemma Parallel_iff_filter_edge (F : SetFamily α) (w z : α) :
-  Parallel F w z
-  ↔ withElem F.edgeFinset w = withElem F.edgeFinset z := by
-  -- sets での定義と edgeFinset = ground.powerset.filter(sets) をつなぐだけ
-  -- `Finset.ext` と `mem_filter` の往復で出せます
-  dsimp [Parallel]
-  dsimp [withElem]
-  rw [Finset.ext_iff]
-  simp
-  constructor
-  · intro h
-    rw [Set.ext_iff] at h
-    intro a a_1 a_2
-    simp_all only [Set.mem_setOf_eq, and_congr_right_iff]
-  · intro h
-    rw [Set.ext_iff]
-    intro A
-    simp_all
-    intro hA
-    specialize h A
-    specialize h (F.inc_ground hA)
-    exact h hA
-
-  /-- 会員判定の基本形：`x ∈ ParallelClass F a` を「台集合所属＋平行」へ展開。 -/
-@[simp] lemma mem_ParallelClass_iff
-  (F : SetFamily α) (a x : α) :
-  x ∈ ParallelClass F a ↔ (x ∈ F.ground ∧ Parallel F a x) := by
-  classical
-  unfold ParallelClass
-  -- ground.filter _
-  have : x ∈ F.ground.filter (fun b => Parallel F a b)
-       ↔ (x ∈ F.ground ∧ Parallel F a x) :=
-    by
-      constructor
-      · intro hx
-        exact Finset.mem_filter.mp hx
-      · intro hx
-        exact Finset.mem_filter.mpr hx
-  exact this
-
 /-- `u‖v` なら、任意のクラス `C` で `u ∈ C ↔ v ∈ C`。 -/
---全体集合を持たないと証明がうまくいかない。
+--全体集合を持たないと証明がうまくいかない。少し使われている。
+
 lemma mem_u_iff_mem_v_of_class
   (F : SetFamily α) (hasU: F.sets F.ground){u v : α} (hp : Parallel F u v)
   {C : Finset α} (hC : C ∈ classSet F) :
@@ -853,302 +600,70 @@ lemma mem_u_iff_mem_v_of_class
     subst hCdef
     simp_all only [Parallel, imp_self, mem_ParallelClass_iff, and_true, and_self]
 
-section CountLemmas
+----使われてないもの。
 
-variable {β : Type*}
-/- 使ってないみたい。
-/- 和 `∑ a∈s, (if p a then 1 else 0)` は `s.filter p` の個数に一致。 -/
-lemma sum_indicator_card_filter (s : Finset β) (p : β → Prop) [DecidablePred p] :
-    ∑ a ∈ s, (if p a then (1 : Nat) else 0) = (s.filter p).card := by
+--パラレルであることと含んでいるedgeが等しいということの同値性だがどこからも使われていない。
+lemma Parallel_iff_filter_edge (F : SetFamily α) (w z : α) :
+  Parallel F w z
+  ↔ withElem F.edgeFinset w = withElem F.edgeFinset z := by
+  -- sets での定義と edgeFinset = ground.powerset.filter(sets) をつなぐだけ
+  -- `Finset.ext` と `mem_filter` の往復で出せます
+  dsimp [Parallel]
+  dsimp [withElem]
+  rw [Finset.ext_iff]
+  simp
+  constructor
+  · intro h
+    rw [Set.ext_iff] at h
+    intro a a_1 a_2
+    simp_all only [Set.mem_setOf_eq, and_congr_right_iff]
+  · intro h
+    rw [Set.ext_iff]
+    intro A
+    simp_all
+    intro hA
+    specialize h A
+    specialize h (F.inc_ground hA)
+    exact h hA
+
+---ここまでパラレル関連。
+--ここからideal関連
+
+def isOrderIdealOn (le : α → α → Prop) (V I : Finset α) : Prop :=
+  I ⊆ V ∧ ∀ ⦃x⦄, x ∈ I → ∀ ⦃y⦄, y ∈ V → le y x → y ∈ I
+
+/-- 台集合 `V` と関係 `le` に対する「順序イデアル族」を `SetFamily` として束ねる。 -/
+--idealFamilyの定義として利用されている。
+noncomputable def orderIdealFamily (le : α → α → Prop) (V : Finset α) : SetFamily α := by
   classical
-  refine Finset.induction_on s ?h0 ?hstep
-  · -- 空集合
-    simp
-  · intro a s ha_notmem ih
-    by_cases hpa : p a
-    · -- p a = true
-      have : (s.filter p).card.succ
-            = (insert a s |>.filter p).card := by
-        -- filter_insert（p a=true）→ a が 1 個増える（a∉sなので重複なし）
-        have hfi : (insert a s).filter p = insert a ((s.filter p)) := by
-          -- `Finset.filter_insert` と `hpa`、`ha_notmem`
-          -- `simp` を避け、等式で書換え
-          -- 既知：`filter p (insert a s) = if p a then insert a (filter p s) else filter p s`
-          -- ここでは `p a = true`
-          have := Finset.filter_insert (s := s) (p := p) a
-          -- 書き換え
-          have : (insert a s).filter p
-              = (if p a then insert a (s.filter p) else s.filter p) := this
-          -- true ケースに潰す
-          have : (insert a s).filter p = insert a (s.filter p) := by
-            simpa [hpa]
-          exact this
-        -- いまの等式から card をとる
-        -- `a ∉ s.filter p`（a∉s なので当然）
-        have hnot : a ∉ s.filter p := by
-          intro ha'
-          have : a ∈ s := (Finset.mem_of_subset (Finset.filter_subset _ _) ha')
-          exact ha_notmem this
-        -- `card (insert a t) = card t + 1` （a∉t）
-        have hcard := Finset.card_insert_of_notMem hnot
-        -- 目的の向きに整形
-        -- `card (insert a (s.filter p)) = (s.filter p).card + 1`
-        -- 逆向きに書いておく
-        have : (insert a ((s.filter p))).card = (s.filter p).card + 1 := hcard
-        -- succ = +1
-        -- `Nat.succ n = n + 1`
-        have : (s.filter p).card.succ = (insert a (s.filter p)).card := by
-          -- `Nat.succ` の定義で置換
-          -- `Nat.succ n = n + 1`
-          -- ここでは `rw [Nat.succ_eq_add_one]`
-          -- ただし simpa 禁止のため段階的に
-          simp_all only [Finset.sum_boole, Nat.cast_id, Finset.mem_filter, and_true, not_false_eq_true, Finset.card_insert_of_notMem, Nat.succ_eq_add_one]
-        simp_all only [Finset.sum_boole, Nat.cast_id, Finset.mem_filter, and_true, not_false_eq_true, Finset.card_insert_of_notMem, Nat.succ_eq_add_one]
-        -- これで完了
+  refine
+  { ground := V
+    , sets := fun I => isOrderIdealOn le V I
+    , decSets := Classical.decPred _
+    , inc_ground := ?_ }
+  intro A a
+  simpa using a.1
 
-      -- 和の側：挿入で 1 足し
-      -- sum over insert = sum over s + (if p a then 1 else 0) = ih + 1
-      have hs : ∑ x ∈ insert a s, (if p x then (1:Nat) else 0)
-              = (if p a then 1 else 0) + ∑ x ∈ s, (if p x then 1 else 0) := by
-        -- `sum_insert`（a∉s）
-        have := Finset.sum_insert (by exact ha_notmem) (f := fun x => if p x then (1:Nat) else 0)
-        -- `sum_insert` は `f a + sum_s` の形。型を合わせて使う
-        exact this
-      -- まとめ
-      -- 左辺：hs、右辺：ih と上の card 等式
-      -- （`Nat.succ` を `+1` に戻す）
-      -- `Nat.succ_eq_add_one`
-      have : ∑ x ∈ insert a s, (if p x then (1:Nat) else 0)
-             = (s.filter p).card + 1 := by
-        -- 書き換え
-        -- hs と ih、hpa を使う
-        -- 先に hs を適用
-        calc
-          _ = (if p a then 1 else 0) + ∑ x ∈ s, (if p x then (1:Nat) else 0) := hs
-          _ = 1 + (∑ x ∈ s, (if p x then (1:Nat) else 0)) := by
-                -- p a = true
-                have : (if p a then 1 else 0) = (1:Nat) := by exact by simp_all only [Finset.sum_boole, Nat.cast_id, Nat.succ_eq_add_one, ↓reduceIte]
-                rw [this]
-          _ = 1 + (s.filter p).card := by rw [ih]
-          _ = (s.filter p).card + 1 := Nat.add_comm 1 _
-      -- 右辺：filter のカード
-      -- 先に `Nat.succ_eq_add_one` と上で得た `succ = card(insert ...)`
-      have hcard_ins :
-        (insert a s |>.filter p).card = (s.filter p).card + 1 := by
-        -- すでに上の `this` が `succ = card(insert ...)` の対称形
-        -- 直上で作った等式 `this` は sum 側、紛らわしいので別名に
-        -- ここは `Nat.succ` の等式を使った `this` (hfi/hcard 組) から
-        -- `card (filter (insert ...)) = (s.filter p).card + 1` が出ています
-        -- 上で `this` として `∑ = ...` を付けたので名称が被るため書き直し:
-        -- 再構築は冗長なので、簡潔にもう一度：
-        have hfi : (insert a s).filter p = insert a (s.filter p) := by
-          have := Finset.filter_insert (s := s) (p := p) a
-          have : (insert a s).filter p
-              = (if p a then insert a (s.filter p) else s.filter p) := this
-          -- true ケース
-          exact by simpa [hpa] using this
-        -- すると `card(filter insert) = card(insert ...) = ... + 1`
-        have hnot : a ∉ s.filter p := by
-          intro ha'
-          have : a ∈ s := (Finset.mem_of_subset (Finset.filter_subset _ _) ha')
-          exact ha_notmem this
-        have : (insert a (s.filter p)).card = (s.filter p).card + 1 :=
-          Finset.card_insert_of_notMem hnot
-        -- 置換
-        simpa [hfi]
-      -- 以上で両辺一致
-      -- まとめる：
-      -- 目標：sum(insert) = card(filter(insert))
-      -- 左辺は上の `this`、右辺は `hcard_ins`
-      -- （記号衝突を避け、ここでは `hs_sum` と `hs_card` に分けて再利用）
-      -- 既に左辺 `this` を作ったので、置換して終了
-      -- 実際にはこのブロックで十分
-      -- 目標を書き換えて終了
-      -- （`exact` で置ける）
-      -- ここでは、先ほどの `this` は sum 側だったので、再度命名してから `exact` します。
-      exact by
-        -- sum(insert) = (s.filter p).card + 1 かつ
-        -- card(filter(insert)) = (s.filter p).card + 1
-        -- よって等しい
-        have hsum : ∑ x ∈ insert a s, (if p x then (1:Nat) else 0)
-                  = (s.filter p).card + 1 := by
-          -- 直上で作った sum 等式
-          -- 再掲
-          -- （すでに `this` 名が使われているので再作成）
-          -- 同内容をもう一度書くのは冗長ですが、明示で安全にします。
-          calc
-            _ = (if p a then 1 else 0) + ∑ x ∈ s, (if p x then (1:Nat) else 0) := by
-                  exact hs
-            _ = 1 + (∑ x ∈ s, (if p x then (1:Nat) else 0)) := by
-                  have : (if p a then 1 else 0) = (1:Nat) := by
-                    simp_all only [Finset.sum_boole, Nat.cast_id, Nat.succ_eq_add_one, ↓reduceIte, Nat.cast_add, Nat.cast_one]
-                  rw [this]
-            _ = 1 + (s.filter p).card := by rw [ih]
-            _ = (s.filter p).card + 1 := Nat.add_comm 1 _
-        -- これと hcard_ins を合わせて
-        exact by
-          -- 目標：sum(insert) = card(filter(insert))
-          -- 置換
-          rw [hsum, hcard_ins]
-    · -- p a = false
-      -- 挿入後の和は ih のまま
-      have hs : ∑ x ∈ insert a s, (if p x then (1:Nat) else 0)
-              = ∑ x ∈ s, (if p x then (1:Nat) else 0) := by
-        have := Finset.sum_insert (by exact ha_notmem) (f := fun x => if p x then (1:Nat) else 0)
-        -- 左辺の先頭項は 0
-        -- `if p a then 1 else 0 = 0`
-        have hz : (if p a then (1:Nat) else 0) = 0 := by simp_all only [Finset.sum_boole, Nat.cast_id, ↓reduceIte, zero_add]
-        -- 上の sum_insert: `f a + sum_s`
-        -- ゆえに `0 + sum_s = sum_s`
-        -- 置換
-        have := by
-          calc
-            (if p a then (1:Nat) else 0) + ∑ x ∈ s, (if p x then (1:Nat) else 0)
-                = 0 + ∑ x ∈ s, (if p x then (1:Nat) else 0) := by rw [hz]
-            _ = ∑ x ∈ s, (if p x then (1:Nat) else 0) := by exact Nat.zero_add _
-        -- まとめ
-        exact by
-          -- `sum_insert` から始めて置換
-          have := Finset.sum_insert (by exact ha_notmem)
-              (f := fun x => if p x then (1:Nat) else 0)
-          -- その等式を `rw` で使い、次に上の 0 消去を使う
-          -- ここは直接 `rw` が煩雑なので、別経路の等式として使う
-          -- 簡潔に：`bycases` で `p a = false` を使えば上と同じ結果に到達
-          -- 最後は直接目標を `exact` で閉じます
-          -- 既に `hs` に等式を収束させています
-          simp_all only [Finset.sum_boole, Nat.cast_id, ↓reduceIte, zero_add]
+--使われている。
+@[simp] lemma sets_iff_isOrderIdeal {I : Finset α} :
+    (orderIdealFamily le V).sets I ↔ isOrderIdealOn le V I := Iff.rfl
 
-      -- filter 側：¬p の方が 1 増える
-      have hfi_false : (insert a s).filter (fun x => ¬ p x) = insert a (s.filter (fun x => ¬ p x)) := by
-        -- `filter_insert` に p := (fun x => ¬ p x)
-        have := Finset.filter_insert (s := s) (p := fun x => ¬ p x) a
-        -- 今は `¬ p a = true` なので true ケース
-        have : (insert a s).filter (fun x => ¬ p x)
-            = (if (¬ p a) then insert a (s.filter (fun x => ¬ p x))
-               else s.filter (fun x => ¬ p x)) := this
-        have : (insert a s).filter (fun x => ¬ p x)
-            = insert a (s.filter (fun x => ¬ p x)) := by
-          -- ここで `¬ p a` は true
-          have : (¬ p a) := by
-            have : p a = False := by simp_all only [Finset.sum_boole, Nat.cast_id, not_false_eq_true, ↓reduceIte]
-            -- `p a = false` から `¬ p a`
-            exact by
-              -- 反転
-              simp_all only [Finset.sum_boole, Nat.cast_id, not_false_eq_true, ↓reduceIte, eq_iff_iff, iff_false]
 
-          simp_all only [Finset.sum_boole, Nat.cast_id, not_false_eq_true, ↓reduceIte]
-        exact this
-      -- `a ∉ s.filter (¬p)`
-      have hnot : a ∉ s.filter (fun x => ¬ p x) := by
-        intro ha'
-        have : a ∈ s := (Finset.mem_of_subset (Finset.filter_subset _ _) ha')
-        exact ha_notmem this
-      have hcard_ins :
-          (insert a s |>.filter (fun x => ¬ p x)).card
-          = (s.filter (fun x => ¬ p x)).card + 1 := by
-        -- 上の等式から card_insert_of_not_mem
-        have := Finset.card_insert_of_notMem hnot
-        -- 置換
-        simpa [hfi_false] using this
-      -- また、`(insert a s).filter p = s.filter p`（p a=false）
-      have hfi_true :
-          (insert a s |>.filter p) = s.filter p := by
-        -- 先ほどの p 版の filter_insert の false ケース
-        have := Finset.filter_insert (s := s) (p := p) a
-        have : (insert a s).filter p
-            = (if p a then insert a (s.filter p) else s.filter p) := this
-        -- p a = false
-        have : (insert a s).filter p = s.filter p := by simpa [hpa] using this
-        exact this
-      -- 目標：sum = card(filter p)
-      -- `hs` と `ih`、`hfi_true` を合わせれば OK
-      calc
-        ∑ x ∈ insert a s, (if p x then (1:Nat) else 0)
-            = ∑ x ∈ s, (if p x then (1:Nat) else 0) := hs
-        _ = (s.filter p).card := ih
-        _ = ((insert a s).filter p).card := by rw [hfi_true]
--/
-/-- `card (s.filter p) + card (s.filter (¬p)) = card s`。 -/
-lemma card_filter_add_card_filter_not (s : Finset β) (p : β → Prop) [DecidablePred p] :
-    (s.filter p).card + (s.filter (fun b => ¬ p b)).card = s.card := by
-  classical
-  refine Finset.induction_on s ?h0 ?hstep
-  · simp
-  · intro a s ha ih
-    by_cases hpa : p a
-    · -- p a
-      -- 左辺： (insert a (filter p s)).card + (filter ¬p s).card
-      have hfi_p :
-          (insert a s).filter p = insert a (s.filter p) := by
-        have := Finset.filter_insert (s := s) (p := p) a
-        simpa [hpa] using this
-      have hfi_np :
-          (insert a s).filter (fun b => ¬ p b) = (s.filter (fun b => ¬ p b)) := by
-        have := Finset.filter_insert (s := s) (p := fun b => ¬ p b) a
-        -- ここでは `¬ p a = false`
-        have : ¬ p a = False := by simp_all only [not_true_eq_false, ↓reduceIte, eq_iff_iff, iff_false, not_false_eq_true]
-        -- false ケース
-        simp_all only [not_true_eq_false, ↓reduceIte, eq_iff_iff, iff_false, not_false_eq_true]
-      have hnot : a ∉ s.filter p := by
-        intro ha'
-        have : a ∈ s := (Finset.mem_of_subset (Finset.filter_subset _ _) ha')
-        exact ha this
-      have hcard_insert :
-          (insert a (s.filter p)).card = (s.filter p).card + 1 :=
-        Finset.card_insert_of_notMem hnot
-      calc
-        ((insert a s).filter p).card + ((insert a s).filter (fun b => ¬ p b)).card
-            = (insert a (s.filter p)).card + (s.filter (fun b => ¬ p b)).card := by
-                rw [hfi_p, hfi_np]
-        _ = (s.filter p).card + 1 + (s.filter (fun b => ¬ p b)).card := by
-                rw [hcard_insert]
-        _ = (s.filter p).card + (s.filter (fun b => ¬ p b)).card + 1 := by
-                exact Nat.add_right_comm (Finset.filter p s).card 1 {b ∈ s | ¬p b}.card
-        _ = s.card + 1 := by
-                rw [ih]
-        _ = (insert a s).card := by
-                -- `card_insert_of_not_mem`
-                have := Finset.card_insert_of_notMem ha
-                -- `card (insert a s) = card s + 1`
-                exact this.symm
-    · -- p a = false
-      -- 対称な議論
-      have hfi_p :
-          (insert a s).filter p = (s.filter p) := by
-        have := Finset.filter_insert (s := s) (p := p) a
-        simpa [hpa] using this
-      have hfi_np :
-          (insert a s).filter (fun b => ¬ p b) = insert a (s.filter (fun b => ¬ p b)) := by
-        have := Finset.filter_insert (s := s) (p := fun b => ¬ p b) a
-        -- ここでは `¬ p a = true`
-        have : (¬ p a) = True := by simp_all only [not_false_eq_true, ↓reduceIte]
-        -- true ケース
-        simp_all only [↓reduceIte, eq_iff_iff, iff_true]
-      have hnot : a ∉ s.filter (fun b => ¬ p b) := by
-        intro ha'
-        have : a ∈ s := (Finset.mem_of_subset (Finset.filter_subset _ _) ha')
-        exact ha this
-      have hcard_insert :
-          (insert a (s.filter (fun b => ¬ p b))).card
-          = (s.filter (fun b => ¬ p b)).card + 1 :=
-        Finset.card_insert_of_notMem hnot
-      calc
-        ((insert a s).filter p).card + ((insert a s).filter (fun b => ¬ p b)).card
-            = (s.filter p).card + (insert a (s.filter (fun b => ¬ p b))).card := by
-                rw [hfi_p, hfi_np]
-        _ = (s.filter p).card + (s.filter (fun b => ¬ p b)).card + 1 := by
-                rw [hcard_insert]
-                exact rfl
-        _ = s.card + 1 := by
-                rw [ih]
-        _ = (insert a s).card := by
-                have := Finset.card_insert_of_notMem ha
-                exact this.symm
-
-end CountLemmas
 end SetFamily
+end AvgRare
 
-
+/-
+noncomputable def restrict (U : Finset α) : SetFamily α := by
+  classical
+  refine
+  { ground := U
+    , sets   := fun B => ∃ A : Finset α, F.sets A ∧ B ⊆ A ∧ B ⊆ U
+    , decSets := Classical.decPred _
+    , inc_ground := ?_ }
+  intro B hB
+  rcases hB with ⟨A, hA, hBsubA, hBsubU⟩
+  exact hBsubU
+-/
 
 /-
 
@@ -1312,4 +827,135 @@ end AvgRare
 --@[simp] lemma imageQuot_ground (E : Setoid α) (F : SetFamily α) :
 --  imageQuot E F.ground = (trace E F).ground := rfl
 
+-/
+
+
+/-
+--方針を変えたので使わない方向
+lemma sum_card_sub_one_add_card
+  (s : Finset (Finset α)) :
+  (∑ C ∈ s, ((C.card:Int) - 1)) + s.card = ∑ C ∈ s, C.card := by
+  classical
+  refine Finset.induction_on s ?h0 ?hstep
+  · -- 空集合
+    simp
+  · -- 挿入ステップ
+    intro C s hC ih
+    -- `sum_insert`, `card_insert` を展開
+    -- `Nat.succ_eq_add_one` を使って整形
+    have h1 :
+        (∑ D ∈ insert C s, ((D.card:Int) - 1))
+          = ((C.card:Int) - 1) + ∑ D ∈ s, ((D.card:Int) - 1) := by
+
+      exact Finset.sum_insert (by exact hC)
+    have h2 :
+        (∑ D ∈ insert C s, D.card)
+          = C.card + ∑ D ∈ s, D.card := by
+      exact Finset.sum_insert (by exact hC)
+    have h3 : (insert C s).card = s.card + 1 := by
+      -- `Finset.card_insert` と `Nat.succ_eq_add_one`
+      simp_all only [not_false_eq_true, Finset.sum_insert, Finset.card_insert_of_notMem]
+
+    -- 目標を両辺とも `h1, h2, h3` で書換えてから整理
+    -- LHS
+    --   = ((C.card - 1) + ∑(…)) + (s.card + 1)
+    --   = (C.card + ∑(…)) + s.card
+    -- RHS
+    --   = C.card + ∑(…)
+    -- となるので、結局 `ih` を使って一致
+    -- 実装は `simp` と結合法則で十分
+    -- 展開
+
+    calc
+      (∑ D ∈ insert C s, ((D.card:Int) - 1)) + (insert C s).card
+          = (((C.card:Int) - 1) + ∑ D ∈ s, ((D.card:Int) - 1)) + (s.card + 1) := by
+            rw [h1, h3]
+            exact rfl
+      _   = (C.card + ∑ D ∈ s, ((D.card:Int) - 1)) + s.card := by
+            -- `(C.card - 1) + (s.card + 1) = C.card + s.card`
+            -- を使って整理
+            -- ℕ なので可換群の道具は使わず、書換＋結合法則で
+            -- `(a - 1) + (b + 1) = a + b`
+            -- ここは `Nat.add_comm` 系で整理
+            have : ((C.card:Int) - 1) + (s.card + 1) = C.card + s.card := by
+              -- `Nat` では `a - 1 + 1 = a`、さらに `+ s.card` を付ける
+              -- 形式的整形を `Nat.add_comm`/`Nat.add_assoc` で行う
+              -- ここは計算補題として扱い、最終形だけ置きます
+              -- 実務的には `cases C.card` で場合分けでも可
+
+              simp_all only [Finset.sum_sub_distrib, Finset.sum_const, Int.nsmul_eq_mul, mul_one, sub_add_cancel, Nat.cast_sum,
+                not_false_eq_true, Finset.sum_insert, Nat.cast_add, Nat.cast_one,
+                Finset.card_insert_of_notMem, sub_add_add_cancel]
+
+            -- 置換してから結合法則
+            -- （実務では `simp [Nat.add_assoc, Nat.add_comm, this]` で十分）
+            simp_all only [not_false_eq_true, Finset.sum_insert, Finset.card_insert_of_notMem]
+            simp_all only [Finset.sum_sub_distrib, Finset.sum_const, Int.nsmul_eq_mul, mul_one, sub_add_cancel, Nat.cast_sum,
+               sub_add_add_cancel]
+            omega
+      _   = C.card + (∑ D ∈ s, ((D.card:Int) - 1) + s.card) := by
+            -- 結合法則
+            exact Int.add_assoc (↑C.card) (∑ D ∈ s, (↑D.card - 1)) ↑s.card
+      _   = C.card + (∑ D ∈ s, D.card) := by
+            -- 帰納法の仮定
+            -- `ih : (∑ (… - 1)) + s.card = ∑ (…)`
+            -- を使用
+            -- 実務では `rw [← ih]` 等
+            simp_all only [Finset.sum_sub_distrib, Finset.sum_const, Int.nsmul_eq_mul, mul_one, sub_add_cancel, Nat.cast_sum,
+              not_false_eq_true, Finset.sum_insert, Nat.cast_add, Nat.cast_one, Finset.card_insert_of_notMem]
+      _   = (∑ D ∈ insert C s, D.card) := by
+            -- `h2` で戻す
+            rw [h2]
+            exact rfl
+
+--方針を変えたので、使わない方向
+/-- 「∑1 = 個数」の基本補題。 -/
+lemma sum_one_eq_card (s : Finset (Finset α)) :
+  ∑ _ ∈ s, (1 : Nat) = s.card := by
+  classical
+  refine Finset.induction_on s ?h0 ?hstep
+  · simp
+  · intro C s hC ih
+    -- `sum_insert` と `card_insert`
+    have h1 := Finset.sum_insert (by exact hC) (f := fun _ => (1 : Nat))
+    simp_all only [Finset.sum_const, smul_eq_mul, mul_one, not_false_eq_true, Finset.card_insert_of_notMem]
+
+--方針を変えたので、使わない方向
+/-- 各クラスは非空なので、∑ card ≥ 個数。 -/
+lemma classes_card_le_sum_cards (F : SetFamily α) :
+  (classSet F).card ≤ ∑ C ∈ classSet F, C.card := by
+  classical
+  -- 各クラス `C` について `1 ≤ C.card`
+  have h1 : ∀ C ∈ classSet F, 1 ≤ C.card := by
+    intro C hC
+    -- 代表元 a を取って `C = ParallelClass F a` に直す
+    unfold classSet at hC
+    rcases Finset.mem_image.mp hC with ⟨a, ha, hCa⟩
+    -- クラスは非空
+    have hne : (ParallelClass F a).Nonempty :=
+      ParallelClass_nonempty (F := F) ha
+    have : 0 < (ParallelClass F a).card :=
+      Finset.card_pos.mpr hne
+    -- `Nat.succ_le_of_lt`
+    have : 1 ≤ (ParallelClass F a).card := Nat.succ_le_of_lt this
+    -- `C = ParallelClass F a` で置換
+    -- 実務では `rw [hCa]` の 1 行
+    (expose_names; exact le_of_le_of_eq this_1 (congrArg Finset.card hCa))
+  -- ∑1 ≤ ∑card
+  have hsumle :
+      ∑ C ∈ classSet F, (1 : Nat) ≤ ∑ C ∈ classSet F, C.card := by
+    refine Finset.sum_le_sum ?hpoint
+    intro C hC
+    exact h1 C hC
+  -- ∑1 = 個数
+  have hleft : ∑ C ∈ classSet F, (1 : Nat) = (classSet F).card :=
+    sum_one_eq_card (s := classSet F)
+  -- 仕上げ
+  -- `≤` に左辺を書換
+  -- 実運用では `rw [hleft] at hsumle; exact hsumle`
+  exact by
+    -- 書換後にそのまま出す
+    -- ここでは最終形だけ：
+    -- `have := hsumle; rw [hleft] at this; exact this`
+    exact le_of_eq_of_le (id (Eq.symm hleft)) hsumle
 -/
