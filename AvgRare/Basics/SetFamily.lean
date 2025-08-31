@@ -1,6 +1,5 @@
 import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Powerset
-import Mathlib.Algebra.BigOperators.Finsupp.Basic
 import Mathlib.Algebra.Order.BigOperators.Group.Finset
 
 import AvgRare.Basics.General
@@ -36,8 +35,8 @@ instance instDecidablePred_sets (F : SetFamily α) : DecidablePred F.sets :=
 def edgeFinset : Finset (Finset α) :=
   F.ground.powerset.filter (fun A => decide (F.sets A))
 
-/-- The `edgeFinset` element is included in the platform set.-/
---It's only used in one place.That lemma is not used either.
+/-- The `edgeFinset` element is included in the ground set. -/
+-- Used in only one place. That lemma is not used either.
 lemma subset_ground_of_mem_edge {A : Finset α}
     (hA : A ∈ F.edgeFinset) : A ⊆ F.ground := by
   classical
@@ -67,10 +66,10 @@ noncomputable def sumProd {α} [DecidableEq α]
   have hAsub : A ⊆ F₁.ground := F₁.inc_ground hA
   have hBsub : B ⊆ F₂.ground := F₂.inc_ground hB
   exact Finset.union_subset
-          (by exact hAsub.trans (Finset.subset_union_left))
-          (by exact hBsub.trans (Finset.subset_union_right))
+          (hAsub.trans Finset.subset_union_left)
+          (hBsub.trans Finset.subset_union_right)
 
---NDS`2 * (Summary of size) - (Number of edges) * (Size of the set of tables)` is defined as `Int`. -/
+-- NDS: `2 * (sum of sizes) - (number of edges) * (size of ground set)` defined as `Int`.
 def NDS (F : SetFamily α) : Int :=
   2 * (F.totalHyperedgeSize : Int) - (F.numHyperedges : Int) * (F.ground.card : Int)
 
@@ -82,8 +81,8 @@ variable (F : SetFamily α)
     NDS F = 2 * (F.totalHyperedgeSize : Int)
              - (F.numHyperedges : Int) * (F.ground.card : Int) := rfl
 
-/-- An edition with `degree` rewritten as ``number of edges containing.''-/
---It has been used in several places.
+/-- Version with `degree` rewritten as "number of edges containing x". -/
+-- Used in several places.
 lemma degree_eq_card_filter (x : α) :
     F.degree x = (F.edgeFinset.filter (fun A => x ∈ A)).card := by
   classical
@@ -94,7 +93,7 @@ lemma degree_eq_card_filter (x : α) :
     simp_all only [Finset.sum_boole, Nat.cast_id, Finset.sum_const, smul_eq_mul, mul_one]
   simp_all only [Finset.sum_boole, Nat.cast_id, Finset.sum_const, smul_eq_mul, mul_one]
 
-/-- `edgeFinset` は powerset の部分集合。 -/
+/-- `edgeFinset` is a subset of powerset. -/
 /-
 lemma edgeFinset_subset_powerset :
     F.edgeFinset ⊆ F.ground.powerset := by
@@ -118,7 +117,7 @@ lemma edgeFinset_subset_powerset :
   · intro h
     rcases h with ⟨hSub, hSets⟩
     have hPow : A ∈ F.ground.powerset := Finset.mem_powerset.mpr hSub
-    have hDec : decide (F.sets A) = true := by simpa using hSets
+    have hDec : decide (F.sets A) = true := decide_eq_true_iff.mpr hSets
     exact Finset.mem_filter.mpr ⟨hPow, hDec⟩
 
 @[simp] lemma mem_edgeFinset_iff_sets : (A ∈ F.edgeFinset) ↔ F.sets A := by
@@ -189,7 +188,7 @@ noncomputable def ParallelClass (F : SetFamily α) (a : α) : Finset α :=
     exact F.ground.filter (fun b => Parallel F a b)
 
 /-
---現状使われてない。
+-- Currently not used.
 lemma ParallelClass_subset_ground (F : SetFamily α) {a : α} :
   ParallelClass F a ⊆ F.ground := by
   classical
@@ -197,17 +196,17 @@ lemma ParallelClass_subset_ground (F : SetFamily α) {a : α} :
   have hx' := Finset.mem_filter.mp hx
   exact hx'.1
 
---現状使われてない。
+-- Currently not used.
 lemma ParallelClass_nonempty (F : SetFamily α) {a : α} (ha : a ∈ F.ground) :
   (ParallelClass F a).Nonempty := by
   classical
   refine ⟨a, ?_⟩
   -- a ∈ ground ∧ Parallel F a a
-  exact Finset.mem_filter.mpr (And.intro ha (by rfl))
+  exact Finset.mem_filter.mpr (And.intro ha rfl)
 -/
 
-/-- Even if you replace the representative of `ParallelClass`, it will be the same. -/
---現状このファイル内のみから。
+/-- Even if you replace the representative of `ParallelClass`, it remains the same. -/
+-- Currently used only within this file.
 private lemma parallelClass_eq_of_parallel
   (F : SetFamily α) {a b : α}
   (hab : Parallel F a b) :
@@ -217,46 +216,30 @@ private lemma parallelClass_eq_of_parallel
   intro x
   constructor
   · intro hx
-    rcases (Finset.mem_filter.mp hx) with ⟨hxg, hax⟩
-    have hbx : Parallel F b x := by
-      have hba : Parallel F b a := (parallel_symm (F := F) hab)
-      exact parallel_trans (F := F) hba hax
-    exact Finset.mem_filter.mpr ⟨hxg, hbx⟩
+    have ⟨hxg, hax⟩ := Finset.mem_filter.mp hx
+    exact Finset.mem_filter.mpr ⟨hxg, parallel_trans (parallel_symm hab) hax⟩
   · intro hx
-    rcases (Finset.mem_filter.mp hx) with ⟨hxg, hbx⟩
-    have hax : Parallel F a x := by
-      have hab' : Parallel F b a := (parallel_symm (F := F) hab)
-      exact parallel_trans hab hbx
-    exact Finset.mem_filter.mpr ⟨hxg, hax⟩
+    have ⟨hxg, hbx⟩ := Finset.mem_filter.mp hx
+    exact Finset.mem_filter.mpr ⟨hxg, parallel_trans hab hbx⟩
 
-  /-- Basic form of member determination: `x ∈ ParallelClass F a` is expanded to ``participation of a machine + parallel.'' -/
---よく使われている。
+  /-- Basic form of membership test: `x ∈ ParallelClass F a` expands to "ground membership + parallel". -/
+-- Used extensively.
 @[simp] lemma mem_ParallelClass_iff
   (F : SetFamily α) (a x : α) :
   x ∈ ParallelClass F a ↔ (x ∈ F.ground ∧ Parallel F a x) := by
   classical
-  unfold ParallelClass
-  -- ground.filter _
-  have : x ∈ F.ground.filter (fun b => Parallel F a b)
-       ↔ (x ∈ F.ground ∧ Parallel F a x) :=
-    by
-      constructor
-      · intro hx
-        exact Finset.mem_filter.mp hx
-      · intro hx
-        exact Finset.mem_filter.mpr hx
-  exact this
+  exact Finset.mem_filter
 
----From here on, we'll talk about classSet for a while.
+-- From here on, we'll discuss classSet for a while.
 
--- An "set of equivalence classes" is implemented as an image of the representative map.
+-- "Set of equivalence classes" is implemented as an image of the representative map.
 noncomputable def classSet (F : SetFamily α) : Finset (Finset α) :=
   by
     classical
     exact F.ground.image (fun a => ParallelClass F a)
 
 /-
---As a result, it has not been used.
+-- Not used in the end.
 lemma mem_classSet_iff (F : SetFamily α) {C : Finset α} :
   C ∈ classSet F ↔ ∃ a ∈ F.ground, C = ParallelClass F a := by
   classical
@@ -268,7 +251,7 @@ lemma mem_classSet_iff (F : SetFamily α) {C : Finset α} :
     exact ⟨a,ha,hC.symm⟩
   · intro h
     rcases h with ⟨a, ha, hC⟩
-    -- C = imageの値 なので像に入る
+    -- C is an image value, so it belongs to the image
     have : ParallelClass F a ∈ F.ground.image (fun a => ParallelClass F a) :=
       Finset.mem_image.mpr ⟨a, ha, rfl⟩
     rw [Finset.mem_image]
@@ -279,8 +262,8 @@ lemma mem_classSet_iff (F : SetFamily α) {C : Finset α} :
     simp_all only [and_self]
 -/
 
---Disjointness of equivalence class
---少し使われている。
+-- Disjointness of equivalence classes
+-- Used somewhat.
 lemma classSet_disjoint_of_ne
   (F : SetFamily α) {C D : Finset α}
   (hC : C ∈ classSet F) (hD : D ∈ classSet F) (hne : C ≠ D) :
@@ -318,54 +301,34 @@ lemma classSet_disjoint_of_ne
     simp_all only [Parallel]
   exact (hne this).elim
 
---It's been used a little.
-/-- ground is a class incorporation. -/
+-- Used somewhat.
+/-- ground is a union of classes. -/
 lemma ground_eq_biUnion_classSet (F : SetFamily α) :
   F.ground = Finset.biUnion (classSet F) (fun C => C) := by
-classical
-  apply Finset.Subset.antisymm_iff.mpr
+  classical
+  apply Finset.ext
+  intro a
   constructor
-  · intro a ha
-    have hmem : a ∈ ParallelClass F a := by
-      exact Finset.mem_filter.mpr (And.intro ha (parallel_refl F a))
-    have hC : ParallelClass F a ∈ classSet F := by
-      unfold classSet
-      exact Finset.mem_image.mpr ⟨a, ha, rfl⟩
+  · intro ha
+    have hmem : a ∈ ParallelClass F a :=
+      Finset.mem_filter.mpr ⟨ha, parallel_refl F a⟩
+    have hC : ParallelClass F a ∈ classSet F :=
+      Finset.mem_image.mpr ⟨a, ha, rfl⟩
     exact Finset.mem_biUnion.mpr ⟨ParallelClass F a, hC, hmem⟩
-  ·
-    intro a ha
-    rcases Finset.mem_biUnion.mp ha with ⟨C, hC, haC⟩
-    have hsub : C ⊆ F.ground := by
-      unfold classSet at hC
-      rcases Finset.mem_image.mp hC with ⟨x, hx, hCx⟩
-      have : ParallelClass F x ⊆ F.ground :=
-        by
-          intro y hy
-          exact (Finset.mem_filter.mp hy).1
-      exact
-        (by
-          subst hCx
-          simp_all only [Finset.mem_biUnion, Finset.mem_image]
-
-          )
-    exact hsub haC
+  · intro ha
+    obtain ⟨C, hC, haC⟩ := Finset.mem_biUnion.mp ha
+    obtain ⟨x, hx, hCx⟩ := Finset.mem_image.mp hC
+    rw [←hCx] at haC
+    exact (Finset.mem_filter.mp haC).1
 
 lemma card_ground_eq_sum_card_classes (F : SetFamily α) :
   F.ground.card = ∑ C ∈ classSet F, C.card := by
   classical
   -- `ground = ⋃ C∈classSet, C`
-  have hcover := ground_eq_biUnion_classSet (F := F)
-  have hdisj :
-    ∀ C ∈ classSet F, ∀ D ∈ classSet F, C ≠ D → Disjoint C D := by
-    intro C hC D hD hne
-    exact classSet_disjoint_of_ne (F := F) hC hD hne
-  have hcard :
-      (Finset.biUnion (classSet F) (fun C => C)).card
-        = ∑ C ∈ classSet F, C.card := by
-    exact Finset.card_biUnion hdisj
-  have := hcard
-
-  simp_all only [ne_eq]
+  have hcover := ground_eq_biUnion_classSet F
+  have hdisj : ∀ C ∈ classSet F, ∀ D ∈ classSet F, C ≠ D → Disjoint C D :=
+    fun C hC D hD hne => classSet_disjoint_of_ne F hC hD hne
+  rw [hcover, Finset.card_biUnion hdisj]
 
 
 /--Any element in `classSet` is non-empty. -/
@@ -373,21 +336,17 @@ lemma classSet_nonempty (F : SetFamily α) :
   ∀ C ∈ classSet F, C.Nonempty := by
   classical
   intro C hC
-  unfold classSet at hC
-  rcases Finset.mem_image.mp hC with ⟨a, ha, hCa⟩
+  obtain ⟨a, ha, hCa⟩ := Finset.mem_image.mp hC
   have : a ∈ ParallelClass F a :=
-    Finset.mem_filter.mpr (And.intro ha (parallel_refl F a))
-  exact ⟨a, by
-    subst hCa
-    simp_all only [Finset.mem_image]
-    ⟩
+    Finset.mem_filter.mpr ⟨ha, parallel_refl F a⟩
+  exact ⟨a, hCa ▸ this⟩
 
---From here on, numClasses related
+-- From here on, numClasses related
 
 noncomputable def numClasses (F : SetFamily α) : ℕ :=
   (classSet F).card
 
-/- The number of equivalence classes is less than the original set：`numClasses ≤ |ground|`。 -/
+/- The number of equivalence classes is at most the size of the original set: `numClasses ≤ |ground|`. -/
 lemma numClasses_le_ground_card (F : SetFamily α) :
   numClasses F ≤ F.ground.card := by
   classical
@@ -396,15 +355,15 @@ lemma numClasses_le_ground_card (F : SetFamily α) :
   exact Finset.card_image_le
 
 
---numClasses関連はここまで
+-- numClasses related ends here
 
--- 「w を含むエッジの集合」を Finset で：
---すぐ下で使っているだけ。
+-- "Set of edges containing w" as Finset:
+-- Used only immediately below.
 def withElem (E : Finset (Finset α)) (w : α) : Finset (Finset α) :=
   E.filter (fun A => w ∈ A)
 
-/-- `u‖v` なら、任意のクラス `C` で `u ∈ C ↔ v ∈ C`。 -/
---Without a total set, proven cannot work.It's been used a little.
+/-- If `u‖v`, then for any class `C`: `u ∈ C ↔ v ∈ C`. -/
+-- Cannot prove without the universal set. Used somewhat.
 
 lemma mem_u_iff_mem_v_of_class
   (F : SetFamily α) (hasU: F.sets F.ground){u v : α} (hp : Parallel F u v)
@@ -475,9 +434,9 @@ lemma mem_u_iff_mem_v_of_class
     simp_all only [Parallel, imp_self, mem_ParallelClass_iff, and_true, and_self]
 
 /-
-----Something not used.
+-- Something not used.
 
---The equivalent of being parallel and the edges included are equal, but they are not used anywhere.
+-- The equivalence of being parallel and having equal included edges, but not used anywhere.
 lemma Parallel_iff_filter_edge (F : SetFamily α) (w z : α) :
   Parallel F w z
   ↔ withElem F.edgeFinset w = withElem F.edgeFinset z := by
@@ -501,8 +460,8 @@ lemma Parallel_iff_filter_edge (F : SetFamily α) (w z : α) :
 -/
 
 -------------------------------------------
-----ideal------------------------------------
---------------------------------------------
+-- ideal
+-------------------------------------------
 
 def isOrderIdealOn (le : α → α → Prop) (V I : Finset α) : Prop :=
   I ⊆ V ∧ ∀ ⦃x⦄, x ∈ I → ∀ ⦃y⦄, y ∈ V → le y x → y ∈ I
@@ -515,9 +474,9 @@ noncomputable def orderIdealFamily (le : α → α → Prop) (V : Finset α) : S
     , decSets := Classical.decPred _
     , inc_ground := ?_ }
   intro A a
-  simpa using a.1
+  exact a.1
 
---使われている。
+-- Used.
 @[simp] lemma sets_iff_isOrderIdeal {I : Finset α} :
     (orderIdealFamily le V).sets I ↔ isOrderIdealOn le V I := Iff.rfl
 

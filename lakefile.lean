@@ -13,17 +13,17 @@ package AvgRare {
 lean_lib AvgRare where
   roots := #[
     -- Basics
-    `AvgRare.Basics.General,           --一般的な補題
-    `AvgRare.Basics.SetFamily,         --集合族とIdealに関する基本
-    `AvgRare.Basics.SetTrace,      --Traceに関する基本
-    `AvgRare.Functional.FuncSetup,           --前順序に関すること
-    `AvgRare.Functional.TraceFunctional,     -- FunctionalのTraceがFunctional
-    `AvgRare.Functional.FuncPoset,     -- 後半用のFuncSetup
-    `AvgRare.Reductions.Rare, --Traceの単調性
-    `AvgRare.Reductions.Reduction,   -- ← trace×FuncSetup の結合レイヤ。名前を変えるかも。PaperLemmaとか。
-    `AvgRare.Secondary.UniqueMax,       --半順序と帰納法
-    `AvgRare.Secondary.SumProduct,   --半順序のunion product
-    `AvgRare.Secondary.MainStatement  -- ← 主定理
+    `AvgRare.Basics.General,           -- General lemmas
+    `AvgRare.Basics.SetFamily,         -- Basics about set families and ideals
+    `AvgRare.Basics.SetTrace,      -- Basics about trace
+    `AvgRare.Functional.FuncSetup,           -- About preorders
+    `AvgRare.Functional.TraceFunctional,     -- Trace of functional is functional
+    `AvgRare.Functional.FuncPoset,     -- FuncSetup for the second half
+    `AvgRare.Reductions.Rare, -- Monotonicity of trace
+    `AvgRare.Reductions.Reduction,   -- ← Composition layer of trace×FuncSetup. May rename. PaperLemma etc.
+    `AvgRare.Secondary.UniqueMax,       -- Partial orders and induction
+    `AvgRare.Secondary.SumProduct,   -- Union product of partial orders
+    `AvgRare.Secondary.MainStatement  -- ← Main theorem
   ]
   srcDir := "."
 

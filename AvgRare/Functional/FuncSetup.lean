@@ -46,7 +46,7 @@ lemma le_refl (x : S.Elem) : S.le x x := by
 lemma le_trans {x y z : S.Elem} (hxy : S.le x y) (hyz : S.le y z) : S.le x z := by
   exact Relation.ReflTransGen.trans hxy hyz
 
---以下の2つは、FuncPosetに移動。
+-- The following two are moved to FuncPoset.
 def has_le_antisymm  : Prop :=
 ∀ {x y : S.Elem}, (S.le x y) → (S.le y x) → x = y
 
@@ -55,8 +55,8 @@ def has_le_antisymm  : Prop :=
 lemma cover_to_le {x y : S.Elem} (h : S.cover x y) : S.le x y := by
   exact Relation.ReflTransGen.single h
 
-/-- 同じ元からの `cover` の像は一意 -/
---下で使われている。
+/-- The image of `cover` from the same element is unique -/
+-- Used below.
 lemma cover_out_unique (S : FuncSetup α){u y z : S.Elem} :
   S.cover u y → S.cover u z → y = z := by
   intro hy hz
@@ -70,7 +70,7 @@ lemma cover_out_unique (S : FuncSetup α){u y z : S.Elem} :
 --SubType---------
 ----------------------
 
-/-- ground の元 `x : α` とその証明から `S.Elem` を作るユーティリティ。 -/
+/-- Utility to create `S.Elem` from an element `x : α` in ground and its proof. -/
 def toElem! {x : α} (hx : x ∈ S.ground) : S.Elem := ⟨x, hx⟩
 
 @[simp] lemma toElem!_val {x : α} (hx : x ∈ S.ground) :
@@ -78,15 +78,15 @@ def toElem! {x : α} (hx : x ∈ S.ground) : S.Elem := ⟨x, hx⟩
 @[simp] lemma toElem!_mem {x : α} (hx : x ∈ S.ground) :
     (S.toElem! hx).2 = hx := rfl
 
--- toElem! の往復（既存なら @[simp] を付けると後の書き換えが楽）。
---使っている。
+-- Round trip of toElem! (adding @[simp] would make later rewrites easier).
+-- Used.
 @[simp] lemma toElem!_coe (S : FuncSetup α) (x : S.Elem) :
     S.toElem! x.property = x := by
   cases x with
   | mk x hx => rfl
 
--- S.Elem の不等号から underlying へ
---一箇所使っている。
+-- From S.Elem inequality to underlying
+-- Used in one place.
 lemma coe_ne_of_ne {S : FuncSetup α} {x y : S.Elem} (h : x ≠ y) :
     (x : α) ≠ (y : α) := by
   intro hxy
@@ -94,13 +94,13 @@ lemma coe_ne_of_ne {S : FuncSetup α} {x y : S.Elem} (h : x ≠ y) :
   apply Subtype.ext
   exact hxy
 
-/-- `leOn S y x` : ground 上の要素 `y, x : α` について，
-S の部分型 `S.Elem` 上の `S.le ⟨y,hy⟩ ⟨x,hx⟩` が成り立つことを「存在」で述べる。 -/
+/-- `leOn S y x` : For elements `y, x : α` on the ground,
+using "existence" to state that `S.le ⟨y,hy⟩ ⟨x,hx⟩` holds on the subtype `S.Elem` of S. -/
 def leOn (S : FuncSetup α) (y x : α) : Prop :=
   ∃ (hy : y ∈ S.ground) (hx : x ∈ S.ground),
       FuncSetup.le S ⟨y, hy⟩ ⟨x, hx⟩
 
---結構使っている
+--Frequently used
 lemma leOn_iff_subtype (S : FuncSetup α) {a b : α}
   (ha : a ∈ S.ground) (hb : b ∈ S.ground) :
   S.leOn a b ↔ S.le ⟨a, ha⟩ ⟨b, hb⟩ := by
@@ -113,32 +113,27 @@ lemma leOn_iff_subtype (S : FuncSetup α) {a b : α}
 
 lemma leOn_refl (S : FuncSetup α) {x : α} (hx : x ∈ S.ground) :
   S.leOn x x :=
-by
-  exact ⟨hx, hx, Relation.ReflTransGen.refl⟩
+⟨hx, hx, S.le_refl ⟨x, hx⟩⟩
 
 lemma leOn_trans (S : FuncSetup α) {y x z : α}
   (h₁ : S.leOn y x) (h₂ : S.leOn x z) :
-  S.leOn y z :=
-by
+  S.leOn y z := by
   rcases h₁ with ⟨hy, hx, h_yx⟩
   rcases h₂ with ⟨hx', hz, h_xz⟩
   have h_yx' : S.le ⟨y, hy⟩ ⟨x, hx'⟩ := by
-    have e : (⟨x, hx⟩ : S.Elem) = ⟨x, hx'⟩ := Subtype.ext (by rfl)
-    cases e
-    exact h_yx
-  have h_yz : S.le ⟨y, hy⟩ ⟨z, hz⟩ :=
-    Relation.ReflTransGen.trans h_yx' h_xz
-  exact ⟨hy, hz, h_yz⟩
+    have e : (⟨x, hx⟩ : S.Elem) = ⟨x, hx'⟩ := Subtype.ext rfl
+    rwa [e]
+  exact ⟨hy, hz, S.le_trans h_yx' h_xz⟩
 
---leOn_iff_subtypeと同じ
+--Same as leOn_iff_subtype
 lemma leOn_iff (S : FuncSetup α)
   {a b : α} (hb : b ∈ S.ground) (ha : a ∈ S.ground) :
   S.leOn b a ↔ S.le ⟨b, hb⟩ ⟨a, ha⟩ := by
   unfold FuncSetup.leOn
   simp_all only [exists_true_left]
 
--- サブタイプ上の比較と ground 上の比較の橋渡し
--- （S.le が「S.leOn をサブタイプへ持ち上げたもの」になっていれば定義等号で証明できます）
+-- Bridge between subtype comparison and ground comparison
+-- (If S.le were "S.leOn lifted to subtype", this could be proven by definitional equality)
 @[simp] lemma le_iff_leOn_val
     (S : FuncSetup α) (x y : S.Elem) :
     S.le x y ↔ S.leOn (x : α) (y : α) := by
@@ -154,7 +149,7 @@ lemma leOn_iff (S : FuncSetup α)
       simp_all only [exists_true_left]
 
 --------------------------------
---------------------hyperedge関連
+--------------------hyperedge-related
 -----------------------------------
 
 noncomputable def coeFinset (S : FuncSetup α) (I : Finset S.Elem) : Finset α :=
@@ -193,12 +188,12 @@ noncomputable def liftFinset
   constructor
   · intro haI
     rcases (mem_coeFinset_val_iff (S:=S)).mp haI with ⟨z, hzI, hz⟩
-    -- `z : S.Elem` と `z.1 = a` から `z = ⟨a,ha⟩` を得る
+    -- From `z : S.Elem` and `z.1 = a`, obtain `z = ⟨a,ha⟩`
     have : z = ⟨a, ha⟩ := Subtype.ext (by simpa [Subtype.ext] using congrArg id hz)
     subst this
     simp_all only [FuncSetup.mem_coeFinset, Subtype.exists, exists_and_right, exists_eq_right, exists_const]
   · intro hz
-    -- 逆向きは像の定義そのもの
+    -- The reverse direction is just the definition of image
     exact Finset.mem_image.mpr ⟨⟨a, ha⟩, hz, rfl⟩
 
 @[simp] lemma mem_liftFinset_iff
@@ -210,7 +205,7 @@ noncomputable def liftFinset
   · intro hz
     rcases Finset.mem_map.mp hz with ⟨t, ht, hmap⟩
     -- t : {a // a ∈ J}, ht : t ∈ J.attach, hmap : ⟨t.1, hJ t.2⟩ = z
-    -- よって (z : α) = t.1 ∈ J
+    -- Therefore (z : α) = t.1 ∈ J
     have : (z : α) = t.1 := by cases z; cases t; cases hmap; rfl
     exact this ▸ t.2
   · intro hz
@@ -219,7 +214,7 @@ noncomputable def liftFinset
     · exact Finset.mem_attach _ _
     · cases z; rfl
 
-/-- 目的の補題：`coeFinset ∘ liftFinset = id` （`J ⊆ ground` が前提） -/
+/-- Target lemma: `coeFinset ∘ liftFinset = id` (assuming `J ⊆ ground`) -/
 @[simp] lemma coeFinset_liftFinset
   (S : FuncSetup α) (J : Finset α) (hJ : J ⊆ S.ground) :
   S.coeFinset (S.liftFinset J hJ) = J := by
@@ -232,44 +227,40 @@ noncomputable def liftFinset
     rcases (mem_coeFinset_val_iff S).1 ha with ⟨z, hzLift, hz⟩
     -- z ∈ lift ↔ z.1 ∈ J
     have : (z : α) ∈ J := (mem_liftFinset_iff S).1 hzLift
-    -- z.1 = a で書き換え
+    -- Rewrite with z.1 = a
     subst hz
     simp_all only [mem_liftFinset_iff, FuncSetup.mem_coeFinset, Subtype.exists, exists_and_left, exists_prop,
     exists_eq_right_right]
 
   · intro haJ
-    -- a ∈ J → ある z=⟨a, hJ haJ⟩ が lift に入り、その像に a が入る
+    -- a ∈ J → some z=⟨a, hJ haJ⟩ is in lift and a is in its image
     have hz : (⟨a, hJ haJ⟩ : S.Elem) ∈ S.liftFinset J hJ :=
       (mem_liftFinset_iff S).2 haJ
     exact (mem_coeFinset_val_iff S).2 ⟨⟨a, hJ haJ⟩, hz, rfl⟩
---同値類関係
+--Equivalence class relation
 
-/-- 同値関係：`x ∼ y` iff `x ≤ y ∧ y ≤ x`。 -/
+/-- Equivalence relation: `x ∼ y` iff `x ≤ y ∧ y ≤ x`. -/
 def sim (x y : S.Elem) : Prop := S.le x y ∧ S.le y x
 
-/-- `sim` は同値関係。 -/
-lemma sim_refl (x : S.Elem) : S.sim x x := by
-  constructor <;> exact S.le_refl x
+/-- `sim` is an equivalence relation. -/
+lemma sim_refl (x : S.Elem) : S.sim x x :=
+  ⟨S.le_refl x, S.le_refl x⟩
 
-lemma sim_symm {x y : S.Elem} (h : S.sim x y) : S.sim y x := by
-  constructor
-  · exact h.2
-  · exact h.1
+lemma sim_symm {x y : S.Elem} (h : S.sim x y) : S.sim y x :=
+  ⟨h.2, h.1⟩
 
-lemma sim_trans {x y z : S.Elem} (hxy : S.sim x y) (hyz : S.sim y z) : S.sim x z := by
-  constructor
-  · exact S.le_trans hxy.1 hyz.1
-  · exact S.le_trans hyz.2 hxy.2
+lemma sim_trans {x y z : S.Elem} (hxy : S.sim x y) (hyz : S.sim y z) : S.sim x z :=
+  ⟨S.le_trans hxy.1 hyz.1, S.le_trans hyz.2 hxy.2⟩
 
-/-- `sim` を `Setoid` に。 -/
---現状使ってない
+/-- `sim` as a `Setoid`. -/
+--Currently not used
 def simSetoid : Setoid S.Elem where
   r := S.sim
   iseqv := ⟨S.sim_refl, S.sim_symm, S.sim_trans⟩
 
 
 
-/-- 「同値類が非自明（別の点がある）」の実用形。 -/
+/-- Practical form of "equivalence class is non-trivial (has another point)". -/
 def nontrivialClass {α : Type u} [DecidableEq α] (S : FuncSetup α) (x : S.Elem) : Prop :=
   ∃ y : S.Elem, y ≠ x ∧ S.sim x y
 
@@ -281,57 +272,48 @@ lemma fixed_point_unique {α : Type u} [DecidableEq α] (S : FuncSetup α) (u : 
   | refl => rfl
   | tail hb h_cover ih =>
     rename_i b c
-    have : S.f b = c:= by exact h_cover
+    have : S.f b = c := h_cover
     rw [ih] at h_fixed
     rw [h_fixed] at this
     rw [←ih] at this
     exact this
 
-/-- 非自明同値類に属する `u` は自己固定点ではない（`f u ≠ u`）。 -/
---2箇所で使っている。
+/-- `u` belonging to a non-trivial equivalence class is not a self-fixed point (`f u ≠ u`). -/
+--Used in 2 places.
 lemma f_ne_of_nontrivialClass (S : FuncSetup α) {u : S.Elem}
     (h : S.nontrivialClass u) : S.f u ≠ u := by
   rcases h with ⟨y, hy_ne, hy_sim⟩
-  intro hfix -- 仮に等しいとすると
-  -- u ≤ y から `fixed_point_unique` で u = y
+  intro hfix -- Suppose they are equal
+  -- From u ≤ y, get u = y by `fixed_point_unique`
   have : u = y := S.fixed_point_unique u hfix hy_sim.1
   exact hy_ne this.symm
 
 /-! ## 2) 「機能性」：出次数高々 1 -/
 
--- 極大関係
+-- Maximal relation
 
-/-- 極大：`x` の上は全部 `x` に戻る（前順序版）。 -/
+/-- Maximal: everything above `x` returns to `x` (preorder version). -/
 def maximal (x : S.Elem) : Prop :=
   ∀ ⦃y⦄, S.le x y → S.le y x
 
 @[simp] lemma maximal_iff (x : S.Elem) :
     S.maximal x ↔ (∀ ⦃y⦄, S.le x y → S.le y x) := Iff.rfl
 
-/-- `f u = u` なら `u` は極大（反対称性不要） -/
---使われている。
+/-- If `f u = u`, then `u` is maximal (antisymmetry not required) -/
+--Used.
 lemma maximal_of_fixpoint  (S : FuncSetup α){u : S.Elem} (huu : S.cover u u) :
   S.maximal u := by
   intro v huv
-  -- 「u から到達できるのは u のみ」を反復閉包で帰納
-  have reach_eq : ∀ w, S.le u w → w = u := by
-    intro w hw
-    induction hw with
-    | @refl =>
-        rfl
-    | @tail w x hw ih hwx =>
-        -- `hw : u ≤ w`, `hwx : cover w x`, 帰納法の仮定 `ih : w = u`
-        have hux : S.cover u x := by
-          cases ih
-          exact congrArg S.f (id (Eq.symm hwx))
-        have hx : x = u := by
-          exact cover_out_unique S hux huu
-        exact hx
-  have hveq : v = u := reach_eq v huv
-  cases hveq
-  exact Relation.ReflTransGen.refl
+  -- "Only u is reachable from u" by induction on reflexive transitive closure
+  suffices v = u from this ▸ S.le_refl u
+  induction huv with
+  | refl => rfl
+  | tail _ hwx ih =>
+    -- `hwx : cover _ v`, induction hypothesis `ih : _ = u`
+    rw [ih] at hwx
+    exact S.cover_out_unique hwx huu
 
---上と内容が同じなので廃止
+--Deprecated as it has the same content as above
 /-
 lemma fixpoint_is_maximal
   (S : FuncSetup α) {p : S.Elem} (hfix : S.cover p p) :
@@ -350,32 +332,31 @@ lemma fixpoint_is_maximal
 
 /-! ## 3) Lemma 3.1：maximal ⇒ rare -/
 
---Rare.leanで利用。
+--Used in Rare.lean.
 lemma sim_of_maximal_above_class
     (S : FuncSetup α) {u x y : S.Elem}
     (hmax : S.maximal u)
     (hyU : S.sim y u) (hyx : S.le y x) :
     S.sim x u := by
-  -- `u ≤ x` と `x ≤ u` の両方を示せば良い
+  -- We need to show both `u ≤ x` and `x ≤ u`
+  have hux : S.le u x := S.le_trans hyU.2 hyx
   constructor
-  · -- まず `u ≤ x`
-    have hux : S.le u x := S.le_trans hyU.2 hyx
-    -- 最大性：`u ≤ x → x ≤ u`
+  · -- First `u ≤ x` → maximality: `u ≤ x → x ≤ u`
     exact hmax hux
-  · -- つぎに `u ≤ x` は上で得た `hux`
-    exact S.le_trans hyU.2 hyx
+  · -- Next, `u ≤ x` is the `hux` obtained above
+    exact hux
 
---------sim (idealもParallelも関係ないもの)
+--------sim (unrelated to ideal or Parallel)
 
-/-- ground 上の要素型 `S.Elem` における `u` の同値類（Finset 版）。 -/
+/-- Equivalence class of `u` in element type `S.Elem` on ground (Finset version). -/
 noncomputable def simClassElem (S : FuncSetup α) (u : S.Elem) : Finset S.Elem :=
   S.ground.attach.filter (fun v => S.sim v u)
 
-/-- `α` 側へ戻した同値類（`idealFamily : SetFamily α` が扱うのはこちら）。 -/
+/-- Equivalence class mapped back to `α` side (this is what `idealFamily : SetFamily α` handles). -/
 noncomputable def simClass (S : FuncSetup α) (u : S.Elem) : Finset α :=
   (S.simClassElem u).image (Subtype.val)
 
-/-- `v ∈ simClassElem u` の判定は「ちょうど `S.sim v u`」。 -/
+/-- Determining `v ∈ simClassElem u` is exactly `S.sim v u`. -/
 @[simp] lemma mem_simClassElem
     (S : FuncSetup α) (u : S.Elem) (v : S.Elem) :
     v ∈ S.simClassElem u ↔ S.sim v u := by
@@ -387,12 +368,12 @@ noncomputable def simClass (S : FuncSetup α) (u : S.Elem) : Finset α :=
     exact hv'.2
   · intro hsim
     have hvattach : v ∈ S.ground.attach := by
-      -- `attach` の要素は（証明部分はどうであれ）常に自分自身が所属します
-      -- `simp` だけで出ます
+      -- Elements of `attach` always belong to themselves (regardless of proof part)
+      -- Can be done with just `simp`
       simp_all only [Finset.mem_attach]
     exact Finset.mem_filter.mpr ⟨hvattach, hsim⟩
 
-/-- `a ∈ simClass u` の判定。 -/
+/-- Judgment of `a ∈ simClass u`. -/
 lemma mem_simClass_iff
     (S : FuncSetup α) (u : S.Elem) {a : α} :
     a ∈ S.simClass u ↔ ∃ (ha : a ∈ S.ground), S.sim ⟨a, ha⟩ u := by
@@ -411,11 +392,11 @@ lemma mem_simClass_iff
     exact Finset.mem_image.mpr ⟨v, hv, rfl⟩
 
 -------------------------------
-----ここからIdeal関連
+----From here: Ideal-related
 
-/-- S に対応する order-ideal family を ground 型 `α` 上の `SetFamily` として与える。 -/
---FuncSetupからidealFaimilyが定理できると便利なので定義だけ与える。
---と思ったが、FuncSetupでIdealを使ったものを集めたファイルがないので、分離するとよいかも。
+/-- Give the order-ideal family corresponding to S as a `SetFamily` on ground type `α`. -/
+--It's convenient to be able to derive idealFamily from FuncSetup, so just giving the definition.
+--On second thought, there's no file that collects FuncSetup things using Ideal, so it might be good to separate.
 noncomputable def idealFamily (S : FuncSetup α) : SetFamily α :=
   SetFamily.orderIdealFamily (le := leOn S) (V := S.ground)
 
@@ -423,26 +404,27 @@ noncomputable def idealFamily (S : FuncSetup α) : SetFamily α :=
     (S : FuncSetup α) {I : Finset α} :
     (S.idealFamily).sets I ↔ SetFamily.isOrderIdealOn (S.leOn) S.ground I := Iff.rfl
 
-/-- `S.ground` は `idealFamily` の edge（＝理想）である。 -/
+/-- `S.ground` is an edge (= ideal) of `idealFamily`. -/
 lemma ground_mem_ideal_edge (S : FuncSetup α) :
   S.ground ∈ (S.idealFamily).edgeFinset := by
   classical
-  -- `S.ground` が order ideal であることを直展開で示す
+  -- Show that `S.ground` is an order ideal by direct expansion
   have hIdeal : SetFamily.isOrderIdealOn (S.leOn) S.ground S.ground := by
     dsimp [SetFamily.isOrderIdealOn]
     constructor
     · intro x hx; exact hx
     · intro x hx y hy _; exact hy
-  -- sets ↔ isOrderIdealOn で写してから、edgeFinset へ
+  -- Transfer via sets ↔ isOrderIdealOn, then to edgeFinset
   have hSets : (S.idealFamily).sets S.ground :=
     (S.sets_iff_isOrderIdeal).2 hIdeal
   exact (SetFamily.mem_edgeFinset_iff_sets (F := S.idealFamily) (A := S.ground)).2 hSets
 
-/-- `∅` も `idealFamily` の edge である。 -/
+/-- `∅` is also an edge of `idealFamily`. -/
+--similar to empty_mem_ideal_edge
 lemma empty_mem_ideal_edge (S : FuncSetup α) :
   (∅ : Finset α) ∈ (S.idealFamily).edgeFinset := by
   classical
-  -- 空集合は自明に order ideal
+  -- The empty set is trivially an order ideal
   have hIdeal : SetFamily.isOrderIdealOn (S.leOn) S.ground (∅ : Finset α) := by
     dsimp [SetFamily.isOrderIdealOn]
     constructor
@@ -452,23 +434,23 @@ lemma empty_mem_ideal_edge (S : FuncSetup α) :
     (S.sets_iff_isOrderIdeal).2 hIdeal
   exact (SetFamily.mem_edgeFinset_iff_sets (F := S.idealFamily) (A := ∅)).2 hSets
 
-/-- `idealFamily` の `edgeFinset` は空でない。 -/
+/-- The `edgeFinset` of `idealFamily` is non-empty. -/
 lemma ideal_edge_nonempty (S : FuncSetup α) :
   (S.idealFamily).edgeFinset.Nonempty := by
   classical
   exact ⟨S.ground, ground_mem_ideal_edge S⟩
 
-/-- よって `numHyperedges ≥ 1`。 -/
+/-- Therefore `numHyperedges ≥ 1`. -/
 lemma numHyperedges_ge_one (S : FuncSetup α) :
   1 ≤ (S.idealFamily).numHyperedges := by
   classical
   -- `numHyperedges = card edgeFinset`
   have hpos : 0 < (S.idealFamily).edgeFinset.card :=
     Finset.card_pos.mpr (ideal_edge_nonempty S)
-  -- `0 < n` から `1 ≤ n`
+  -- From `0 < n` to `1 ≤ n`
   exact Nat.succ_le_of_lt hpos
 
-/-- `ground ≠ ∅` なら、`∅` と `ground` がどちらも edge でしかも異なるので card ≥ 2。 -/
+/-- If `ground ≠ ∅`, then both `∅` and `ground` are edges and different, so card ≥ 2. -/
 lemma numHyperedges_ge_two
   (S : FuncSetup α) (hne : S.ground.Nonempty) :
   2 ≤ (S.idealFamily).numHyperedges := by
@@ -487,7 +469,7 @@ lemma numHyperedges_ge_two
       intro h; exact hg_ne (Finset.mem_singleton.mp h)
     simp_all only [ne_eq, Finset.mem_singleton, not_false_eq_true, Finset.card_insert_of_notMem, Finset.card_singleton,
     Nat.reduceAdd, P]
-  -- `card_le_card` で押す
+  -- Use `card_le_card` to bound
   have := Finset.card_le_card hPsub
   simpa [SetFamily.numHyperedges, hPcard] using this
 
@@ -496,32 +478,32 @@ lemma simClass_subset_of_contains
     (hI : (S.idealFamily).sets I) (huI : u.1 ∈ I) :
     S.simClass u ⊆ I := by
   classical
-  -- isOrderIdealOn に展開
+  -- Expand to isOrderIdealOn
   have hIdeal : SetFamily.isOrderIdealOn (S.leOn) S.ground I := by
-    -- `[simp] lemma sets_iff_isOrderIdeal` が `Iff.rfl` なので書換えだけで OK
-    -- `rw` で潰す（`simpa using` は使わない）
+    -- Since `[simp] lemma sets_iff_isOrderIdeal` is `Iff.rfl`, rewriting alone is OK
+    -- Eliminate with `rw` (don't use `simpa using`)
     change SetFamily.isOrderIdealOn (S.leOn) S.ground I
     exact (S.sets_iff_isOrderIdeal).1 hI
-  -- 以降：U の元 a を任意に取り、I に属することを示す
+  -- From here: take any element a of U and show it belongs to I
   intro a haU
   rcases (S.mem_simClass_iff u).1 haU with ⟨ha, hsim⟩
-  -- `a ≤ u` を取り出す
+  -- Extract `a ≤ u`
   have h_le : S.le ⟨a, ha⟩ u := hsim.1
-  -- `leOn a u.1` に持ち上げ
+  -- Lift to `leOn a u.1`
   have h_leOn : S.leOn a u.1 := by
-    -- `leOn_iff_subtype` を使う
+    -- Use `leOn_iff_subtype`
     have : S.leOn a u.1 ↔ S.le ⟨a, ha⟩ u :=
       S.leOn_iff_subtype (a := a) (b := u.1) ha u.property
     exact this.mpr h_le
-  -- isOrderIdealOn の下方閉により `a ∈ I`
+  -- By downward closure of isOrderIdealOn, `a ∈ I`
   have hI_sub : I ⊆ S.ground := hIdeal.1
   have hxI : u.1 ∈ I := huI
   --have hxV : u.1 ∈ S.ground := hI_sub hxI
-  -- 下方閉：`x∈I, y∈V, leOn y x → y∈I`
-  have := hIdeal.2 (x := u.1) hxI (y := a) (by exact ha) h_leOn
+  -- Downward closure: `x∈I, y∈V, leOn y x → y∈I`
+  have := hIdeal.2 (x := u.1) hxI (y := a) ha h_leOn
   exact this
 
---下で使っている。単なるidealが下に閉じているという性質のleOn版か。今はそとから参照されてないので、private。
+--Used below. LeOn version of the property that simple ideals are downward closed? Currently not referenced from outside, so private.
 private lemma mem_of_le_of_mem_inIdeal
   (S : FuncSetup α) {I : Finset S.Elem}
   (hIdeal : SetFamily.isOrderIdealOn S.leOn S.ground (S.coeFinset I))
@@ -532,10 +514,10 @@ private lemma mem_of_le_of_mem_inIdeal
   -- y∈I → (y:α)∈coeFinset I
   have hyIn : (y : α) ∈ S.coeFinset I :=
     (S.mem_coeFinset_iff (I := I) (a := y) hyGround).2 hy
-  -- downward closed で (x:α)∈coeFinset I
+  -- Downward closed, so (x:α)∈coeFinset I
   have hxIn : (x : α) ∈ S.coeFinset I :=
-    hIdeal.2 (x := (y : α)) hyIn (y := (x : α)) (by exact x.property) hleOn
-  -- 逆向きで x∈I に戻す
+    hIdeal.2 (x := (y : α)) hyIn (y := (x : α)) x.property hleOn
+  -- Convert back to x∈I in reverse direction
   have : ∃ z ∈ I, (z : α) = (x : α) := (S.mem_coeFinset_val_iff).1 hxIn
   rcases this with ⟨z, hzI, hz⟩
   cases z with
@@ -549,10 +531,10 @@ private lemma mem_of_le_of_mem_inIdeal
 noncomputable def Iy (S : FuncSetup α) (y : S.Elem) : Finset S.Elem :=
   S.ground.attach.filter (fun z : S.Elem => S.le z y)
 
--- 目標： hb : b ∈ S.ground, hleOn : S.leOn b a, haGround : a ∈ S.coeFinset Iy
---       から b ∈ S.coeFinset Iy を出す
---xとyに大小関係があれば、yを含むidealは、xも含む。重要補題。
---基礎補題を集めたファイルを作って分離してもよい。
+-- Goal: From hb : b ∈ S.ground, hleOn : S.leOn b a, haGround : a ∈ S.coeFinset Iy
+--       derive b ∈ S.coeFinset Iy
+--If x and y have an order relation, any ideal containing y also contains x. Important lemma.
+--Could create a separate file collecting basic lemmas.
 
 lemma le_iff_forall_ideal_mem
   (S : FuncSetup α) (x y : S.Elem) :
@@ -560,7 +542,7 @@ lemma le_iff_forall_ideal_mem
     (∀ I : Finset S.Elem,
       (S.idealFamily).sets (S.coeFinset I) → y ∈ I → x ∈ I) := by
   constructor
-  · -- (→) : `x ≤ y` なら、任意のイデアル I で `y ∈ I → x ∈ I`
+  · -- (→) : If `x ≤ y`, then for any ideal I, `y ∈ I → x ∈ I`
     intro hxy I hI hyI
     have hIdeal :
         SetFamily.isOrderIdealOn (S.leOn) S.ground (S.coeFinset I) :=
@@ -569,7 +551,7 @@ lemma le_iff_forall_ideal_mem
 
       exact (mem_coeFinset_iff S (I:=I) (a:=y.1) (ha:=y.2)).2 hyI
     have hx' : (x.1 : α) ∈ S.coeFinset I := by
-      have hleOn : S.leOn x.1 y.1 := by exact (S.le_iff_leOn_val x y).mp hxy--S.le_to_leOn hxy
+      have hleOn : S.leOn x.1 y.1 := (S.le_iff_leOn_val x y).mp hxy
       simp_all only [ FuncSetup.mem_coeFinset, Subtype.exists, exists_and_right,
          exists_eq_right, Subtype.coe_eta, Finset.coe_mem, exists_const]
       exact S.mem_of_le_of_mem_inIdeal hIdeal hleOn  hyI
@@ -637,9 +619,9 @@ lemma le_iff_forall_ideal_mem
 
 ----Something that comes with ideal and parallel at the same time.
 
-/-- 論文 Lemma 3.3：
-`u, v` が同じ同値類（S.sim）であることと，`idealFamily S` における parallel が同値。 -/
---この関係はfunctionalでなくても成り立つはずであるがここではfunctionalなものに対して証明している。
+/-- Paper Lemma 3.3:
+`u, v` being in the same equivalence class (S.sim) is equivalent to parallel in `idealFamily S`. -/
+--This relation should hold even without being functional, but here we prove it for functional ones.
 theorem parallel_iff_sim
   (S : FuncSetup α) (u v : S.Elem) :
   (S.idealFamily).Parallel u v ↔ FuncSetup.sim S u v := by
@@ -724,9 +706,9 @@ theorem parallel_iff_sim
         specialize lifim hv.1
         simp_all only [FuncSetup.le_iff_leOn_val, FuncSetup.sets_iff_isOrderIdeal, FuncSetup.mem_liftFinset_iff, forall_const]
 
--- 既存: parallel_iff_sim (S : FuncSetup α) (u v : S.Elem)
--- をそのまま使い、必要なら underlying へ落とすだけ。
---そとから使っている。Rare.leanでもIdealTraceでも。
+-- Existing: parallel_iff_sim (S : FuncSetup α) (u v : S.Elem)
+-- Use it as is, just drop to underlying when necessary.
+--Used from outside. In both Rare.lean and IdealTrace.
 @[simp]
 lemma parallel_of_sim_coe (S : FuncSetup α) {x y : S.Elem}
     (h : FuncSetup.sim S x y) :
@@ -735,9 +717,9 @@ lemma parallel_of_sim_coe (S : FuncSetup α) {x y : S.Elem}
     (parallel_iff_sim S x y).2 h
   exact hxy
 
---FuncSetupを使っているので、SetFamilyには移せない。
---`simClass u` と `ParallelClass F u` の同値性。
---そとからも使っている。
+--Cannot be moved to SetFamily because it uses FuncSetup.
+--Equivalence of `simClass u` and `ParallelClass F u`.
+--Also used from outside.
 @[simp]
 lemma simClass_eq_parallelClass
   (S : FuncSetup α) (u : S.Elem) :
@@ -754,13 +736,13 @@ lemma simClass_eq_parallelClass
     have hsim : S.sim u ⟨a, ha'⟩ := (S.parallel_iff_sim u ⟨a, ha'⟩).1 hpar
     exact (S.mem_simClass_iff u).2 ⟨ha', S.sim_symm hsim⟩
 
---下で使っている。
+--Used below.
 private lemma mem_simClass_of_sim
   (S : FuncSetup α) {u v : S.Elem} (h : S.sim u v) :
   (v : α) ∈ S.simClass u :=
   (S.mem_simClass_iff u).2 ⟨v.2, S.sim_symm h⟩
 
---そとからも使っている。
+--Also used from outside.
 lemma eq_of_sim_of_all_classes_card_one
   (S : FuncSetup α)
   (h1 : ∀ C ∈ (S.idealFamily).classSet , C.card = 1) :
@@ -793,7 +775,7 @@ lemma exists_parallel_partner_from_nontrivial
   classical
   rcases hx with ⟨y, hneq, hsim⟩
   refine ⟨(y : α), ?hne, y.property, ?hpar⟩
-  · -- y ≠ u から値の不等号へ
+  · -- From y ≠ u to value inequality
     intro h
     apply hneq
     apply Subtype.ext
@@ -802,20 +784,20 @@ lemma exists_parallel_partner_from_nontrivial
     exact S.parallel_of_sim_coe hsim
 
 -----------------------------------------------------------
-------fのiterationの話---------------------------------
------idealよりも前においてもいいかも。
+------Discussion of f iteration---------------------------------
+-----Could be placed before ideals.
 
-section IterateRTG  --sectionを区切る意味があるのか？
-variable {α : Type u} (f : α → α) --Type *だったがType uに変更。
+section IterateRTG  --Is there meaning to separating sections?
+variable {α : Type u} (f : α → α) --Was Type * but changed to Type u.
 
-/-- 「反復で到達できる」写像反復。 -/
---traceFunctionalでつかっているみたい。使わずに直接書いているところも多数。
+/-- "Reachable by iteration" map iteration. -/
+--Seems to be used in traceFunctional. Many places also write directly without using it.
 def iter (k : Nat) : S.Elem → S.Elem :=
   Nat.iterate S.f k
 
---SetFamilyもFuncSetupも出てこない、一般的な補題は、Generalに置くべきかもしれない。
---ただし、fが出てきているので、実質的にFuncSetupの枠組み。stepRelもFuncSetupの枠組みで定義した方がいいかも。
--- 関係 R_f : x R_f y ↔ f x = y
+--General lemmas that don't involve SetFamily or FuncSetup should perhaps be placed in General.
+--However, since f appears, it's substantially within the FuncSetup framework. stepRel might also be better defined within the FuncSetup framework.
+-- Relation R_f : x R_f y ↔ f x = y
 def stepRel : α → α → Prop := fun x y => f x = y
 
 private lemma iterate_commute_right (f : α → α) :
@@ -826,17 +808,17 @@ private lemma iterate_commute_right (f : α → α) :
   · intro x
     -- iterate (n+1) (f x) = iterate n (f (f x))
     have h1 : Nat.iterate f (n+1) (f x) = Nat.iterate f n (f (f x)) := by
-      -- 定義展開
+      -- Definition expansion
       simp [Nat.iterate]
-    -- 右側を `ih` で一段ほどく
+    -- Unpack the right side one step with `ih`
     have h2 : Nat.iterate f n (f (f x)) = f (Nat.iterate f n (f x)) := by
-      -- `ih` を `x := f x` に適用
+      -- Apply `ih` to `x := f x`
       simpa using ih (f x)
-    -- さらに `ih` で `(f^[n]) (f x)` を置換
+    -- Further substitute `(f^[n]) (f x)` with `ih`
     have h3 : f (Nat.iterate f n (f x)) = f (f (Nat.iterate f n x)) := by
-      -- `ih x : (f^[n]) (f x) = f ((f^[n]) x)` を `f ∘ _` の中で使用
+      -- Use `ih x : (f^[n]) (f x) = f ((f^[n]) x)` inside `f ∘ _`
       simpa using congrArg f (ih x)
-    -- 仕上げ：定義で `(f^[n+1]) x = (f^[n]) (f x)` に戻す
+    -- Finish: by definition `(f^[n+1]) x = (f^[n]) (f x)`
     calc
       Nat.iterate f (n+1) (f x)
           = Nat.iterate f n (f (f x)) := h1
@@ -847,8 +829,8 @@ private lemma iterate_commute_right (f : α → α) :
               simp [Nat.iterate]
               simp_all only [Function.iterate_succ, Function.comp_apply]
 
-/-- 主要補題：`ReflTransGen (stepRel f) x y ↔ ∃ k, (f^[k]) x = y` -/
---外部ファイルからも多数引用。le_iff_exists_iterと内容が被っている。
+/-- Main lemma: `ReflTransGen (stepRel f) x y ↔ ∃ k, (f^[k]) x = y` -/
+--Frequently cited from external files. Content overlaps with le_iff_exists_iter.
 theorem reflTransGen_iff_exists_iterate
     (f : α → α) {x y : α} :
     Relation.ReflTransGen (stepRel f) x y ↔ ∃ k : ℕ, Nat.iterate f k x = y := by
@@ -866,7 +848,7 @@ theorem reflTransGen_iff_exists_iterate
               = Nat.iterate f k (f x) := by
                   simp [Nat.iterate]
           _   = f (Nat.iterate f k x) := iterate_commute_right f k x
-          _   = f b := by exact congrArg f hk
+          _   = f b := congrArg f hk
           _   = c := hbc
   ·
     intro h
@@ -898,7 +880,7 @@ theorem reflTransGen_iff_exists_iterate
       )
     exact this
 
-/-- 論文 Lemma 2.2：
+/-- Paper Lemma 2.2:
 `x ≤ y` ↔ ある `k ≥ 0` で `f^[k] x = y`。 -/
 --It is duplicated just like reflTransGen_iff_exists_iterate.Maybe it's better to unify it.
 --However, since the arguments are different, a simple replacement might not work.
@@ -908,7 +890,7 @@ lemma le_iff_exists_iter {α} [DecidableEq α] (S : FuncSetup α) (x y : S.Elem)
   unfold FuncSetup.cover
   exact reflTransGen_iff_exists_iterate (fun xx => S.f xx)
 
--- まず小補題： g u = u なら g^[n] u = u
+-- First small lemma: if g u = u then g^[n] u = u
 private lemma iterate_fixpoint {β} (g : β → β) (u : β) (n : ℕ) (hu : g u = u) :
     Nat.iterate g n u = u := by
   induction' n with n ih
@@ -922,36 +904,26 @@ private lemma iterate_fixpoint {β} (g : β → β) (u : β) (n : ℕ) (hu : g u
       simp_all only
     simp [Nat.iterate, hu, ih]
 
-/-- イテレートは単調：`i ≤ j` なら `(f^[i]) x ≤ (f^[j]) x`。 -/
---le_iff_exists_iterと違って、自然数の大小
+/-- Iterate is monotonic: if `i ≤ j` then `(f^[i]) x ≤ (f^[j]) x`. -/
+--Unlike le_iff_exists_iter, this involves ordering of natural numbers
 lemma le_between_iter {α} [DecidableEq α]  (S : FuncSetup α) (x : S.Elem) :
   ∀ {i j : ℕ}, i ≤ j → S.le ((S.f^[i]) x) ((S.f^[j]) x)
 | i, j, hij => by
-
   rcases Nat.exists_eq_add_of_le hij with ⟨d, rfl⟩
   induction d with
-  | zero =>
-      exact Relation.ReflTransGen.refl
+  | zero => exact S.le_refl _
   | succ d ih =>
-      -- 1歩： (f^[i+d]) x ⋖ (f^[i+d+1]) x
-      have hstep :
-          S.cover ((S.f^[i + d]) x) ((S.f^[i + d + 1]) x) := by
-        dsimp [FuncSetup.cover]
+      -- One step: (f^[i+d]) x ⋖ (f^[i+d+1]) x
+      have hstep : S.cover ((S.f^[i + d]) x) ((S.f^[i + d + 1]) x) := by
         exact (Function.iterate_succ_apply' S.f (i + d) x).symm
-      simp at ih
-      refine Relation.ReflTransGen.tail ?_ hstep
-      convert ih
-      dsimp [FuncSetup.cover]
-      dsimp [FuncSetup.leOn]
-      dsimp [FuncSetup.le]
-      simp_all only [le_add_iff_nonneg_right, zero_le, Function.iterate_succ, Function.comp_apply, Subtype.coe_eta,
-        Finset.coe_mem, exists_const]
+      have h_prev : S.le ((S.f^[i]) x) ((S.f^[i + d]) x) := ih (Nat.le_add_right i d)
+      exact S.le_trans h_prev (S.cover_to_le hstep)
 
 
-end IterateRTG  --これをどこに置くかで後ろのalphaに影響。
+end IterateRTG  --Where to place this affects the alpha scope below.
 
---Parallel関係かつIteration関係
---直接的にはidealも出てこない。
+--Parallel relation and Iteration relation
+--Ideals don't appear directly.
 omit [DecidableEq α] in
 lemma maximal_of_nontrivialClass_lemma
     (f : α → α) [Fintype α] {u v : α}
@@ -1040,11 +1012,11 @@ lemma maximal_of_nontrivialClass_lemma
 
   exact (reflTransGen_iff_exists_iterate f).2 ⟨t, h_iter_eq⟩
 
---パラレルな元であれば、uからxにいければxからuにいける。
---極大性は使ってない。parallel_iff_simは使う立場。
---nontrivialClassの仮定を使って書き換えられそう。
---nds_monotone_under_traceで利用されている。
---この言明には、functionalという仮定が必要。
+--If elements are parallel, then if you can go from u to x, you can go from x to u.
+--Doesn't use maximality. Uses parallel_iff_sim.
+--Could be rewritten using the assumption of nontrivialClass.
+--Used in nds_monotone_under_trace.
+--This statement requires the functional assumption.
 theorem maximal_of_parallel_nontrivial
     (S : FuncSetup α) {u v : α}
     (hu : u ∈ S.ground) (hv : v ∈ S.ground)
@@ -1057,7 +1029,7 @@ theorem maximal_of_parallel_nontrivial
   -- parallel ⇒ sim
   have hsim : S.sim (S.toElem! hu) (S.toElem! hv) :=
     (S.parallel_iff_sim (S.toElem! hu) (S.toElem! hv)).1 hpar
-  -- sim ⇒ 両向きの ReflTransGen(stepRel S.f)
+  -- sim ⇒ bidirectional ReflTransGen(stepRel S.f)
   have huv : Relation.ReflTransGen (stepRel S.f) (S.toElem! hu) (S.toElem! hv) := by
     -- le → ∃k → ReflTransGen
     have hle := hsim.1
@@ -1069,13 +1041,13 @@ theorem maximal_of_parallel_nontrivial
     exact (reflTransGen_iff_exists_iterate S.f).2 ⟨k, hk⟩
   have hneq' : (S.toElem! hu) ≠ (S.toElem! hv) := by
     intro h; exact hneq (congrArg Subtype.val h)
-  -- 一般補題を S.Elem, f := S.f に適用
+  -- Apply general lemma to S.Elem, f := S.f
   have hmax :=
     maximal_of_nontrivialClass_lemma
       (α := S.Elem) (f := S.f)
       (u := S.toElem! hu) (v := S.toElem! hv)
       ⟨huv, hvu⟩ hneq'
-  -- 仕上げ
+  -- Finish
   intro x hx; exact hmax x hx
 
 
@@ -1086,8 +1058,8 @@ end AvgRare
 ------------------------
 
 /-
-/-- 逆に、`v` が `u` のクラスに入るなら `sim u v`。 -/
---つかってないかも。
+/-- Conversely, if `v` is in the class of `u`, then `sim u v`. -/
+--Maybe not used.
 lemma sim_of_mem_simClass
   (S : FuncSetup α) {u : S.Elem} {a : α}
   (ha : a ∈ S.ground) (hmem : a ∈ S.simClass u) :
@@ -1096,22 +1068,22 @@ lemma sim_of_mem_simClass
   have := (S.mem_simClass_iff u).mp hmem
   -- this : ∃ ha', S.sim ⟨a, ha'⟩ u
   rcases this with ⟨_, hsim⟩
-  -- ground 証明が違っても Subtype.ext で同一視
-  -- ⟨a, ha⟩ と ⟨a, _⟩ は値が同じなので transport で書き換え
-  -- 実際には値部分が同じなので hsim をそのまま使えます
+  -- Identify with Subtype.ext even if ground proofs differ
+  -- ⟨a, ha⟩ and ⟨a, _⟩ have the same value so rewrite with transport
+  -- Actually, since the value parts are the same, we can use hsim directly
   exact hsim
 -/
 
-/- ground 上の比較を subtype に引き上げる便利関数。 -/
+/- Convenient function to lift ground comparison to subtype. -/
 --def toElem! (S : FuncSetup α) {x : α} (hx : x ∈ S.ground) : S.Elem := ⟨x, hx⟩
 
-----使ってないもの。
+----Unused items.
 
 
-/-（使い勝手用）非自明同値類のとき，後継 `f u` を
-    「u と異なる ground の元」として取り出す形。 -/
--- hvは暗黙につかっている。
---現状使ってない。
+/-(For convenience) When in a non-trivial equivalence class, extract successor `f u`
+    as "a ground element different from u". -/
+-- hv is used implicitly.
+--Currently not used.
 /-
 lemma exists_succ_partner_of_nontrivial {α : Type u} [DecidableEq α]
     (S : FuncSetup α) {u : α} (hu : u ∈ S.ground)
@@ -1121,14 +1093,14 @@ lemma exists_succ_partner_of_nontrivial {α : Type u} [DecidableEq α]
   let ue : S.Elem := ⟨u, hu⟩
   let ve : S.Elem := S.f ue
   refine ⟨ve.1, ve.2, ?_⟩
-  -- `ve ≠ ue` を `Subtype.ext` で基の α に落とす
+  -- Drop `ve ≠ ue` to the base α with `Subtype.ext`
   have hne : ve ≠ ue := S.f_ne_of_nontrivialClass (u := ue) h
   intro hval
   apply hne
   apply Subtype.ext
   exact hval
 
--- 部分型の同値 ≠ から基底の ≠ を取り出す補助。現状使ってない。
+-- Helper to extract base ≠ from subtype equivalence ≠. Currently not used.
 private lemma ne_val_of_ne {x y : {a // a ∈ S.ground}} (h : x ≠ y) : x.1 ≠ y.1 := by
   intro hval
   apply h

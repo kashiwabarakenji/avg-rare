@@ -7,11 +7,11 @@ import AvgRare.Basics.SetTrace
 import AvgRare.Functional.FuncSetup
 import AvgRare.Functional.TraceFunctional
 import AvgRare.Reductions.Rare
-import AvgRare.Functional.FuncPoset --isPoset_excessのため。
+import AvgRare.Functional.FuncPoset -- For isPoset_excess.
 
 
 /-
-IdealsTrace.lean — 「functional preorder × ideals × trace」
+IdealsTrace.lean — "functional preorder × ideals × trace"
 
 From high-level lemma statements as mentioned in papers, to the return of the quasi-primary theorem to the quasi-primary theorem
 It is only quoted from Secondary.lean.
@@ -30,8 +30,8 @@ open SetFamily
 
 variable {α : Type u} [DecidableEq α]
 
---Lemma 2.4--Non-obvious equivalence class ⇒ Max
---Also, {α} is required.
+-- Lemma 2.4 -- Non-trivial equivalence class ⇒ Maximal
+-- Also, {α} is required.
 private theorem maximal_of_nontrivialClass {α : Type u} [DecidableEq α]
     (S : FuncSetup α) {x : S.Elem}
     (hx : S.nontrivialClass x) : S.maximal x := by
@@ -59,7 +59,7 @@ private theorem maximal_of_nontrivialClass {α : Type u} [DecidableEq α]
 
   intro z hxz
 
-  have hxz_rtg : Relation.ReflTransGen (FuncSetup.stepRel S.f) x z := by exact hxz --rtg_of_le S hxz
+  have hxz_rtg : Relation.ReflTransGen (FuncSetup.stepRel S.f) x z := hxz --rtg_of_le S hxz
   have hzx_rtg : Relation.ReflTransGen (FuncSetup.stepRel S.f) z x :=
     Hx z hxz_rtg
   rcases (FuncSetup.reflTransGen_iff_exists_iterate (S.f)).1 hzx_rtg with ⟨k, hk⟩
@@ -137,31 +137,24 @@ private lemma exists_nontrivialClass_of_excess_pos {α : Type u} [DecidableEq α
       (s := F.ground) (f := fun x : α => F.ParallelClass x) himg
   have hpar_ab : F.Parallel a b := by
     have hb_in : b ∈ F.ParallelClass b := by
-      have : F.Parallel b b := by
-        rfl
-      have : b ∈ F.ground ∧ F.Parallel b b := And.intro hb this
+      have : F.Parallel b b := rfl
+      have : b ∈ F.ground ∧ F.Parallel b b := ⟨hb, this⟩
       have : b ∈ F.ground.filter (fun x => F.Parallel b x) := by
         have : b ∈ F.ground := hb
         simp [this, Finset.mem_filter]
-
       simpa [SetFamily.ParallelClass] using this
     have : b ∈ F.ParallelClass a := by
-      have hb' := hb_in
-      rw [← hcls] at hb'
-      exact hb'
+      rw [hcls]
+      exact hb_in
     have : b ∈ F.ground ∧ F.Parallel a b := by
       simpa [SetFamily.ParallelClass, Finset.mem_filter] using this
     exact this.right
   let u : S.Elem := ⟨a, ha⟩
   let v : S.Elem := ⟨b, hb⟩
-  have hneq_uv : u ≠ v := by
-    intro h'
-    have : a = b := congrArg (fun (z : S.Elem) => z.1) h'
-    exact hneq this
-  have hsim : FuncSetup.sim S u v := by
-    have : (F).Parallel u v := by
-      exact hpar_ab
-    exact (FuncSetup.parallel_iff_sim S u v).mp hpar_ab
+  have hneq_uv : u ≠ v :=
+    fun h' => hneq (congrArg Subtype.val h')
+  have hsim : FuncSetup.sim S u v :=
+    (FuncSetup.parallel_iff_sim S u v).mp hpar_ab
   have hsim' : FuncSetup.sim S u v :=
     (S.parallel_iff_sim u v).1 hpar_ab
   use u
@@ -169,9 +162,9 @@ private lemma exists_nontrivialClass_of_excess_pos {α : Type u} [DecidableEq α
   use v
   simp_all [F, u, v]
   intro a_1
-  simp_all only [not_true_eq_false]
+  simp_all
 
-/-- （論文の前半の結論）準主定理を仮定して主定理を導く：強い帰納法を使う。 このファイルの主定理-/
+/-- (First half conclusion of the paper) Derive main theorem from secondary theorem: using strong induction. Main theorem of this file -/
 theorem main_nds_nonpos_of_secondary {α : Type u} [DecidableEq α]
   (secondary_nds_nonpos :
     ∀ (T : FuncSetup α), FuncSetup.isPoset_excess T → (T.idealFamily).NDS ≤ 0)
@@ -191,8 +184,8 @@ theorem main_nds_nonpos_of_secondary {α : Type u} [DecidableEq α]
       have hposet : FuncSetup.isPoset_excess T := hk
       exact secondary_nds_nonpos T hposet
     | succ k' =>
-      have hpos : 0 < excess (T.idealFamily) := by
-        rw [hk]; exact Nat.succ_pos _
+      have hpos : 0 < excess (T.idealFamily) :=
+        hk ▸ Nat.succ_pos _
       obtain ⟨u, hnontriv⟩ :=
         exists_nontrivialClass_of_excess_pos (S := T) hpos
       have hNDS_mono :
@@ -201,19 +194,15 @@ theorem main_nds_nonpos_of_secondary {α : Type u} [DecidableEq α]
       obtain ⟨v, hneq_uv, hsim⟩ := hnontriv
       have hpar : (T.idealFamily).Parallel u v :=
         (T.parallel_iff_sim u v).2 hsim
-      have h_nonempty : (T.idealFamily).ground.card ≥ 1 := by
-        have : 0 < (T.idealFamily).ground.card :=
-          Finset.card_pos.mpr ⟨u.1, u.2⟩
-        exact Nat.succ_le_of_lt this
+      have h_nonempty : (T.idealFamily).ground.card ≥ 1 :=
+        Nat.succ_le_of_lt (Finset.card_pos.mpr ⟨u.1, u.2⟩)
       have h_ground_sets :
           (T.idealFamily).sets (T.idealFamily).ground := by
         change isOrderIdealOn (T.leOn) T.ground (T.idealFamily).ground
-        simp_all only [SetFamily.NDS_def, Nat.zero_lt_succ, traceAt_ground, Finset.coe_mem, Finset.card_erase_of_mem,
-          Nat.cast_sub, Nat.cast_one, ne_eq, SetFamily.Parallel, FuncSetup.sets_iff_isOrderIdeal, ge_iff_le,
-          Finset.one_le_card]
+        simp_all
         obtain ⟨val, property⟩ := u
         obtain ⟨val_1, property_1⟩ := v
-        simp_all only [Subtype.mk.injEq]
+        simp_all
         rw [isOrderIdealOn]
         apply And.intro
         · rfl
@@ -225,14 +214,14 @@ theorem main_nds_nonpos_of_secondary {α : Type u} [DecidableEq α]
         have hu : u.1 ∈ (T.idealFamily).ground := u.2
         -- v.1 ∈ ground, u.1 ≠ v.1
         have hv : v.1 ∈ (T.idealFamily).ground := v.2
-        have hneqα : u.1 ≠ v.1 := by
-          intro h'; have : u = v := Subtype.ext (by exact h'); exact hneq_uv (id (Eq.symm this))
+        have hneqα : u.1 ≠ v.1 :=
+          fun h' => hneq_uv (Subtype.ext h'.symm)
         exact excess_trace
           (F := T.idealFamily) (hasU := h_ground_sets) (Nonemp := h_nonempty)
           (u := u.1) (v := v.1)
           (hu := hu) (hv := hv) (huv := hneqα) (hp := hpar)
       have hNontriv' : FuncSetup.nontrivialClass T u :=
-        ⟨v, And.intro hneq_uv hsim⟩  -- 順序を揃える
+        ⟨v, And.intro hneq_uv hsim⟩  -- Align order
       let tisf := T.traced_is_functional_family (u := u) hNontriv'
       obtain ⟨T', hTrace⟩ := tisf
       -- `excess (T'.idealFamily) = k'`
@@ -241,7 +230,7 @@ theorem main_nds_nonpos_of_secondary {α : Type u} [DecidableEq α]
           excess (T'.idealFamily)
               = excess (SetFamily.traceAt u.1 (T.idealFamily)) := by
                 rw [hTrace]
-          _   = excess (T.idealFamily) - 1 := by exact h_excess
+          _   = excess (T.idealFamily) - 1 := h_excess
           _   = Nat.succ k' - 1 := by rw [hk]
           _   = k' := Nat.succ_sub_one k'
       have hIH_T' : (T'.idealFamily).NDS ≤ 0 :=

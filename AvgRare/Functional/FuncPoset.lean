@@ -2,7 +2,7 @@ import Mathlib.Data.Finset.Basic
 --import Mathlib.Algebra.BigOperators.Finsupp.Basic
 import Mathlib.Algebra.Order.Sub.Basic
 import AvgRare.Basics.SetFamily
-import AvgRare.Basics.SetTrace --excessがここで定義
+import AvgRare.Basics.SetTrace --excess is defined here
 import AvgRare.Functional.FuncSetup
 
 universe u
@@ -19,17 +19,15 @@ open SetFamily
 variable {α : Type u} [DecidableEq α] (S : FuncSetup α)
 
 ----------------------------
---後半の議論用
-
 
 noncomputable def principalIdeal (S : FuncSetup α) (a : α) (ha : a ∈ S.ground) : Finset α := by
   classical
-  -- attach は {y // y ∈ ground}、述語は `S.le y ⟨a,ha⟩`
+  -- attach is {y // y ∈ ground}, predicate is `S.le y ⟨a,ha⟩`
   exact (S.ground.attach.filter (fun (y : {z // z ∈ S.ground}) => S.le y ⟨a, ha⟩)).map
     ⟨Subtype.val, by simp_all only [Subtype.val_injective]⟩
 
---後半の議論で参照。
-/-- 会員判定（存在形）：`y ∈ ↓a` ↔ `∃ hy, y ∈ ground ∧ (⟨y,hy⟩ ≤ₛ ⟨a,ha⟩)`。 -/
+-- Referenced in the second half of the proof.
+/-- Membership test (existential form): `y ∈ ↓a` ↔ `∃ hy, y ∈ ground ∧ (⟨y,hy⟩ ≤ₛ ⟨a,ha⟩)`. -/
 lemma mem_principalIdeal_iff (S : FuncSetup α)
   {a y : α} (ha : a ∈ S.ground) :
   y ∈ S.principalIdeal a ha ↔ ∃ hy : y ∈ S.ground, S.le ⟨y, hy⟩ ⟨a, ha⟩ := by
@@ -37,7 +35,7 @@ lemma mem_principalIdeal_iff (S : FuncSetup α)
   constructor
   · intro hy
     rcases Finset.mem_map.mp hy with ⟨u, hu, huv⟩
-    -- 条件部を取り出す
+    -- Extract the condition part
     have hcond : S.le u ⟨a, ha⟩ := (Finset.mem_filter.mp hu).2
     -- `u.val = y`
     cases u with
@@ -51,7 +49,7 @@ lemma mem_principalIdeal_iff (S : FuncSetup α)
       Finset.mem_filter.mpr ⟨hy_att, hle⟩
     exact Finset.mem_map.mpr ⟨⟨y, hy⟩, hy_fil, rfl⟩
 
-/-- ground 側を前提にした簡約形：`y ∈ ↓a` ↔ `⟨y,hy⟩ ≤ₛ ⟨a,ha⟩`。 -/
+/-- Simplified form with ground premise: `y ∈ ↓a` ↔ `⟨y,hy⟩ ≤ₛ ⟨a,ha⟩`. -/
 private lemma mem_principalIdeal_iff_le (S : FuncSetup α)
   {a y : α} (ha : a ∈ S.ground) (hy : y ∈ S.ground) :
   y ∈ S.principalIdeal a ha ↔ S.le ⟨y, hy⟩ ⟨a, ha⟩ := by
@@ -61,18 +59,18 @@ private lemma mem_principalIdeal_iff_le (S : FuncSetup α)
     exact hle
   · intro hle; exact (S.mem_principalIdeal_iff (a:=a) (y:=y) ha).2 ⟨hy, hle⟩
 
---SumProductで使う。
+-- Used by SumProduct.
 lemma self_mem_principalIdeal (m : S.Elem) :
   m.1 ∈ S.principalIdeal m.1 m.2 := by
   classical
-  -- 反射律で `⟨m, _⟩ ≤ ⟨m, _⟩`
+  -- By reflexivity: `⟨m, _⟩ ≤ ⟨m, _⟩`
   have : S.le ⟨m.1, m.2⟩ ⟨m.1, m.2⟩ := Relation.ReflTransGen.refl
-  -- 会員判定（簡約形）で即
+  -- Use simplified membership test
   exact
     (S.mem_principalIdeal_iff_le (a := m.1) (y := m.1) (ha := m.2) (hy := m.2)).2
       this
 
---SumProductで使う。
+-- Used by SumProduct.
 lemma principalIdeal_subset_ground (S : FuncSetup α) (x : S.Elem) :
   S.principalIdeal x.1 x.2 ⊆ S.ground := by
   intro a ha
@@ -110,7 +108,8 @@ private lemma principalIdeal_isOrderIdealOn
 def isPoset_excess (S : FuncSetup α) : Prop :=
   excess (S.idealFamily) = 0
 
-/- `isPoset`（≡ excess=0）なら `|ground| = #classes`。 -/
+/- `isPoset` (≡ excess=0) implies `|ground| = #classes`. -/
+-- Used later.
 private lemma ground_card_eq_numClasses_of_isPoset
   (S : FuncSetup α) (h : isPoset_excess S) :
   (S.idealFamily).ground.card = numClasses (S.idealFamily) := by
@@ -127,21 +126,21 @@ private lemma ground_card_eq_numClasses_of_isPoset
     numClasses_le_ground_card (F := S.idealFamily)
   exact Nat.le_antisymm hle₁ hle₂
 
-/- `isPoset S` なら `classSet (S.idealFamily)` の各クラスの大きさは 1。 -/
---後ろで使われている。
+/- `isPoset S` implies each class in `classSet (S.idealFamily)` has size 1. -/
+-- Used later.
 private lemma classes_card_one_of_isPoset
   (S : FuncSetup α) (h : isPoset_excess S) :
   ∀ C ∈ classSet (S.idealFamily), C.card = 1 := by
   classical
   let F := S.idealFamily
-  -- 非空
+  -- Nonempty
   have hnon : ∀ C ∈ classSet F, C.Nonempty :=
     classSet_nonempty (F := F)
-  -- 互いに素
+  -- Pairwise disjoint
   have hdisj :
       ∀ C ∈ classSet F, ∀ D ∈ classSet F, C ≠ D → Disjoint C D :=
     by intro C hC D hD hne; exact classSet_disjoint_of_ne (F := F) hC hD hne
-  -- 被覆
+  -- Covering
   have hcover : F.ground = Finset.biUnion (classSet F) (fun C => C) :=
     ground_eq_biUnion_classSet (F := F)
   have hcard : F.ground.card = (classSet F).card :=
@@ -152,18 +151,18 @@ private lemma classes_card_one_of_isPoset
   exact (by
     exact (Iff.mp hiff hcard))
 
---Posetがantisymmであること。たくさん使われている。
+-- Posets are antisymmetric. Used extensively.
 lemma antisymm_of_isPoset
   (S : FuncSetup α) (h : isPoset_excess S) :
   ∀ {u v : S.Elem}, S.le u v → S.le v u → u = v := by
   classical
   intro u v hxy hyx
-  -- まず `sim u v`
+  -- First establish `sim u v`
   have hsim : S.sim u v := And.intro hxy hyx
-  -- `isPoset` から「全クラスのサイズ＝1」
+  -- From `isPoset`, all classes have size 1
   have hall1 : ∀ C ∈ classSet (S.idealFamily), C.card = 1 :=
     classes_card_one_of_isPoset (S := S) h
-  -- 3) を適用
+  -- Apply lemma 3)
   exact FuncSetup.eq_of_sim_of_all_classes_card_one S hall1 hsim
 
 instance functional_poset (S : FuncSetup α) (h : isPoset_excess S) :
@@ -173,7 +172,7 @@ instance functional_poset (S : FuncSetup α) (h : isPoset_excess S) :
            le_trans := fun a b c hab hbc => by exact FuncSetup.le_trans S hab hbc,
            le_antisymm := fun a b hab hba => by exact antisymm_of_isPoset S h hab hba }
 
---逆にFuncSetupがすべての同値類のサイズが1のときに、isPosetになる。
+-- Conversely, when all equivalence classes in FuncSetup have size 1, it becomes a poset.
 private lemma isPoset_of_classes_card_one (S : FuncSetup α) (h : ∀ C ∈ classSet (S.idealFamily), C.card = 1) :
   isPoset_excess S := by
   classical
@@ -184,11 +183,11 @@ private lemma isPoset_of_classes_card_one (S : FuncSetup α) (h : ∀ C ∈ clas
   rw [SetFamily.card_ground_eq_sum_card_classes]
   simp_all only [Finset.sum_const, smul_eq_mul, mul_one, tsub_self]
 
---FuncSetupのleがanti-symmetricなときに、isPosetになる。
---そとから使われている。
+-- When FuncSetup.le is anti-symmetric, it becomes a poset.
+-- Used externally.
 lemma isPoset_of_le_antisymm (S : FuncSetup α) (h : ∀ {u v : S.Elem}, S.le u v → S.le v u → u = v) :
   isPoset_excess S := by
-  --任意のsimClassが1要素集合であることを示す。
+  -- Show that every simClass is a singleton.
   have : ∀ (x : S.Elem), (S.simClass x).card  = 1 := by
     intro x
     dsimp [FuncSetup.simClass]
@@ -239,29 +238,29 @@ private lemma iterate_has_collision
   ∃ i j : Fin (Fintype.card β + 1), i ≠ j ∧
     Nat.iterate f i.1 x = Nat.iterate f j.1 x := by
   classical
-  -- 鳩ノ巣：Fin (|β|+1) → β は単射になれない
+  -- Pigeonhole principle: Fin (|β|+1) → β cannot be injective
   have hnotinj :
     ¬ Function.Injective (fun i : Fin (Fintype.card β + 1) => Nat.iterate f i.1 x) := by
     intro hinj
-    -- 単射なら |Fin (n)| ≤ |β|、つまり n ≤ |β|。ここで n = |β|+1 なので矛盾。
+    -- If injective, then |Fin (n)| ≤ |β|, i.e., n ≤ |β|. Here n = |β|+1, contradiction.
     have hcard := Fintype.card_le_of_injective _ hinj
     -- card_fin
     have : Fintype.card (Fin (Fintype.card β + 1)) ≤ Fintype.card β := hcard
-    -- つまり |β|+1 ≤ |β| は偽
+    -- i.e., |β|+1 ≤ |β| is false
     have : Fintype.card β + 1 ≤ Fintype.card β := by
       simp_all only [Fintype.card_fin, add_le_iff_nonpos_right, nonpos_iff_eq_zero, one_ne_zero]
     exact (Nat.not_succ_le_self (Fintype.card β)) this
-  -- 非単射の具体化
+  -- Concrete instance of non-injectivity
   -- ¬Injective ↔ ∃ i≠j, f i = f j
-  -- 順序は（= と ≠）の並びが逆の版もありますが、ここでは組を作って返すだけでOK
+  -- The order in the (= vs ≠) arrangement may vary, but here we just need to construct a pair
   classical
-  -- 展開
+  -- Expand
   have : ∃ i j, i ≠ j ∧
       (fun k : Fin (Fintype.card β + 1) => Nat.iterate f k.1 x) i =
       (fun k : Fin (Fintype.card β + 1) => Nat.iterate f k.1 x) j := by
-    -- 直接 `by_contra` 展開してもOKですが、ここは classical choice に任せます
-    -- 短く：Classical.not_forall.mp で取り出し
-    -- ここでは補題として受け入れてもらって構いません
+    -- Could directly expand with `by_contra`, but here we leave it to classical choice
+    -- Short: extract with Classical.not_forall.mp
+    -- Here you can accept this as a lemma
 
     let nf := not_forall.mp (by
           intro h
@@ -291,17 +290,17 @@ private lemma iterate_has_collision
 def isPoset : Prop :=
   has_le_antisymm S
 
-/-- 反復に周期が出たら、反対称性により長さ 1 のサイクル（不動点）になる。 -/
---UniqueMax.leanで使っている。
+/-- If iteration develops a cycle, antisymmetry forces it to be a fixed point (cycle of length 1). -/
+-- Used in UniqueMax.lean.
 lemma eventually_hits_fixpoint
   (S : FuncSetup α) [Fintype S.Elem] (hpos : isPoset S)
   (x : S.Elem) :
   ∃ m : S.Elem, S.le x m ∧ S.cover m m := by
   classical
-  -- 鳩ノ巣で反復の衝突
+  -- Collision in iteration by pigeonhole principle
   obtain ⟨i, j, hneq, heq⟩ :=
     iterate_has_collision (β := S.Elem) (f := S.f) x
-  -- 便宜上 i<j 側に並べ替え
+  -- For convenience, rearrange to i<j side
   have hij : i.1 ≠ j.1 := by
     simp_all only [ne_eq]
     obtain ⟨val, property⟩ := x
@@ -317,11 +316,11 @@ lemma eventually_hits_fixpoint
       let t := j.1 - i.1
       have htpos : 0 < t := Nat.sub_pos_of_lt hlt
       let y := Nat.iterate S.f i.1 x
-      -- 周期：iterate f t y = y
+      -- Cycle: iterate f t y = y
       have cyc : Nat.iterate S.f t y = y := by
-        -- `Nat.iterate_add` を使って i と (j-i) をつなぐ
+        -- Use `Nat.iterate_add` to connect i and (j-i)
         have hj : i.1 + t = j.1 := Nat.add_sub_of_le (Nat.le_of_lt hlt)
-        -- 計算列
+        -- Calculation sequence
         calc
           Nat.iterate S.f t y
               = Nat.iterate S.f (i.1 + t) x := by
@@ -369,11 +368,11 @@ lemma eventually_hits_fixpoint
         rw [ht1]
         exact cyc
 
-      -- 1歩で y ≤ f y
+      -- One step: y ≤ f y
       have y_le_fy : S.le y (S.f y) :=
         Relation.ReflTransGen.tail
           (Relation.ReflTransGen.refl) rfl
-      -- (t-1) 歩で f y ≤ y
+      -- (t-1) steps: f y ≤ y
       have : S.cover x (S.f x) := by
         exact rfl
       have fy_le_y : S.le (S.f y) y:= by
@@ -459,14 +458,14 @@ lemma eventually_hits_fixpoint
       · exact xyle
       · exact this
 
---極大要素が存在すること。
---MainStatementからも使っている。
+--Existence of maximal element.
+--Also used from MainStatement.
 lemma exists_maximal_of_finite
   (S : FuncSetup α) [Fintype S.Elem] (hpos : isPoset S)
   (hne : S.ground.Nonempty) :
   ∃ m : S.Elem, S.maximal m := by
   classical
-  -- 任意の x から出発して不動点に到達
+  -- Start from any x and reach a fixed point
   obtain ⟨x, hx⟩ := hne
   let x0 : S.Elem := ⟨x, by exact hx⟩
   obtain ⟨m, x_le_m, hmfix⟩ := eventually_hits_fixpoint S hpos x0
@@ -501,39 +500,39 @@ lemma principalOn_inj(S : FuncSetup α) {x y : S.Elem}
   have hyx_le: S.le y x := by exact hxh
   exact hpos hhy hxh
 
---使われているが、FuncSetupにも同様な補題がある。
+-- Used, but FuncSetup also has a similar lemma.
 lemma empty_isOrderIdealOn (S : FuncSetup α) :
   SetFamily.isOrderIdealOn (S.leOn) S.ground (∅ : Finset α) := by
   dsimp [SetFamily.isOrderIdealOn]
   constructor
   · -- ∅ ⊆ ground
     intro x hx; cases hx
-  · -- 下方閉：前提が偽
+  · -- Downward closed: premise is false
     intro x hx; cases hx
 
---これも他の補題と内容が被っているかも。
-/-- principalIdeal は edge（`idealFamily` の要素） -/
+-- This might overlap with other lemmas.
+/-- principalIdeal is an edge (element of `idealFamily`) -/
 lemma principalIdeal_mem_edge (S : FuncSetup α) (x : S.Elem) :
   S.principalIdeal x.1 x.2 ∈ (S.idealFamily).edgeFinset := by
-  -- `sets ↔ isOrderIdealOn` を使って示す
+  -- Use `sets ↔ isOrderIdealOn` to prove this
   have hI :
     SetFamily.isOrderIdealOn (S.leOn) S.ground (S.principalIdeal x.1 x.2) :=
     principalIdeal_isOrderIdealOn (S := S) x.2
   have hxSets :
     (S.idealFamily).sets (S.principalIdeal x.1 x.2) := by
-    -- `sets_iff_isOrderIdeal` の右向きを使う
+    -- Use the right direction of `sets_iff_isOrderIdeal`
     have := (S.sets_iff_isOrderIdeal (I := S.principalIdeal x.1 x.2))
     exact this.mpr hI
-  -- `mem_edgeFinset_iff_sets` で edge へ
+  -- Use `mem_edgeFinset_iff_sets` to get edge
   exact
     (SetFamily.mem_edgeFinset_iff_sets
       (F := S.idealFamily) (A := S.principalIdeal x.1 x.2)).2 hxSets
 
-/- 空集合も edge。 -/
---FuncSetupに同様の補題あり。
+/- Empty set is also an edge. -/
+-- FuncSetup has a similar lemma.
 lemma empty_mem_edge (S : FuncSetup α) :
   (∅ : Finset α) ∈ (S.idealFamily).edgeFinset := by
-  -- 空集合が ideal であることから
+  -- From the fact that empty set is an ideal
   have hI : SetFamily.isOrderIdealOn (S.leOn) S.ground (∅ : Finset α) :=
     empty_isOrderIdealOn S
   have hSets : (S.idealFamily).sets (∅ : Finset α) := by

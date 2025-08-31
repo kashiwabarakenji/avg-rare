@@ -66,7 +66,7 @@ private lemma cover_preserves_principalIdeal_of_maximal (S : FuncSetup α)
       rcases h with ⟨z, hxz, hzm⟩
       have : z = y := by
         dsimp [FuncSetup.cover] at hxz hxy
-        exact Eq.trans (Eq.symm hxz) hxy
+        exact (hxz.symm).trans hxy
       cases this
       exact
         (S.mem_principalIdeal_iff (a := m.1) (y := y.1) (ha := m.2)).2
@@ -110,7 +110,7 @@ private lemma le_preserves_principalIdeal_of_maximal (S : FuncSetup α)
   classical
   induction hxy with
   | @refl =>
-    simp_all only [maximal_iff, le_iff_leOn_val, Subtype.forall]
+    simp_all
   | @tail z hxz hzy ih =>
     apply cover_preserves_principalIdeal_of_maximal S (m := m) (x := z) hm
     (expose_names; exact a_ih)
@@ -166,10 +166,10 @@ lemma exists_maximal_above (S : FuncSetup α)
         have := hm_in
         exact hEq ▸ this
       exact hm_notin this
-    have hss : upSet S y ⊂ upSet S m := by
-      exact HasSubset.Subset.ssubset_of_not_subset hsubset fun a => hm_notin (a hm_in)
+    have hss : upSet S y ⊂ upSet S m :=
+      HasSubset.Subset.ssubset_of_not_subset hsubset fun a => hm_notin (a hm_in)
 
-    have hlt : (upSet S y).card < (upSet S m).card := by exact Finset.card_lt_card hss
+    have hlt : (upSet S y).card < (upSet S m).card := Finset.card_lt_card hss
     have hle : (upSet S m).card ≤ (upSet S y).card := hmin y hyU
     have : (upSet S y).card < (upSet S y).card := Nat.lt_of_lt_of_le hlt hle
     exact (lt_irrefl _ ) this
@@ -187,7 +187,7 @@ private lemma coIdeal_nonempty_of_two_maximal (S : FuncSetup α)
     have ⟨hmG, hm'le⟩ :=
       (S.mem_principalIdeal_iff (a := m.1) (y := m'.1) (ha := m.2)).1 hmem
     have hmle' : S.le m m' := hm' hm'le
-    have : m = m' := by exact hpos (hm' hm'le) hm'le
+    have : m = m' := hpos (hm' hm'le) hm'le
     exact hne this
   have hm'G : m'.1 ∈ S.ground := m'.2
   have : m'.1 ∈ coIdeal S m :=
@@ -217,12 +217,10 @@ private lemma coIdeal_nonempty_of_not_unique_maximal
   have hmp_max : S.maximal mp := by
     by_cases h : m = m0
     · have : mp = m1 := by simp [mp, h]
-      simp_all only [maximal_iff, le_iff_leOn_val, Subtype.forall, Finset.coe_mem, ne_eq, dite_eq_ite, ↓reduceIte,
-        implies_true, mp]
+      simp_all
 
     · have : mp = m0 := by simp [mp, h]
-      simp_all only [maximal_iff, le_iff_leOn_val, Subtype.forall, Finset.coe_mem, ne_eq, dite_eq_ite, ↓reduceIte,
-    implies_true, mp]
+      simp_all
 
   have hne_m_mp : m ≠ mp := by
     by_cases h : m = m0
@@ -231,7 +229,7 @@ private lemma coIdeal_nonempty_of_not_unique_maximal
         intro heq
         have : m0 = m1 := Eq.trans (Eq.symm h) heq
         apply hne10
-        exact id (Eq.symm this)
+        exact this.symm
       intro heq
       have : m = m1 := Eq.trans heq hem
       exact hneq this
@@ -273,11 +271,11 @@ noncomputable def restrictToIdeal (S : FuncSetup α)
   refine
     { ground := S.principalIdeal m.1 m.2
       nonempty := by
-        have : m.1 ∈ S.principalIdeal m.1 m.2 := by
-          exact self_mem_principalIdeal S m
-        simp_all only [maximal_iff, le_iff_leOn_val, Subtype.forall, nonempty_subtype]
+        have : m.1 ∈ S.principalIdeal m.1 m.2 :=
+          self_mem_principalIdeal S m
+        simp_all
         obtain ⟨val, property⟩ := m
-        simp_all only
+        simp_all
         exact ⟨_, this⟩
       , f := ?f }
   intro x
@@ -297,7 +295,7 @@ noncomputable def restrictToCoIdeal (S : FuncSetup α) (m : S.Elem)  (hpos : isP
     { ground := coIdeal S m,
       nonempty := by
         let cno := coIdeal_nonempty_of_not_unique_maximal S (hpos := hpos) notconnected m
-        simp_all only [nonempty_subtype]
+        simp_all
         obtain ⟨val, property⟩ := m
         exact cno
     , f := ?f }
@@ -356,8 +354,7 @@ private lemma card_coIdeal_add_card_principal
   calc
     (coIdeal S m).card + (S.principalIdeal m.1 m.2).card
         = (S.ground.card - (S.principalIdeal m.1 m.2).card)
-          + (S.principalIdeal m.1 m.2).card := by
-            exact congrArg (fun t => t + (S.principalIdeal m.1 m.2).card) hsdiff
+          + (S.principalIdeal m.1 m.2).card := by rw [hsdiff]
     _ = S.ground.card := by
          apply Nat.sub_add_cancel
          exact Finset.card_le_card hsub
@@ -382,8 +379,7 @@ private lemma card_coIdeal_lt_ground (S : FuncSetup α) (m : S.Elem) :
     Nat.lt_succ_self _
   exact Nat.lt_of_lt_of_le this (by
     have : Nat.succ ((coIdeal S m).card) = (coIdeal S m).card + 1 := rfl
-    exact (by
-      simpa using hle))
+    simpa using hle)
 
 private lemma card_principal_lt_ground_of_not_unique
   (S : FuncSetup α) [Fintype S.Elem]
@@ -451,15 +447,15 @@ lemma unique_maximal_above (S : FuncSetup α)
   by_cases hij : i ≤ j
   · -- m₁ ≤ m₂
     have hchain := S.le_between_iter x hij
-    have h₁ : S.le m₁ ((S.f^[j]) x) := by cases hi; exact hchain
-    have h₂ : S.le m₁ m₂ := by cases hj; exact h₁
+    have h₁ : S.le m₁ ((S.f^[j]) x) := hi ▸ hchain
+    have h₂ : S.le m₁ m₂ := hj ▸ h₁
     have h₃ : S.le m₂ m₁ := hm₁ h₂
     exact hpos (hm₂ (hm₁ h₂)) h₃
   ·
     have hji : j ≤ i := le_of_not_ge hij
     have hchain := le_between_iter S x hji
-    have h₁ : S.le m₂ ((S.f^[i]) x) := by cases hj; exact hchain
-    have h₂ : S.le m₂ m₁ := by cases hi; exact h₁
+    have h₁ : S.le m₂ ((S.f^[i]) x) := hj ▸ hchain
+    have h₂ : S.le m₂ m₁ := hi ▸ h₁
     have h₃ : S.le m₁ m₂ := hm₂ h₂
     exact hpos (hm₂ (hm₁ h₃)) h₂
 
@@ -472,7 +468,7 @@ lemma exists_unique_maxAbove (S : FuncSetup α)
   refine ⟨m, ⟨hm, hxm⟩, ?uniq⟩
   intro m' hm'
   let uma := unique_maximal_above (S := S) (hpos := hpos) (hm₁ := hm) (hm₂ := hm'.1)  (hx₁ := hxm) (hx₂ := hm'.2)
-  exact id (Eq.symm uma)
+  exact uma.symm
 -/
 
 def liftFromIdeal
@@ -568,10 +564,10 @@ theorem antisymm_restrictToIdeal_of_isPoset
        ∧ (S.le (liftFromIdeal S m hm v) (liftFromIdeal S m hm u)) := by
     exact ⟨this, le_lift_Ideal S m hm hvu⟩
   rcases this with ⟨h₁, h₂⟩
-  have h_eqS : liftFromIdeal S m hm u = liftFromIdeal S m hm v := by
-    exact hpos this h₂
+  have h_eqS : liftFromIdeal S m hm u = liftFromIdeal S m hm v :=
+    hpos this h₂
   have : u.1 = v.1 :=by
-    simp_all only [le_iff_leOn_val]
+    simp_all
     injection h_eqS
 
   exact Subtype.ext this
@@ -596,7 +592,7 @@ lemma antisymm_restrictToCoIdeal_of_isPoset
     exact hpos h₁ h₂
   have : u.1 = v.1 := by
     apply congrArg Subtype.val
-    simp_all only [le_iff_leOn_val]
+    simp_all
     injection h_eqS
     (expose_names; exact Subtype.eq val_eq)
   exact Subtype.ext this
@@ -704,7 +700,7 @@ private lemma mem_I_or_C_of_ground
   have hsplit :=
     ground_union_split S m hm hpos notuniq
   have : x ∈ (restrictToIdeal S m hm).ground ∪ (restrictToCoIdeal S m hpos notuniq).ground := by
-    simp_all only
+    simp_all
 
   have : x ∈ S.principalIdeal m.1 m.2 ∪ coIdeal S m := this
   exact Finset.mem_union.mp this
@@ -725,12 +721,12 @@ private lemma build_restrict_le_I
         exact Relation.ReflTransGen.refl
     | @tail p q hpq hpq_to_b ih =>
         have hp_in_I : p.1 ∈ S.principalIdeal m.1 m.2 := by
-          have y_le_p : S.le ⟨y,hyG⟩ p := by
-            exact hpq --ih.elim (fun _ => Relation.ReflTransGen.refl) (fun h => h)
+          have y_le_p : S.le ⟨y,hyG⟩ p :=
+            hpq --ih.elim (fun _ => Relation.ReflTransGen.refl) (fun h => h)
           exact
             le_preserves_principalIdeal_of_maximal (S := S)
               (m := m) (x := ⟨y,hyG⟩) (y := p) hm
-              (by exact hyI) y_le_p
+              hyI y_le_p
         have hcov_restrict :
             (restrictToIdeal S m hm).cover
               ⟨p.1, hp_in_I⟩
@@ -743,12 +739,12 @@ private lemma build_restrict_le_I
                     le_preserves_principalIdeal_of_maximal (S := S)
                       (m := m) (x := p) (y := q) hm hp_in_I this⟩ := by
           have hf_pq : S.f ⟨p.1, p.2⟩ = q := by
-            simp_all only [le_iff_leOn_val, forall_const, Subtype.coe_eta]
+            simp_all
             exact hpq_to_b
           have hf_on_input :
               S.f ⟨p.1, (S.principalIdeal_subset_ground ⟨m.1,m.2⟩) hp_in_I⟩
             = q := by
-            simp_all only [le_iff_leOn_val, forall_const, Subtype.coe_eta]
+            simp_all
 
           dsimp [FuncSetup.cover, restrictToIdeal]
           apply Subtype.ext
@@ -762,8 +758,8 @@ private lemma build_restrict_le_I
   have := main ⟨x,hxG⟩ h hxI
   exact this
 
-/--（前方向の証明内で使う）`S.le ⟨y,hyG⟩ ⟨x,hxG⟩` から
-  `restrictToCoIdeal` 側の `le ⟨y,hyC⟩ ⟨x,hxC⟩` を構成する。 -/
+/-- (Used in forward direction proof) From `S.le ⟨y,hyG⟩ ⟨x,hxG⟩`,
+  construct `le ⟨y,hyC⟩ ⟨x,hxC⟩` on the `restrictToCoIdeal` side. -/
 private lemma build_restrict_le_C
   (S : FuncSetup α) (m : S.Elem)
   (hpos : isPoset S) (notuniq : ¬ (∃! mm : S.Elem, S.maximal mm))
@@ -782,8 +778,8 @@ private lemma build_restrict_le_C
     | @tail p q hpq hpq_to_b ih =>
 
         have hp_in_C : p.1 ∈ coIdeal S m := by
-          have y_le_p : S.le ⟨y,hyG⟩ p := by
-            exact hpq
+          have y_le_p : S.le ⟨y,hyG⟩ p :=
+            hpq
           exact
             le_preserves_coIdeal (S := S) (m := m)
               (x := ⟨y,hyG⟩) (y := p) (hx := hyC) (hxy := y_le_p)
@@ -793,8 +789,8 @@ private lemma build_restrict_le_C
           (mem_coIdeal_iff S (m := m) (y := p.1)).1 hp_in_C |>.1
         let pG : S.Elem := ⟨p.1, hp_ground⟩
 
-        have hf_pq : S.f ⟨p.1, p.2⟩ = q := by
-          exact hpq_to_b
+        have hf_pq : S.f ⟨p.1, p.2⟩ = q :=
+          hpq_to_b
 
         have heq_dom : pG = ⟨p.1, p.2⟩ := by
           apply Subtype.ext; rfl
@@ -862,7 +858,7 @@ private lemma ideal_sets_iff_sumProd
         have : y ∈ X := by
           cases hX with
           | intro hsub hdown =>
-            exact hdown (by exact hxX) (by exact hyG) (by exact hleS)
+            exact hdown hxX hyG hleS
         exact Finset.mem_inter.mpr ⟨this, hyI⟩
       exact And.intro hAsub hdc
 
@@ -887,7 +883,7 @@ private lemma ideal_sets_iff_sumProd
         have : y ∈ X := by
           cases hX with
           | intro hsub hdown =>
-              exact hdown (by exact hxX) (by exact hyG) (by exact hleS)
+              exact hdown hxX hyG hleS
         exact Finset.mem_inter.mpr ⟨this, hyC⟩
       exact And.intro hBsub hdc
 
@@ -901,7 +897,7 @@ private lemma ideal_sets_iff_sumProd
         | intro hsub hdown =>
           simp_all only [sets_iff_isOrderIdeal, F₁, A, I, F₂, B, C]
           ext a : 1
-          simp_all only [Finset.mem_inter, iff_self_and]
+          simp_all
           intro a_1
           exact hsub a_1
 
@@ -960,7 +956,7 @@ private lemma ideal_sets_iff_sumProd
                           (hx := by exact hAsubI hxA)
                           (hy := hyC)
 
-            simp_all only [Finset.mem_union, true_or, le_iff_leOn_val, not_true_eq_false, and_false, C, I, yE, xE]
+            simp_all
 
           have h_yx_Sle : S.le ⟨y, hyG⟩ ⟨x, hIsubG (hAsubI hxA)⟩ :=
             (S.le_iff_leOn_val (x := ⟨y,hyG⟩) (y := ⟨x,hIsubG (hAsubI hxA)⟩)).mpr hleS
@@ -1042,7 +1038,7 @@ private lemma ideal_sets_iff_sumProd
 
     exact And.intro hXsubG hdown
 
-/-- edgeFinset の一致（これが NDS 等式には十分） -/
+/-- Equality of edgeFinset (this is sufficient for NDS equality) -/
 private lemma ideal_edgeFinset_eq_sumProd
   (S : FuncSetup α) (m : S.Elem) (hm : S.maximal m)
   (hpos : isPoset S) (notuniq : ¬ (∃! mm : S.Elem, S.maximal mm)) :
@@ -1114,15 +1110,15 @@ theorem idealFamily_eq_sumProd_on_NDS
       = (SetFamily.sumProd F₁ F₂).totalHyperedgeSize := by
     dsimp [SetFamily.totalHyperedgeSize]
 
-    simp_all only [F, F₁, F₂]
+    simp_all
 
   have hV :
     (F.ground.card : Int)
       = ((SetFamily.sumProd F₁ F₂).ground.card : Int) := by
 
-    simp_all only [F, F₁, F₂]
+    simp_all
 
-  simp_all only [SetFamily.NDS_def, F, F₁, F₂]
+  simp_all
 
 --使っている。
 omit [DecidableEq α] in
@@ -1135,9 +1131,9 @@ private lemma sum_const_nat (s : Finset α) (c : Nat) :
   -- `n • m = n * m` を適用
   calc
     (∑ _ ∈ s, c) = s.card • c := this
-    _ = s.card * c := by exact rfl
+    _ = s.card * c := rfl
 
----移すとしたらSetFamilyだが。下で使われている。
+---Could be moved to SetFamily, but it's used below.
 private lemma sum_card_union_add_inter_general
   (F₁ F₂ : SetFamily α) :
   (∑ A ∈ F₁.edgeFinset, ∑ B ∈ F₂.edgeFinset, (A ∪ B).card)
@@ -1216,7 +1212,7 @@ private lemma sum_card_union_add_inter_general
                 exact Finset.sum_add_distrib
       _ = F₂.edgeFinset.card * (∑ A ∈ F₁.edgeFinset, A.card)
           + F₁.edgeFinset.card * (∑ B ∈ F₂.edgeFinset, B.card) := by
-           simp_all only [SetFamily.mem_edgeFinset, and_imp, Finset.sum_const, smul_eq_mul, Nat.add_right_cancel_iff]
+           simp_all
            rw [Finset.mul_sum]
 
 
@@ -1265,10 +1261,10 @@ private lemma sum_card_union_general_int
               + (F₁.numHyperedges : Int) * (∑ B ∈ F₂.edgeFinset, (B.card : Int))
               - (∑ A ∈ F₁.edgeFinset, ∑ B ∈ F₂.edgeFinset, (A ∩ B).card : Int))
   simp at eqn
-  simp_all only [Nat.cast_add, Nat.cast_sum, Nat.cast_mul, sub_add_cancel, forall_const]
+  simp_all
 
 
-/-- 台集合が素に交わるとき、各エッジ対の交差は空。 -/
+/-- When ground sets are disjoint, the intersection of each edge pair is empty. -/
 private lemma inter_card_zero_of_disjoint_ground
   (F₁ F₂ : SetFamily α) (hd : Disjoint F₁.ground F₂.ground)
   {A B : Finset α} (hA : A ∈ F₁.edgeFinset) (hB : B ∈ F₂.edgeFinset) :
@@ -1295,7 +1291,7 @@ private lemma inter_card_zero_of_disjoint_ground
   have hmem := Finset.mem_inter.mp ha
   apply (Finset.disjoint_left.mp hdisjAB)
   exact Finset.mem_of_mem_filter a ha
-  simp_all only [SetFamily.mem_edgeFinset, and_self, Finset.mem_inter]
+  simp_all
 
 /-- 交差サイズの二重和は 0。 -/
 private lemma sum_inter_card_eq_zero_of_disjoint_ground
@@ -1314,13 +1310,12 @@ private lemma sum_inter_card_eq_zero_of_disjoint_ground
       refine Finset.sum_congr rfl ?_
       intro B hB
       exact inter_card_zero_of_disjoint_ground F₁ F₂ hd hA hB
-    simp_all only [SetFamily.mem_edgeFinset, Finset.sum_const_zero, Finset.sum_eq_zero_iff, Finset.card_eq_zero, and_imp,
-    Finset.card_empty, implies_true]
+    simp_all
 
   have : ∑ A ∈ F₁.edgeFinset, 0 = 0 := Finset.sum_const_zero
   exact Eq.trans hcongrA this
 
-/-- 【目的】台集合が素に交わるときの簡約版（Int 版）。 -/
+/-- [Goal] Simplified version when ground sets are disjoint (Int version). -/
 private lemma sum_card_union_disjoint_int
   (F₁ F₂ : SetFamily α) (hd : Disjoint F₁.ground F₂.ground) :
   ((∑ A ∈ F₁.edgeFinset, ∑ B ∈ F₂.edgeFinset, (A ∪ B).card) : Int)
@@ -1453,7 +1448,7 @@ private lemma union_inj_on_edges_of_disjoint
       cases hL; cases hR
       rfl
 
-/-- 和積の総サイズ（Nat）：disjoint なら直積二重和に一致。 -/
+/-- Total size of sum-product (Nat): equals double sum of Cartesian product if disjoint. -/
 private lemma total_size_sumProd_eq_doubleSum_disjoint_nat
   (F₁ F₂ : SetFamily α) (hd : Disjoint F₁.ground F₂.ground) :
   (SetFamily.sumProd F₁ F₂).totalHyperedgeSize
@@ -1496,7 +1491,7 @@ private lemma total_size_sumProd_eq_doubleSum_disjoint_int
   have hnat := total_size_sumProd_eq_doubleSum_disjoint_nat (F₁ := F₁) (F₂ := F₂) hd
   exact_mod_cast hnat
 
-/-- NDS の分解式（台集合が素に交わるとき） -/
+/-- NDS decomposition formula (when ground sets are disjoint) -/
 private lemma NDS_sumProd_of_disjoint
   (F₁ F₂ : SetFamily α) (hd : Disjoint F₁.ground F₂.ground) :
   (SetFamily.sumProd F₁ F₂).NDS
@@ -1543,8 +1538,8 @@ private lemma NDS_sumProd_of_disjoint
         (c := ((F₁.ground ∩ F₂.ground).card : Int))
         (by simp_all only [Finset.card_eq_zero, Finset.card_union_of_disjoint, Finset.card_empty, add_zero, Nat.cast_add, Nat.cast_zero])
 
-      have hc : ((F₁.ground ∩ F₂.ground).card : Int) = 0 := by
-        exact_mod_cast hdis
+      have hc : ((F₁.ground ∩ F₂.ground).card : Int) = 0 :=
+        by exact_mod_cast hdis
 
       exact (by
         -- `(u∪v).card = (u.card+v.card) - 0`

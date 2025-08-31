@@ -22,27 +22,27 @@ variable {α : Type u} [DecidableEq α]
 def Rare (F : SetFamily α) (x : α) : Prop :=
   2 * F.degree x ≤ F.numHyperedges
 
---すぐ下で使っている。FuncSetupは使ってない。
---SetFamily.leanに移動でもよいがこのファイルはRare関連のファイルなのでここに置く。
+-- Used immediately below. FuncSetup is not used.
+-- Could be moved to SetFamily.lean but placed here since this file is for Rare-related content.
 private lemma two_deg_le_num_int_of_Rare
     (F : SetFamily α) (x : α) (hR : Rare F x) :
     (2 * (F.degree x : Int) ≤ (F.numHyperedges : Int)) := by
-  -- Nat の不等式を Int に持ち上げる
+  -- Lift Nat inequality to Int
   -- Int.ofNat_le.mpr : m ≤ n → (m : ℤ) ≤ (n : ℤ)
   have : Int.ofNat (2 * F.degree x) ≤ Int.ofNat F.numHyperedges :=
     Int.ofNat_le.mpr hR
-  -- 表記を (· : Int) に戻す
+  -- Return to (· : Int) notation
   exact this
 
---Rareの定義をIntに書き直したもの。
---ReductionからNDSの証明で使っている。
+-- Rare definition rewritten in Int.
+-- Used in NDS proof from Reduction.
 lemma diff_term_nonpos_of_Rare
     (F : SetFamily α) (x : α) (hR : Rare F x) :
     2 * (F.degree x : Int) - (F.numHyperedges : Int) ≤ 0 := by
   -- a - b ≤ 0 ↔ a ≤ b
   have hx : (2 * (F.degree x : Int) ≤ (F.numHyperedges : Int)) :=
     two_deg_le_num_int_of_Rare (F := F) (x := x) hR
-  -- `sub_nonpos.mpr` は「a ≤ b」を「a - b ≤ 0」にする
+  -- `sub_nonpos.mpr` converts "a ≤ b" to "a - b ≤ 0"
   exact Int.sub_nonpos_of_le hx
 
 private lemma ideal_diff_simClass_is_ideal
@@ -89,8 +89,8 @@ private lemma ideal_diff_simClass_is_ideal
         S.sim_of_maximal_above_class (u := u) (x := ⟨x, hxV⟩) (y := ⟨y, hy⟩)
           hmax hySim hyx_le
       have hxU : x ∈ S.simClass u := by
-        have : ∃ (hxg : x ∈ S.ground), S.sim ⟨x, hxg⟩ u := by
-          exact ⟨hxV, hxu_sim⟩
+        have : ∃ (hxg : x ∈ S.ground), S.sim ⟨x, hxg⟩ u :=
+          ⟨hxV, hxu_sim⟩
         exact (S.mem_simClass_iff u).2 this
       exact hxNotU hxU
 
@@ -98,13 +98,13 @@ private lemma ideal_diff_simClass_is_ideal
 
   have hSet : (S.idealFamily).sets (I \ S.simClass u) := by
     change SetFamily.isOrderIdealOn (S.leOn) S.ground (I \ S.simClass u)
-    exact And.intro hSub (by intro x hx; exact hDown hx)
+    exact ⟨hSub, hDown⟩
 
   have huNot : u.1 ∉ (I \ S.simClass u) := by
     have huU : u.1 ∈ S.simClass u := by
       have : S.sim u u := S.sim_refl u
-      have : ∃ (hu' : u.1 ∈ S.ground), S.sim ⟨u.1, hu'⟩ u := by
-        exact ⟨u.property, this⟩
+      have : ∃ (hu' : u.1 ∈ S.ground), S.sim ⟨u.1, hu'⟩ u :=
+        ⟨u.property, this⟩
       exact (S.mem_simClass_iff u).2 this
     intro huIn
     have hu_pair := (Finset.mem_sdiff).1 huIn
@@ -123,7 +123,7 @@ noncomputable def Phi
       (SetFamily.mem_edgeFinset_iff_sets (F := S.idealFamily) (A := I \ S.simClass u)).2 h.1
     ⟨ I \ S.simClass u, hJedge, h.2 ⟩
 
---IdealsTraceで引用されている。
+-- Referenced in IdealsTrace.
 lemma Phi_injective
     (S : FuncSetup α) {u : S.Elem} (hmax : S.maximal u) :
     Function.Injective (Phi S u hmax) := by
@@ -138,9 +138,9 @@ lemma Phi_injective
       | intro hIedge huI =>
         cases hJ with
         | intro hJedge huJ =>
-          -- Φ の定義で基底集合の等式へ
+          -- From Φ's definition to equality of underlying sets
           dsimp [Phi] at hEq
-          -- 使う補題：U ⊆ I, U ⊆ J
+          -- Lemmas to use: U ⊆ I, U ⊆ J
           have hI_sets : (S.idealFamily).sets I :=
             (SetFamily.mem_edgeFinset_iff_sets (F := S.idealFamily) (A := I)).1 hIedge
           have hJ_sets : (S.idealFamily).sets J :=
@@ -149,35 +149,32 @@ lemma Phi_injective
             S.simClass_subset_of_contains (u := u) (I := I) hI_sets huI
           have UsubJ : S.simClass u ⊆ J :=
             S.simClass_subset_of_contains (u := u) (I := J) hJ_sets huJ
-          -- まず基底の Finset 同士の等式を取り出す
+          -- First extract the equality of underlying Finsets
           --   I \ U = J \ U
           have hDiff :
               I \ S.simClass u = J \ S.simClass u := by
-            -- hEq は Subtype の等式なので、値部分を取り出す
+            -- hEq is a Subtype equality, so extract the value part
             exact congrArg Subtype.val hEq
           -- I ⊆ J
           have hIJ : I ⊆ J := by
             intro x hxI
             by_cases hxU : x ∈ S.simClass u
-            · -- U ⊆ J より
+            · -- From U ⊆ J
               exact UsubJ hxU
-            · -- x ∈ I\U なので等式から x ∈ J\U、したがって x ∈ J
+            · -- x ∈ I\U so from equality x ∈ J\U, therefore x ∈ J
               have hxInDiff : x ∈ I \ S.simClass u :=
                 (Finset.mem_sdiff).2 ⟨hxI, hxU⟩
               have hxInDiff' : x ∈ J \ S.simClass u := by
-                -- hDiff の両辺に属するので書き換え
-                -- `rw [hDiff] at hxInDiff` を避けて等価性で移送
-                -- 等式から右辺への移送
+                -- Both sides belong to hDiff so rewrite
+                -- Avoid `rw [hDiff] at hxInDiff` and transport by equivalence
+                -- Transport from equality to right side
                 have : (I \ S.simClass u) ⊆ (J \ S.simClass u) := by
-                  intro t ht; exact by
-                    -- `rw [hDiff]` で十分だが、`rw` を使ってよい
-                    -- ここは素直に置換します
-                    rw [hDiff] at ht
-                    exact ht
+                  intro t ht
+                  rwa [hDiff] at ht
                 exact this hxInDiff
               have hxJ_and_notU := (Finset.mem_sdiff).1 hxInDiff'
               exact hxJ_and_notU.1
-          -- J ⊆ I も同様
+          -- J ⊆ I similarly
           have hJI : J ⊆ I := by
             intro x hxJ
             by_cases hxU : x ∈ S.simClass u
@@ -188,21 +185,18 @@ lemma Phi_injective
               have hxInDiff' : x ∈ I \ S.simClass u := by
                 have : (J \ S.simClass u) ⊆ (I \ S.simClass u) := by
                   intro t ht
-                  -- 反対向きの包含は hDiff⁻¹
-                  -- `rw [← hDiff]` で移送
-                  rw [← hDiff] at ht
-                  exact ht
+                  rwa [← hDiff] at ht
                 exact this hxInDiff
               have hxI_and_notU := (Finset.mem_sdiff).1 hxInDiff'
               exact hxI_and_notU.1
-          -- 以上で I = J
+          -- Thus I = J
           have hIJ_eq : I = J := Finset.Subset.antisymm hIJ hJI
-          -- サブタイプまで持ち上げ
+          -- Lift to subtype
           apply Subtype.ext
           exact hIJ_eq
 
-/-- 単射 `Φ : {A | A∈E ∧ x∈A} → {B | B∈E ∧ x∉B}` があれば `Rare x`。 -/
---単射が存在すればrare。単射の仮定を抜いた形での補題は、Reductionにある。
+/-- If there exists an injection `Φ : {A | A∈E ∧ x∈A} → {B | B∈E ∧ x∉B}`, then `Rare x`. -/
+-- If injection exists then rare. The lemma without injection assumption is in Reduction.
 lemma rare_of_injection_between_filters
   (F : SetFamily α) (x : α)
   (Φ : {A // A ∈ F.edgeFinset ∧ x ∈ A} →
@@ -219,8 +213,8 @@ lemma rare_of_injection_between_filters
   { toFun := fun a =>
       ⟨a.1, by
         have h := a.2
-        have : a.1 ∈ pin := by
-          exact (Finset.mem_filter).2 ⟨h.1, h.2⟩
+        have : a.1 ∈ pin :=
+          (Finset.mem_filter).2 ⟨h.1, h.2⟩
         exact this⟩
     , invFun := fun b =>
       ⟨b.1, by
@@ -240,8 +234,8 @@ lemma rare_of_injection_between_filters
   { toFun := fun a =>
       ⟨a.1, by
         have h := a.2
-        have : a.1 ∈ pout := by
-          exact (Finset.mem_filter).2 ⟨h.1, h.2⟩
+        have : a.1 ∈ pout :=
+          (Finset.mem_filter).2 ⟨h.1, h.2⟩
         exact this⟩
     , invFun := fun b =>
       ⟨b.1, by
@@ -259,22 +253,12 @@ lemma rare_of_injection_between_filters
     Function.Injective (fun a : {A // A ∈ pin} =>
       eOut (Φ (eIn.symm a))) := by
     intro a b h
-    have : eIn.symm a = eIn.symm b := by
+    have h₁ : Φ (eIn.symm a) = Φ (eIn.symm b) :=
+      eOut.injective h
+    have : eIn.symm a = eIn.symm b :=
+      hΦ h₁
 
-      apply hΦ
-
-      have := congrArg Subtype.val h
-
-      have hinj := eOut.injective
-
-      have h₁ : Φ (eIn.symm a) = Φ (eIn.symm b) := by
-        exact hinj h
-      exact hinj h
-
-    simp_all only [Equiv.coe_fn_symm_mk, Equiv.coe_fn_mk, Subtype.mk.injEq, pout, s, eOut, pin, eIn]
-    obtain ⟨val_1, property_1⟩ := b
-    subst this
-    simp_all only [pin, s]
+    simp_all
 
   have hCard_le :
       pin.card ≤ pout.card := by
@@ -287,30 +271,21 @@ lemma rare_of_injection_between_filters
 
   have hDeg : F.degree x = pin.card :=
     (SetFamily.degree_eq_card_filter (F := F) (x := x))
-  have hNum : F.numHyperedges = s.card := by
-    exact rfl
+  have hNum : F.numHyperedges = s.card :=
+    rfl
 
   have hSplit :
-      pin.card + pout.card = s.card := by
-    exact card_filter_add_card_filter_not s fun A => x ∈ A
+      pin.card + pout.card = s.card :=
+    card_filter_add_card_filter_not s fun A => x ∈ A
 
   have h2 :
       2 * pin.card ≤ s.card := by
-    have := Nat.add_le_add_left hCard_le pin.card
-
     have : 2 * pin.card ≤ pin.card + pout.card := by
-
-      have hL : 2 * pin.card = pin.card + pin.card := by
-
-        exact Nat.two_mul pin.card
-      have hR : pout.card + pin.card = pin.card + pout.card :=
-        Nat.add_comm _ _
-
-      have base := (Nat.add_le_add_left hCard_le pin.card)
-
-      simpa [hL, hR] using base
-
-    simpa [hSplit] using this
+      rw [Nat.two_mul]
+      exact Nat.add_le_add_left hCard_le pin.card
+    calc 2 * pin.card
+      ≤ pin.card + pout.card := this
+    _ = s.card := hSplit
 
   change 2 * F.degree x ≤ F.numHyperedges
 

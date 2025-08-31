@@ -104,7 +104,7 @@ variable {β : Type*}
 lemma card_filter_add_card_filter_not (s : Finset β) (p : β → Prop) [DecidablePred p] [DecidableEq β] :
     (s.filter p).card + (s.filter (fun b => ¬ p b)).card = s.card := by
 classical
-  -- 1) 互いに素
+  -- 1) Disjoint
   have hdisj :
       Disjoint (s.filter p) (s.filter (fun b => ¬ p b)) := by
     refine Finset.disjoint_left.mpr ?_
@@ -112,7 +112,7 @@ classical
     have hx_p  : p x     := (Finset.mem_filter.mp hx).2
     have hx_np : ¬ p x   := (Finset.mem_filter.mp hx').2
     exact (hx_np hx_p).elim
-  -- 2) 和が元の集合
+  -- 2) Union equals original set
   have hcup :
       (s.filter p) ∪ (s.filter (fun b => ¬ p b)) = s := by
     ext x
@@ -125,17 +125,17 @@ classical
       by_cases hpx : p x
       · exact Finset.mem_union.mpr (Or.inl (Finset.mem_filter.mpr ⟨hx, hpx⟩))
       · exact Finset.mem_union.mpr (Or.inr (Finset.mem_filter.mpr ⟨hx, hpx⟩))
-  -- 3) カード数
+  -- 3) Cardinality
   have := Finset.card_union_of_disjoint (s := s.filter p)
                                         (t := s.filter (fun b => ¬ p b))
                                         hdisj
-  -- (s ∪ t).card = s.card + t.card なので左右を入れ替えて使う
+  -- Since (s ∪ t).card = s.card + t.card, we use the symmetric version
   simpa [hcup, Nat.add_comm] using this.symm
 
 
-/- 上で別証明を行ったので、こちらは消す。
+/- Alternative proof was done above, so this is commented out.
 
-/-- `card (s.filter p) + card (s.filter (¬p)) = card s`。 -/
+/-- `card (s.filter p) + card (s.filter (¬p)) = card s`. -/
 lemma card_filter_add_card_filter_not (s : Finset β) (p : β → Prop) [DecidablePred p] :
     (s.filter p).card + (s.filter (fun b => ¬ p b)).card = s.card := by
   classical

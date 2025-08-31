@@ -69,8 +69,8 @@ lemma powerset_singleton (x : α) :
         intro y hy
         have : y ∈ (∅ : Finset α) := by
           subst h0
-          simp_all only [Finset.mem_insert, Finset.mem_singleton, true_or, Finset.notMem_empty]
-        exact (False.elim (by simp_all only [Finset.mem_insert, Finset.mem_singleton, true_or, Finset.notMem_empty]))
+          simp_all
+        exact (False.elim (by simp_all))
     | inr h1 =>
         intro y hy
         simpa [h1] using hy
@@ -147,7 +147,7 @@ lemma sizes_of_card_one
     intro h
     have : (S.idealFamily).ground.card = 0 := by
       simp [h]
-    exact Nat.one_ne_zero (by simp_all only [Finset.card_empty, zero_ne_one])
+    exact Nat.one_ne_zero (by simp_all)
   constructor
   ·
     have : (S.idealFamily).totalHyperedgeSize
@@ -212,7 +212,7 @@ private lemma antisymm_restrictToIdeal_of_isPoset
   have h_eqS : SumProduct.liftFromIdeal S m hm u = SumProduct.liftFromIdeal S m hm v := by
     exact hpos this h₂
   have : u.1 = v.1 :=by
-    simp_all only [le_iff_leOn_val]
+    simp_all
     injection h_eqS
 
   exact Subtype.ext this
@@ -237,7 +237,7 @@ private lemma antisymm_restrictToCoIdeal_of_isPoset
 
   have : u.1 = v.1 := by
     apply congrArg Subtype.val
-    simp_all only [le_iff_leOn_val]
+    simp_all
     injection h_eqS
     (expose_names; exact Subtype.eq val_eq)
   exact Subtype.ext this
@@ -313,16 +313,15 @@ theorem secondary_main_theorem
                   exact this
 
                 have hNDS_T' : (T'.idealFamily).NDS ≤ 0 := by
-                  simp_all only [SetFamily.NDS_def, tsub_le_iff_right, zero_add, tsub_lt_self_iff,
-                    Nat.lt_add_one, and_self, T']
+                  simp_all
                   apply ih
-                  on_goal 2 => { simp_all only
+                  on_goal 2 => { simp_all
                   }
                   on_goal 2 => {
-                    simp_all only
+                    simp_all
                     rfl
                   }
-                  · simp_all only [tsub_lt_self_iff, Nat.lt_add_one, and_self]
+                  · simp_all
 
                 have hmono :
                 (T.idealFamily).NDS ≤ (T'.idealFamily).NDS :=
@@ -335,9 +334,9 @@ theorem secondary_main_theorem
 
                 have hexu: (¬∃! mm, T.maximal mm) := by
                   intro h
-                  exact hexu (by exact h)
+                  exact hexu h
 
-                have hne : T.ground.Nonempty := by exact Finset.card_pos.mp hposCard--T.nonempty
+                have hne : T.ground.Nonempty := Finset.card_pos.mp hposCard--T.nonempty
                 obtain ⟨m, hm⟩ :=
                   FuncSetup.exists_maximal_of_finite (S := T) (hpos := hposT) (hne := hne)
 
@@ -347,29 +346,26 @@ theorem secondary_main_theorem
                 have hlt₁ :
                   T₁.ground.card < T.ground.card :=
                   SumProduct.restrictToIdeal_card_lt_of_not_unique
-                    (S := T) (m := m) (hm := hm) (hpos := hposT) (notconnected := by exact hexu)
+                    (S := T) (m := m) (hm := hm) (hpos := hposT) (notconnected := hexu)
                 have hlt₂ :
                   (T₂ hexu).ground.card < T.ground.card :=
                   SumProduct.restrictToCoIdeal_card_lt
-                    (S := T) (m := m) (hpos := hposT) (notconnected := by exact hexu)
+                    (S := T) (m := m) (hpos := hposT) (notconnected := hexu)
 
                 have hpos₁ : isPoset T₁ := (antisymm_restrictToIdeal_of_isPoset (S := T) hposT m hm)
-                have hpos₂ : isPoset (T₂ hexu):=  (antisymm_restrictToCoIdeal_of_isPoset (S := T) hposT m (notuniq := by exact hexu))
+                have hpos₂ : isPoset (T₂ hexu):=  (antisymm_restrictToCoIdeal_of_isPoset (S := T) hposT m (notuniq := hexu))
 
                 have hcard1: T₁.ground.card < n := by
                   subst hcard
-                  simp_all only [Finset.card_pos, Finset.one_le_card, maximal_iff, le_iff_leOn_val, Subtype.forall, SetFamily.NDS_def,
-                    tsub_le_iff_right, zero_add, T₁, T₂]
+                  simp_all
                 have isPoset1 : isPoset T₁ := by
-                   simp_all only [ maximal_iff, le_iff_leOn_val, Subtype.forall, SetFamily.NDS_def,
-                  tsub_le_iff_right, zero_add, T₁, T₂]
+                   simp_all
                 have hNDS₁ : (T₁.idealFamily).NDS ≤ 0 := by
                   exact ih T₁.ground.card hcard1 T₁ isPoset1 rfl
                 have hNDS₂ : ((T₂ hexu).idealFamily).NDS ≤ 0 :=
                   ih (T₂ hexu).ground.card
                     (by simpa [hn] using hlt₂) (T₂ hexu) (by
-                      simp_all only [ maximal_iff, le_iff_leOn_val, Subtype.forall, SetFamily.NDS_def,
-                      tsub_le_iff_right, zero_add, T₁, T₂]
+                      simp_all
                     ) rfl
 
                 let F₁ := (T₁.idealFamily)
@@ -387,7 +383,7 @@ theorem secondary_main_theorem
                   =
                 (SetFamily.sumProd (T₁.idealFamily) ((T₂ hexu).idealFamily)).NDS :=
                  SumProduct.idealFamily_eq_sumProd_on_NDS
-                  (S := T) (m := m) (hm := hm) (hpos := hposT) (notuniq := by exact hexu)
+                  (S := T) (m := m) (hm := hm) (hpos := hposT) (notuniq := hexu)
 
                 have hProd :
                   (SetFamily.sumProd F₁ F₂).NDS
@@ -395,7 +391,7 @@ theorem secondary_main_theorem
                   (F₂.numHyperedges : Int) * F₁.NDS
                   + (F₁.numHyperedges : Int) * F₂.NDS :=
                     SumProduct.NDS_restrict_sumProd_split (S := T) (m := m) (hm := hm)
-                    (hpos := hposT) (notuniq := by exact hexu)
+                    (hpos := hposT) (notuniq := hexu)
 
                 have hcoef₁ : 0 ≤ (((T₂ hexu).idealFamily).numHyperedges:Int) := by
                   exact Int.natCast_nonneg (T₂ hexu).idealFamily.numHyperedges
@@ -419,10 +415,10 @@ theorem secondary_main_theorem
                       --= (SetFamily.sumProd F₁ F₂).NDS := by exact hEdges
                       = ((T₂ hexu).idealFamily).numHyperedges * (T₁.idealFamily).NDS
                         + (T₁.idealFamily).numHyperedges * ((T₂ hexu).idealFamily).NDS := Eq.trans hNDS_congr hProd
-                  _ ≤ 0 := by exact hrhs_le
+                  _ ≤ 0 := hrhs_le
         )
 
-  exact main S.ground.card S (by simp_all only [SetFamily.NDS_def, tsub_le_iff_right, zero_add]) rfl
+  exact main S.ground.card S (by simp_all) rfl
 
 /- The main theorem (statement)：
     the preorder induced by `f : V → V` has non-positive NDS. -/

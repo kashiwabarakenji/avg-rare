@@ -45,7 +45,7 @@ noncomputable def traceAt (x : α) (F : SetFamily α) : SetFamily α := by
 
 @[simp] lemma sets_traceAt_iff (F : SetFamily α) (u : α) {B : Finset α} : (traceAt u F).sets B ↔ ∃ A, F.sets A ∧ B = A.erase u := by
   rfl
---The lemma of what happens when you trace it.
+-- The lemma describing the behavior of trace operation.
 private lemma edgeFinset_traceAt_eq_image_erase (F : SetFamily α) (u : α) :
   (traceAt u F).edgeFinset = F.edgeFinset.image (fun A => A.erase u) := by
   classical
@@ -64,12 +64,12 @@ private lemma edgeFinset_traceAt_eq_image_erase (F : SetFamily α) (u : α) :
       (sets_traceAt_iff (F := F) (u := u) (B := A.erase u)).2 ⟨A, hAsets, rfl⟩
     exact (SetFamily.mem_edgeFinset_iff_sets (F := traceAt u F) (A := A.erase u)).2 hTrace
 
-/-オリジナル証明
+/-Original proof
 lemma edgeFinset_traceAt_eq_image_erase (F : SetFamily α) (u : α) :
   (traceAt u F).edgeFinset = F.edgeFinset.image (λ A => A.erase u) := by
   ext B
   constructor
-  · -- (→) traceAt の edgeFinset にある集合は元エッジの erase
+  · -- (→) Sets in traceAt's edgeFinset are erased from original edges
     intro hB
     simp only [SetFamily.edgeFinset, traceAt, Finset.mem_filter,
                Finset.mem_powerset] at hB
@@ -94,7 +94,7 @@ lemma edgeFinset_traceAt_eq_image_erase (F : SetFamily α) (u : α) :
       · exact (SetFamily.mem_edgeFinset_iff_sets F).mpr hAin
       · exact rfl
 
-  · -- (←) 元エッジ A の erase は traceAt のエッジ
+  · -- (←) Erase of original edge A is an edge of traceAt
     intro hB
     simp only [Finset.mem_image] at hB
     rcases hB with ⟨A, hAin, rfl⟩
@@ -111,64 +111,66 @@ lemma edgeFinset_traceAt_eq_image_erase (F : SetFamily α) (u : α) :
       constructor
       · exact hx.1
       · exact hAsub hx.2
-    · -- sets 部分は match で強制する
+    · -- The sets part is enforced by match
       simp_all only [decide_eq_true_eq]
       exact ⟨A, hAsets, rfl⟩
 -/
 
-/- 参照されてなかった。
+/- Unused reference.
 lemma trace_filter_eq_image_filter_of_ne
   (F : SetFamily α) (u w : α) (hwu : w ≠ u) :
   (traceAt u F).edgeFinset.filter (fun B => w ∈ B)
   =
   (F.edgeFinset.filter (fun A => w ∈ A)).image (fun A => A.erase u) := by
   classical
-  -- まず全体が image という事実を filter にかける
+  -- First apply the fact that the whole thing is an image to filter
   have H := edgeFinset_traceAt_eq_image_erase (F := F) (u := u)
-  -- `w ≠ u` なら `w ∈ A.erase u ↔ w ∈ A`
-  -- これで「filter 後の像 = 像後の filter」が素直に言えます（injective は不要）。
+  -- If `w ≠ u` then `w ∈ A.erase u ↔ w ∈ A`
+  -- This allows us to say "filtered image = image after filter" directly (injective is not needed).
   apply Finset.ext
   intro B
   constructor
   · intro hB
     rcases Finset.mem_filter.mp hB with ⟨hBmem, hBw⟩
-    have : B ∈ (F.edgeFinset.image fun A => A.erase u) := by simpa [H] using hBmem
+    have : B ∈ (F.edgeFinset.image fun A => A.erase u) := by
+      rw [H]; exact hBmem
     rcases Finset.mem_image.mp this with ⟨A, hA, rfl⟩
-    -- `w ∈ A.erase u` から `w ∈ A`（w ≠ u を使用）
+    -- From `w ∈ A.erase u` to `w ∈ A` (using w ≠ u)
     have : w ∈ A := by
-      -- Finset.mem_erase: w ∈ A.erase u ↔ (w ≠ u ∧ w ∈ A)
-      simpa [Finset.mem_erase, hwu] using hBw
+      simp only [Finset.mem_erase, hwu, true_and] at hBw
+      exact hBw
     exact Finset.mem_image.mpr ⟨A, (Finset.mem_filter.mpr ⟨hA, this⟩), rfl⟩
   · intro hB
     rcases Finset.mem_image.mp hB with ⟨A, hA, rfl⟩
     rcases Finset.mem_filter.mp hA with ⟨hAedge, hAw⟩
-    -- 右から左へ：A.erase u がトレース側の edge で、かつ w を含む
+    -- Right to left: A.erase u is an edge on the trace side and contains w
     refine Finset.mem_filter.mpr ?_
     constructor
     · simpa [H]
       using (Finset.mem_image.mpr ⟨A, hAedge, rfl⟩ :
         A.erase u ∈ (F.edgeFinset.image fun A => A.erase u))
-    · -- `w ∈ A.erase u`（w ≠ u を使用）
+    · -- `w ∈ A.erase u` (using w ≠ u)
       -- again: mem_erase ↔ (w ≠ u ∧ w ∈ A)
-      simpa [Finset.mem_erase, hwu] using hAw
+      simp only [Finset.mem_erase, hwu, true_and]
+      exact hAw
 
 -/
 
---trace関係あり
---パラレルパートナーの存在は必要なかった。
+-- Trace-related
+-- Existence of parallel partner was not necessary.
 private lemma parallel_off_u_preserved_by_trace
   {α : Type*}
   [DecidableEq α]
   (F : SetFamily α) (u w z : α)
   (hw : w ≠ u) (hz : z ≠ u) :
   Parallel_edge (traceAt u F) w z ↔ Parallel_edge F w z := by
-  -- 既知：エッジ集合は erase の像
+  -- Known: edge set is the image of erase
   have himg :
       (traceAt u F).edgeFinset
         = F.edgeFinset.image (fun A : Finset α => A.erase u) :=
     edgeFinset_traceAt_eq_image_erase F u
 
-  -- （→）方向
+  -- (→) direction
   constructor
   · intro htr
     have h_on_image :
@@ -190,10 +192,10 @@ private lemma parallel_off_u_preserved_by_trace
       have : (w ∈ A.erase u) ↔ (z ∈ A.erase u) := by
         exact h_on_image (A.erase u)
           (by exact Finset.mem_image.mpr ⟨A, hA, rfl⟩)
-      have hw' : (w ∈ A.erase u) ↔ (w ∈ A) := by
-        simp [Finset.mem_erase, hw]  -- hw で簡約
-      have hz' : (z ∈ A.erase u) ↔ (z ∈ A) := by
-        simp [Finset.mem_erase, hz]
+      have hw' : (w ∈ A.erase u) ↔ (w ∈ A) :=
+        Finset.mem_erase.trans ⟨fun h => h.2, fun h => ⟨hw, h⟩⟩
+      have hz' : (z ∈ A.erase u) ↔ (z ∈ A) :=
+        Finset.mem_erase.trans ⟨fun h => h.2, fun h => ⟨hz, h⟩⟩
       simpa [hw', hz'] using this
     exact
       (filter_eq_iff_on (S := F.edgeFinset)
@@ -210,11 +212,12 @@ private lemma parallel_off_u_preserved_by_trace
         (w ∈ B) ↔ (z ∈ B) := by
       intro B hB
       rcases (Finset.mem_image).1 hB with ⟨A, hA, rfl⟩
-      have hw' : (w ∈ A.erase u) ↔ (w ∈ A) := by
-        simp [Finset.mem_erase, hw]
-      have hz' : (z ∈ A.erase u) ↔ (z ∈ A) := by
-        simp [Finset.mem_erase, hz]
-      simpa [hw', hz'] using (h_on_domain A hA)
+      have hw' : (w ∈ A.erase u) ↔ (w ∈ A) :=
+        Finset.mem_erase.trans ⟨fun h => h.2, fun h => ⟨hw, h⟩⟩
+      have hz' : (z ∈ A.erase u) ↔ (z ∈ A) :=
+        Finset.mem_erase.trans ⟨fun h => h.2, fun h => ⟨hz, h⟩⟩
+      rw [hw', hz']
+      exact h_on_domain A hA
     have : (traceAt u F).edgeFinset.filter (fun B => w ∈ B)
            = (traceAt u F).edgeFinset.filter (fun B => z ∈ B) := by
       have := (filter_eq_iff_on
@@ -273,35 +276,30 @@ private lemma ParallelClass_trace_eq_erase
       parallel_off_u_preserved_by_trace2
         (F := F) (u := u) (w := a) (z := b)
         (hw := (Finset.mem_erase.mp ha).1) (hz := hb_ne_u)
-    have hab_t : Parallel (traceAt u F) a b := by
-      simp_all only [Finset.mem_erase, ne_eq, mem_ParallelClass_iff, traceAt_ground, not_false_eq_true, and_self, Parallel,
-        true_and, implies_true, and_true, iff_true]
-    have hbg_t : b ∈ (traceAt u F).ground := by
-      have : b ∈ F.ground.erase u :=
-        Finset.mem_erase.mpr (And.intro hb_ne_u hbC'.1)
-      have : b ∈ (traceAt u F).ground := by
-        exact cast (by rfl) this
-      exact this
+    have hab_t : Parallel (traceAt u F) a b :=
+      hiff.mpr hbC'.2
+    have hbg_t : b ∈ (traceAt u F).ground :=
+      Finset.mem_erase.mpr ⟨hb_ne_u, hbC'.1⟩
     exact (mem_ParallelClass_iff (traceAt u F) a b).2
            (And.intro hbg_t hab_t)
   constructor
   · intro h; exact LtoR h
   · intro h; exact RtoL h
 
-/-- `classSet (traceAt u F)` は `classSet F` を `erase u` した像。
-    代表が `u` の場合は `v` に差し替えて扱う（`u‖v` を使用）。 -/
+/-- `classSet (traceAt u F)` is the image of `classSet F` after `erase u`.
+    When the representative is `u`, replace it with `v` (using `u‖v`). -/
 private lemma classSet_trace_eq_image_erase_of_parallel
   (F : SetFamily α) {u v : α}
   (hu : u ∈ F.ground) (hv : v ∈ F.ground)
   (hne : u ≠ v) (hp : Parallel F u v) :
   classSet (traceAt u F) = (classSet F).image (fun C => C.erase u) := by
   classical
-  -- 左⊆右
+  -- Left ⊆ Right
   apply Finset.ext
   intro D
   constructor
   · intro hD
-    -- D = class(trace) a（a ∈ ground.erase u）から構成
+    -- D = class(trace) a (a ∈ ground.erase u) constructed from
     obtain ⟨a, ha, hDdef⟩ :
         ∃ a, a ∈ F.ground.erase u ∧
               D = ParallelClass (traceAt u F) a := by
@@ -333,7 +331,7 @@ private lemma classSet_trace_eq_image_erase_of_parallel
       have hCv : C = ParallelClass F v := by
         -- C = class F a = class F u = class F v
         have h1 : C = ParallelClass F u := by
-          exact Eq.trans hCdef.symm (by exact congrArg F.ParallelClass hau)  -- 安定化：型合わせだけ
+          exact Eq.trans hCdef.symm (by exact congrArg F.ParallelClass hau)  -- Stabilization: just type matching
         have h2 : ParallelClass F u = ParallelClass F v :=
           by
 
@@ -370,7 +368,7 @@ private lemma classSet_trace_eq_image_erase_of_parallel
       apply Exists.intro v
       · constructor
         · exact hv'
-        · exact id (Eq.symm this)
+        · exact this.symm
 
     · have : D = ParallelClass (traceAt u F) a := by
         have h := ParallelClass_trace_eq_erase
@@ -386,9 +384,9 @@ private lemma classSet_trace_eq_image_erase_of_parallel
       · constructor
         · subst this hCdef
           simp_all only [ne_eq, Parallel, Finset.mem_image, traceAt_ground, Finset.mem_erase, not_false_eq_true, and_self]
-        · exact id (Eq.symm this)
+        · exact this.symm
 
-/-- `erase u` は `classSet F` 上で単射（`u‖v` のとき）。 -/
+/-- `erase u` is injective on `classSet F` (when `u‖v`). -/
 private lemma erase_on_classSet_injective_of_parallel
   (F : SetFamily α) (hasU: F.sets F.ground) {u v : α}
   (hu : u ∈ F.ground) --(hv : v ∈ F.ground)
@@ -397,7 +395,7 @@ private lemma erase_on_classSet_injective_of_parallel
     (fun (C : {C // C ∈ classSet F}) => (C.1).erase u) := by
   classical
   intro C D hEq
-  -- `C.1` と `D.1` をそれぞれ `Cset`, `Dset` と名付けて扱う
+  -- Name `C.1` and `D.1` as `Cset` and `Dset` respectively for handling
   let Cset := C.1
   let Dset := D.1
   have hCmem : Cset ∈ classSet F := C.2
@@ -505,7 +503,7 @@ private lemma erase_on_classSet_injective_of_parallel
   classical
   simp [traceAt, hu]
 
-/-- ★ 最終目標：`excess` は 1 減る。Reductionから参照 -/
+/-- ★ Final goal: `excess` decreases by 1. Referenced from Reduction -/
 theorem excess_trace
   (F : SetFamily α) (hasU: F.sets F.ground)(Nonemp:F.ground.card ≥ 1) (u v : α)
   (hu : u ∈ F.ground) (hv : v ∈ F.ground)
@@ -542,7 +540,7 @@ theorem excess_trace
     exact this
 
   unfold excess
-  -- 左辺 使わなかったのか？
+  -- Left side - Was it not used?
   have L :
       (traceAt u F).ground.card - numClasses (traceAt u F)
       = (F.ground.card:Int) - (1 + numClasses F) := by
@@ -604,19 +602,11 @@ private lemma erase_on_edges_injective_of_parallel
   by_cases hx : x = u
   ·
 
-    have hAsets : F.sets A.1 := by
-      simp_all only [SetFamily.Parallel, ne_eq]
-      obtain ⟨val, property⟩ := A
-      obtain ⟨val_1, property_1⟩ := B
-      simp_all only
-      simp_all only [SetFamily.mem_edgeFinset]
+    have hAsets : F.sets A.1 :=
+      (SetFamily.mem_edgeFinset_iff_sets F).mp A.2
 
-    have hBsets : F.sets B.1 := by
-      simp_all only [SetFamily.Parallel, ne_eq]
-      obtain ⟨val, property⟩ := A
-      obtain ⟨val_1, property_1⟩ := B
-      simp_all only
-      simp_all only [SetFamily.mem_edgeFinset, and_true]
+    have hBsets : F.sets B.1 :=
+      (SetFamily.mem_edgeFinset_iff_sets F).mp B.2
 
     have hv_on_erases :
         (v ∈ A.1.erase u) ↔ (v ∈ B.1.erase u) := by
@@ -671,8 +661,8 @@ private lemma erase_on_edges_injective_of_parallel
 
 
 
-/-- トレース後のエッジ集合は，元のエッジ集合に `erase u` を施した像と一致。
-`parallel` はここでは不要（像集合の同一性）。 -/
+/-- The edge set after trace matches the image of the original edge set with `erase u` applied.
+`parallel` is not needed here (identity of image sets). -/
 private lemma edgeFinset_trace_eq_image_erase_of_parallel
     (F : SetFamily α) {u v : α}
     (_ : F.Parallel u v) (_ : u ≠ v) :
@@ -720,17 +710,16 @@ private lemma numHyperedges_preserved_of_parallel
     unfold Function.Injective at hsub_inj
     simp_all only [Parallel, ne_eq, mem_edgeFinset, Subtype.forall, Subtype.mk.injEq, and_imp, subset_refl]
     apply hsub_inj
-    · simp_all only [subset_refl]
-    · simp_all only [subset_refl]
-    · simp_all only [subset_refl]
-    · simp_all only [subset_refl]
-    · simp_all only [subset_refl]
+    · exact hA.1
+    · exact hA.2
+    · exact hB.1
+    · exact hB.2
+    · exact hEq
 
   have hcard_image :
       (F.edgeFinset.image (fun A => A.erase u)).card
-        = F.edgeFinset.card := by
-
-    simpa using Finset.card_image_iff.mpr hinj_on
+        = F.edgeFinset.card :=
+    Finset.card_image_iff.mpr hinj_on
 
   simp [numHyperedges, himg, hcard_image]
 
@@ -770,7 +759,7 @@ private lemma sum_edge_sizes_split_by_u
   simp [Finset.sum_add_distrib]
   exact Eq.symm (SetFamily.degree_eq_card_filter F u)
 
-/-- 上をトレースのエッジ集合で書き直した版（parallel を使って像に置換）。 -/
+/-- Refined version using trace's edge set (replacing with image using parallel). -/
 private lemma sum_edge_sizes_trace_version_of_parallel
     (F : SetFamily α) {u v : α}
     (huv : F.Parallel u v) (hne : u ≠ v) :
@@ -791,16 +780,16 @@ private lemma sum_edge_sizes_trace_version_of_parallel
     unfold Function.Injective at hsub_inj
     simp_all only [Parallel, ne_eq, mem_edgeFinset, Subtype.forall, Subtype.mk.injEq, and_imp, subset_refl]
     apply hsub_inj
-    · simp_all only [subset_refl]
-    · simp_all only [subset_refl]
-    · simp_all only [subset_refl]
-    · simp_all only [subset_refl]
-    · simp_all only [subset_refl]
+    · exact hA.1
+    · exact hA.2
+    · exact hB.1
+    · exact hB.2
+    · exact hEq
 
   have hsum_image :
       (∑ A ∈ F.edgeFinset, (A.erase u).card)
-        = (∑ B ∈ (F.edgeFinset.image (fun A => A.erase u)), B.card) := by
-    exact Eq.symm (Finset.sum_image hinj_on)
+        = (∑ B ∈ (F.edgeFinset.image (fun A => A.erase u)), B.card) :=
+    (Finset.sum_image hinj_on).symm
 
   calc
     (∑ A ∈ F.edgeFinset, A.card)
@@ -811,15 +800,15 @@ private lemma sum_edge_sizes_trace_version_of_parallel
             simp [himg]
 
 
-/-- 目標：NDS の等式。Reduction.leanから使う。
-  `NDS(F) = 2 * Σ|A| - |E(F)| * |ground|` を使う。
-  仮定：`u` は ground に属し，`v` は `u` の parallel パートナー。 -/
+/-- Goal: NDS equality. Used from Reduction.lean.
+  Using `NDS(F) = 2 * Σ|A| - |E(F)| * |ground|`.
+  Assumption: `u` belongs to ground and `v` is a parallel partner of `u`. -/
 theorem NDS_eq_of_parallel
     (F : SetFamily α) {u v : α}
     (huv : F.Parallel u v) (hne : u ≠ v) (hu : u ∈ F.ground):
     F.NDS = (traceAt u F).NDS + 2 * (F.degree u : Int) - (F.numHyperedges : Int) := by
 classical
-  -- ⑧（Nat）を Int に持ち上げる：
+  -- ⑧ (Nat) lifted to Int:
   have hsum_nat :
       (∑ A ∈ F.edgeFinset, A.card)
         = (∑ B ∈ (traceAt u F).edgeFinset, B.card) + F.degree u :=

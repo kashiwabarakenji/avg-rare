@@ -22,7 +22,7 @@ lemma erase_nonempty(A:Finset α) (hA : A.card ≥ 2) (hu : u ∈ A) : (A.erase 
     calc
       0 < A.card - 1 := by omega
       _ = (A.erase u).card := by rw [Finset.card_erase_of_mem hu]
-  exact Finset.card_pos.mp card_pos
+  exact Finset.card_pos.1 card_pos
 
 --PosetTrace, which is limited to the maximum, will later appear.
 --Geq2 is assumed to ensure that the one that has been traces is non-empty.
@@ -166,7 +166,7 @@ private lemma le_reflect_to_S_posetTraceCore
         have : toS b = toS c := by
           apply Subtype.ext
           apply congrArg Subtype.val
-          exact congrArg toS (id (Eq.symm h_eq))
+          exact congrArg toS h_eq.symm
         subst h_eq
         simp_all only [posetTraceCore_ground, toS, S']
 
@@ -206,7 +206,7 @@ theorem isPoset_posetTraceCore
     exact rfl
 
   dsimp [isPoset]
-  simp_all only
+  simp_all
 
 ---The number of Ideals must be equal or greater than the set of machines +1.Important, but only quoted in the file.
 private theorem ideals_card_ge_ground_card_succ
@@ -227,20 +227,10 @@ private theorem ideals_card_ge_ground_card_succ
     | inr h0 =>
         have hA0 : A = (∅ : Finset α) := Finset.mem_singleton.mp h0
         have := S.empty_mem_edge
-        exact by
-          have : A ∈ (S.idealFamily).edgeFinset := by
-            exact by
-              have hE := this
-              subst hA0
-              simp_all only [SetFamily.mem_edgeFinset, Finset.empty_subset, sets_iff_isOrderIdeal,
-                and_self, Finset.union_singleton, Finset.mem_insert, Finset.mem_image, Finset.mem_attach, true_and, Subtype.exists,
-                true_or, Finset.mem_singleton, P]
-
-          exact by
-            exact this
+        exact hA0 ▸ this
 
   have hEdgeGeP : (S.idealFamily).edgeFinset.card ≥ P.card := by
-    simp_all only [Finset.union_singleton, ge_iff_le, P]
+    simp_all [Finset.union_singleton, ge_iff_le, P]
     exact Finset.card_le_card hPsub
 
   have hInj :
@@ -252,11 +242,11 @@ private theorem ideals_card_ge_ground_card_succ
 
   have hCardImage :
       (S.ground.attach.image (fun x : S.Elem => S.principalIdeal x.1 x.2)).card
-        = S.ground.attach.card := by
-    exact Finset.card_image_iff.mpr hInj
+        = S.ground.attach.card :=
+    Finset.card_image_iff.mpr hInj
 
-  have hCardAttach : S.ground.attach.card = S.ground.card := by
-    simp_all only [Finset.union_singleton, ge_iff_le, Finset.card_attach, P]
+  have hCardAttach : S.ground.attach.card = S.ground.card :=
+    Finset.card_attach
 
   have hDisj :
       Disjoint
@@ -268,29 +258,21 @@ private theorem ideals_card_ge_ground_card_succ
     have hx_self : x.1 ∈ S.principalIdeal x.1 x.2 := by
       have hxx : S.le x x := Relation.ReflTransGen.refl
       exact (S.mem_principalIdeal_iff (a := x.1) (y := x.1) x.2).2 ⟨x.2, hxx⟩
-    simp_all only [Finset.union_singleton, ge_iff_le, Finset.card_attach, Finset.mem_attach, Finset.mem_image, true_and,
+    simp_all [Finset.union_singleton, ge_iff_le, Finset.card_attach, Finset.mem_attach, Finset.mem_image, true_and,
     exists_apply_eq_apply, Finset.mem_singleton, Finset.notMem_empty, P]
 
   have hPcard :
       P.card
-        = (S.ground.attach.image (fun x : S.Elem => S.principalIdeal x.1 x.2)).card + 1 := by
-    simp_all only [Finset.union_singleton, ge_iff_le, Finset.card_attach, Finset.disjoint_singleton_right, Finset.mem_image,
-    Finset.mem_attach, true_and, Subtype.exists, not_exists, Finset.coe_mem, and_false, exists_false, not_false_eq_true,
-    Finset.card_insert_of_notMem, P]
+        = (S.ground.attach.image (fun x : S.Elem => S.principalIdeal x.1 x.2)).card + 1 :=
+    Finset.card_union_of_disjoint hDisj
 
   have hP_eq : P.card = S.ground.card + 1 := by
-    have : P.card = S.ground.attach.card + 1 := by
-      calc
-        P.card
-            = (S.ground.attach.image (fun x : S.Elem => S.principalIdeal x.1 x.2)).card + 1 := hPcard
-        _   = S.ground.attach.card + 1 := by
-              exact congrArg (fun n => n + 1) hCardImage
     calc
-      P.card = S.ground.attach.card + 1 := this
-      _      = S.ground.card + 1 := by
-                exact congrArg (fun n => n + 1) hCardAttach
+      P.card = (S.ground.attach.image (fun x : S.Elem => S.principalIdeal x.1 x.2)).card + 1 := hPcard
+      _ = S.ground.attach.card + 1 := by rw [hCardImage]
+      _ = S.ground.card + 1 := by rw [hCardAttach]
 
-  exact le_of_eq_of_le (id (Eq.symm hP_eq)) hEdgeGeP
+  exact le_of_eq_of_le hP_eq.symm hEdgeGeP
 
 --使っている
 private lemma lift_le_to_traceCore_if_not_m_below
@@ -444,9 +426,9 @@ private lemma all_below_unique_maximal
 
   have uniq : ∀ {p : S.Elem}, S.maximal p → p = m := by
     intro p a
-    simp_all only [maximal_iff, le_iff_leOn_val, Subtype.forall, m]
+    simp_all [maximal_iff, le_iff_leOn_val, Subtype.forall, m]
     cases hexu
-    simp_all only [maximal_iff, le_iff_leOn_val, Finset.coe_mem, implies_true]
+    simp_all [maximal_iff, le_iff_leOn_val, Finset.coe_mem, implies_true]
   intro u
 
   obtain ⟨p, hup, hpp⟩ :=
@@ -483,7 +465,7 @@ private lemma hOnlyTop_of_uniqueMax
       (leOn_iff S hy m.2).mpr hle_m
     exact hI.2 (x := m.1) hmI (y := y) hy hleOn
 
-  exact Eq.symm (Finset.Subset.antisymm hG_sub_I hI_sub)
+  exact Finset.Subset.antisymm hI_sub hG_sub_I
 
 private lemma keep_sets_from_trace_at_without_m
   (S : FuncSetup α) (m : S.Elem) (geq2: S.ground.card ≥ 2) {I : Finset α}
@@ -512,7 +494,7 @@ private lemma keep_sets_from_trace_at_without_m
         have hz_ne : z ≠ m.1 := by
           intro e; apply hmI; cases e; exact hz
         change z ∈ S.ground.erase m.1
-        exact (Finset.mem_erase.mpr ⟨hz_ne, hzV⟩)
+        exact Finset.mem_erase.mpr ⟨hz_ne, hzV⟩
       exact hSub hxI
     have hRTG' :
         Relation.ReflTransGen (posetTraceCore S m geq2).cover
@@ -619,9 +601,9 @@ by
   have hm_not : m.1 ∉ I := by
     intro hmI
     have : m.1 ∈ (posetTraceCore S m geq2).ground := hSub' hmI
-    rcases Finset.mem_erase.mp (by change m.1 ∈ S.ground.erase m.1; simpa) with ⟨heq, _⟩
+    rcases Finset.mem_erase.mp this with ⟨heq, _⟩
     exact heq rfl
-  exact And.intro hSets hm_not
+  exact ⟨hSets, hm_not⟩
 
 private lemma arith_reduce (V n t : Nat) (hV : 1 ≤ V) :
   ((V : Int)
@@ -654,8 +636,8 @@ private lemma arith_reduce (V n t : Nat) (hV : 1 ≤ V) :
   simp_all only [Nat.cast_sub, Nat.cast_one, sub_add_cancel]
   omega
 
-/- 短い別証明ができたのでコメントアウト
---一般的な変形なのでGeneral.leanに移動してもよい。
+/- Commented out since a shorter alternative proof was found
+--This is a general transformation, so it could be moved to General.lean.
 lemma arith_reduce (V n t : Nat) (hV : 1 ≤ V) :
   ((V : Int)
     + (-(V : Int)
@@ -721,9 +703,9 @@ lemma arith_reduce (V n t : Nat) (hV : 1 ≤ V) :
                               -- (n:ℤ)*1 = n
                               simp_all only [add_neg_cancel_left, Nat.cast_sub, Nat.cast_one, mul_one]
 
-                -- LHS の `- (n * ((V:ℤ)-1))` を上の等式で書換
-                -- `rw` のために一旦 `show` の形で与える
-                -- 実際には `simp` でもよいが明示的に `rw` する
+                -- Rewrite the `- (n * ((V:ℤ)-1))` in LHS using the above equation
+                -- Give it in `show` form for `rw`
+                -- Actually `simp` would work too, but explicitly using `rw`
                 have : -((n : Int) * ((V : Int) - 1))
                           = -(((n : Int) * (V : Int)) - (n : Int)) := by
                   -- 直前の hmul を使うだけ
@@ -938,16 +920,15 @@ private lemma totalHyperedgeSize_trace_sub_card_ground_of_max
       not_true_eq_false, and_false, not_false_eq_true, Finset.sum_singleton,  F', F]
 
   have hSingleton :
-      (∑ A ∈ ({S.ground} : Finset (Finset α)), A.card) = S.ground.card := by
-    simp
+      (∑ A ∈ ({S.ground} : Finset (Finset α)), A.card) = S.ground.card :=
+    by simp
 
   dsimp [SetFamily.totalHyperedgeSize]
   calc
     (∑ A ∈ F.edgeFinset, A.card)
         = (∑ A ∈ F'.edgeFinset, A.card)
           + (∑ A ∈ ({S.ground} : Finset (Finset α)), A.card) := hSumSplit
-    _   = (∑ A ∈ F'.edgeFinset, A.card) + S.ground.card := by
-            exact congrArg (fun n => (∑ A ∈ F'.edgeFinset, A.card) + n) hSingleton
+    _   = (∑ A ∈ F'.edgeFinset, A.card) + S.ground.card := by rw [hSingleton]
 
 /-  exactly 1 decrease -/
 --Called from MainStatement
@@ -958,7 +939,7 @@ lemma ground_card_after_trace_of_max
   classical
   have : (posetTraceCore S m geq2).ground = S.ground.erase m.1 := rfl
   have hm : m.1 ∈ S.ground := m.2
-  have h := Finset.card_erase_add_one (s := S.ground) (a := m.1) hm
+  have h := Finset.card_erase_add_one hm
   exact Nat.eq_sub_of_add_eq h
 
 /- equation of NDS difference -/
@@ -1145,7 +1126,7 @@ theorem nds_trace_nondecreasing_uniqueMax
 
   have : F.NDS ≤ F'.NDS := by
     have h := hEq
-    simp_all only [SetFamily.NDS_def, ge_iff_le, Nat.cast_add, Nat.cast_one, add_le_iff_nonpos_right, F, F', S']
+    simp_all [SetFamily.NDS_def, ge_iff_le, Nat.cast_add, Nat.cast_one, add_le_iff_nonpos_right, F, F', S']
 
   exact this
 
