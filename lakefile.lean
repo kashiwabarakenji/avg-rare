@@ -18,10 +18,11 @@ lean_lib AvgRare where
     `AvgRare.Basics.SetTrace,      --Traceに関する基本
     `AvgRare.Functional.FuncSetup,           --前順序に関すること
     `AvgRare.Functional.TraceFunctional,     -- FunctionalのTraceがFunctional
-    `AvgRare.Reductions.Monotonicity, --Traceの単調性
+    `AvgRare.Functional.FuncPoset,     -- 後半用のFuncSetup
+    `AvgRare.Reductions.Rare, --Traceの単調性
     `AvgRare.Reductions.Reduction,   -- ← trace×FuncSetup の結合レイヤ。名前を変えるかも。PaperLemmaとか。
-    `AvgRare.Secondary.Induction,       --半順序と帰納法
-    `AvgRare.Secondary.DirectProduct,   --半順序のunion product
+    `AvgRare.Secondary.UniqueMax,       --半順序と帰納法
+    `AvgRare.Secondary.SumProduct,   --半順序のunion product
     `AvgRare.Secondary.MainStatement  -- ← 主定理
   ]
   srcDir := "."

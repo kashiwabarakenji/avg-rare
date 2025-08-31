@@ -6,7 +6,7 @@ for functional preorders and the Average-Rare (Frankl-type) results.
 ## Structure
 - `AvgRare/Basics/` — Core definitions (`Nds`, `Trace`, `Excess`).
 - `AvgRare/SPO/` — Functional preorder structures (`SetupSpo`, `Spo2`) and translations.
-- `AvgRare/Forests/` — Induction on rooted forests, direct product lemmas.
+- `AvgRare/Forests/` — UniqueMax on rooted forests, direct product lemmas.
 - `AvgRare/PaperSync/` — Thin wrappers matching paper numbering.
 - `specs/` — Natural-language definitions/specs used to drive code generation.
 - `tests/` — Tiny finite examples for sanity checks.
