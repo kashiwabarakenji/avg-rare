@@ -1,0 +1,152 @@
+% functional-lean.tex: Lean 4 code snippets for key definitions and theorems
+% (Main Theorem, Secondary Main Theorem, NDS, TraceAt, ideal)
+\documentclass[a4paper,11pt]{article}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+
+% Lean code style
+\lstdefinelanguage{Lean}{
+  morekeywords={structure, def, theorem, lemma, Prop, Type, Int, Nat, noncomputable, forall, fun, let, by, apply, intro, exact, dsimp, simp, have, match, with, if, then, else, inductive, instance, class, where},
+  sensitive=true,
+  morecomment=[l]--,
+  morestring=[b]",
+}
+\lstset{
+  language=Lean,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue},
+  commentstyle=\color{gray},
+  stringstyle=\color{orange},
+  frame=single,
+  breaklines=true,
+  columns=fullflexible,
+  keepspaces=true,
+  escapeinside={(*}{*)},
+  mathescape=true
+}
+
+\begin{document}
+
+\section*{Lean 4 Formalisation}
+
+The validity of the proofs of all theorems and lemmas in this paper is machine-checked in
+proof assistant \textsc{Lean 4}.
+%\subsection{Why formalise?}
+Using proof assistants offers three advantages:
+\emph{Rigour}, as every inference is validated by Lean’s kernel, eliminating overlooked edge cases and computational errors; 
+\emph{Reproducibility}, since proof scripts are plain text and can be replayed by anyone to obtain a formal verification;
+ and \emph{Re-use}, because definitions and lemmas are incorporated into the community library \texttt{mathlib4}, thereby accelerating future work on Frankl-type problems.
+
+ We briefly describe the formalized code used in our proofs. % and the AI-assisted workflow that made itpractical.
+The Lean code snippets below are simplified for readability and exposition. For the complete and precise formalization, please refer to the source code in the repository 
+\verb+https://github.com/kashiwabarakenji/avg-rare+.
+
+% --- SetFamily ---
+\subsection*{SetFamily}
+\begin{lstlisting}
+structure SetFamily  where
+  ground : Finset $\alpha$
+  sets : Finset $\alpha$ $\rightarrow$ Prop
+\end{lstlisting}
+
+Structure \texttt{SetFamily} provides a family of subsets of a finite ground set.
+\texttt{SetFamily.sets} is the predicate that determines whether a given subset is in the family.
+
+% --- NDS ---
+\subsection*{Normalized Degree Sum (NDS)}
+\begin{lstlisting}
+def NDS (F : SetFamily $\alpha$) : Int :=
+  2 * F.totalHyperedgeSize - F.numHyperedges * F.ground.card
+\end{lstlisting}
+
+The above code is the definition of the normalized degree sum (NDS):
+\[
+\mathrm{NDS}(\mathcal{F}) := 2 \sum_{F \in \mathcal{F}} |F| - |\mathcal{F}| \cdot |V|.
+\]
+NDS measures the average rarity of elements in a set family. When NDS $\le 0$, the family is average-rare.
+\texttt{F.ground.card} means the cardinality of the ground set. \texttt{Int} represents the set of all integers.
+In the above, NDS returns an integer value.
+
+% --- FuncSetup ---
+\subsection*{FuncSetup}
+\begin{lstlisting}
+structure FuncSetup ($\alpha$ : Type) where
+  ground : Finset $\alpha$
+  f : ground $\rightarrow$ ground
+\end{lstlisting}
+
+Structure \texttt{FuncSetup} provides the assumption for our problem, including the ground set and the function $f:V \rightarrow V$ on the ground set.
+It induces the preorder \texttt{FuncSetup.le} on the ground set.
+
+% --- Order Ideal ---
+\subsection*{Order Ideal}
+\begin{lstlisting}
+def isOrderIdealOn (S: FuncSetup $\alpha$) (le : $\alpha$ $\rightarrow$ $\alpha$ $\rightarrow$ Prop) (I : Finset $\alpha$) : Prop :=
+  I $\subseteq$ S.ground $\land$
+  $\forall x, x \in I \rightarrow \forall y,  y\in$ S.ground $\rightarrow$ S.le y x $\rightarrow$ y $\in$ I
+\end{lstlisting}
+This is the condition of the order ideal
+\[
+I \subseteq V \quad \wedge \quad (\forall x \in I, \forall y \in V,\ y \leq x \implies y \in I).
+\]
+\texttt{FuncSetup.idealFamily} is the set of all order ideals defined using \texttt{isOrderIdealOn}.
+
+
+% --- Main Theorem ---
+\subsection*{Main Theorem}
+\begin{lstlisting}
+theorem main_nds_nonpos {$\alpha$ : Type} 
+  (S : FuncSetup $\alpha$) :
+  (S.idealFamily).NDS $\leq$ 0 := by
+  apply Reduction.main_nds_nonpos_of_secondary
+  intro T hT
+  have hT' : isPoset T := by
+    dsimp [isPoset]
+    dsimp [has_le_antisymm]
+    exact T.antisymm_of_isPoset hT
+  exact secondary_main_theorem T hT'
+\end{lstlisting}
+This is the Main Theorem of our paper: for any function \(f:V\rightarrow V\), the induced order ideal family $\mathcal{I}$ is always average-rare:
+\[
+{\mathrm{NDS}(\mathcal{I}(V, \le)) \le 0}.
+\]
+
+\texttt{(S:FuncSetup $\alpha$)} is the assumption of the statement, placed before the colon. 
+\texttt{(S.idealFamily).NDS <= 0} is the conclusion of the statement.
+The codes followed by \texttt{:=} are the proof of the statement. Proof codes consist of tactics in Lean 4.
+Theorem \verb+theorem main_nds_nonpos_of_secondary+ in the repository is the reduction theorem for proving the Main Theorem from the Secondary Main Theorem.
+
+% --- Secondary Main Theorem ---
+\subsection*{Secondary Main Theorem}
+\begin{lstlisting}
+theorem secondary_main_theorem {$\alpha$ : Type}
+  (S : FuncSetup $\alpha$) (hpos : isPoset S) :
+  (S.idealFamily).NDS $\leq$ 0
+\end{lstlisting}
+Assumption \texttt{isPoset S} means that the order \texttt{FuncSetup.le} $S$ is a partial order.
+This statement is the Secondary Main Theorem: for any functional poset (rooted forest poset), the induced order ideal family is always average-rare.
+This assumption is stronger than that of the Main Theorem. The Secondary Main Theorem is also used as a lemma for proving the Main Theorem.
+
+% --- TraceAt ---
+\subsection*{Trace Operator}
+\begin{lstlisting}
+def traceAt (x : $\alpha$) (F : SetFamily $\alpha$) : SetFamily $\alpha$ :=
+  { ground := F.ground.erase x,
+    sets := fun A => (F.sets (A $\cup$ {x}) $\lor$ F.sets A)
+  }
+
+\end{lstlisting}
+This code defines the trace operator for a set family, which removes an element \(x\) from all sets in the family:
+\[
+\operatorname{trace}_x(\mathcal{F}) := \{ F \setminus \{x\} \mid F \in \mathcal{F} \}.
+\]
+The trace operator is used to remove an element from all sets, essential for inductive proofs and structural reductions.
+
+% --- AI-assisted formalisation ---
+During the formalisation we made extensive use of AI-assisted tools, notably ChatGPT~5 (for brainstorming tactics and diagnosing type errors), Lean Copilot (for interactive tactic completion), and GitHub Copilot (for boilerplate suggestions). These tools drastically reduced the development time—from what would have taken months by hand to only a few weeks—while correctness is uncompromised since all suggested fragments are checked by Lean’s kernel.
+Our experience shows that recent AI tools have made Lean 4 formalisation of advanced combinatorial mathematics practically feasible. Without them, the scale of the present project would likely have been out of reach. We therefore regard this as evidence that AI-assisted proof development is becoming an essential methodology in formal mathematics.
+
+
+\end{document}

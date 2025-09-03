@@ -313,25 +313,6 @@ lemma maximal_of_fixpoint  (S : FuncSetup α){u : S.Elem} (huu : S.cover u u) :
     rw [ih] at hwx
     exact S.cover_out_unique hwx huu
 
---Deprecated as it has the same content as above
-/-
-lemma fixpoint_is_maximal
-  (S : FuncSetup α) {p : S.Elem} (hfix : S.cover p p) :
-  S.maximal p := by
-
-  have h_fixed : S.f p = p := hfix
-
-  intro y hy
-
-  have : p = y :=
-    fixed_point_unique (S := S) (u := p) (h_fixed := h_fixed) (v := y) (h_le := hy)
-
-  cases this
-  exact Relation.ReflTransGen.refl
--/
-
-/-! ## 3) Lemma 3.1：maximal ⇒ rare -/
-
 --Used in Rare.lean.
 lemma sim_of_maximal_above_class
     (S : FuncSetup α) {u x y : S.Elem}
