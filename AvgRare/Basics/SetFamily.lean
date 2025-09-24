@@ -3,7 +3,7 @@ import Mathlib.Data.Finset.Powerset
 import Mathlib.Algebra.Order.BigOperators.Group.Finset
 
 import AvgRare.Basics.General
-import LeanCopilot
+--import LeanCopilot
 
 universe u
 

@@ -2,7 +2,7 @@ import Mathlib.Data.Finset.Basic
 import Mathlib.Data.Finset.Powerset
 import Mathlib.Algebra.BigOperators.Finsupp.Basic
 import AvgRare.Basics.SetFamily
-import LeanCopilot
+--import LeanCopilot
 
 /-
 SetTrace.lean — Trace without FuncSetup

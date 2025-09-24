@@ -3,7 +3,7 @@ import Mathlib.Data.Finset.Powerset
 import Mathlib.Data.Nat.Basic
 import Mathlib.Logic.Function.Iterate
 import AvgRare.Basics.SetFamily
-import LeanCopilot
+--import LeanCopilot
 
 /-
 FuncSetup.lean — Setup for (functional preorder) (Paper §2)

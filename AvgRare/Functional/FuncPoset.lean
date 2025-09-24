@@ -93,9 +93,7 @@ private lemma principalIdeal_isOrderIdealOn
     simp_all only [Finset.mem_map, Finset.mem_filter, Finset.mem_attach, true_and, Function.Embedding.coeFn_mk,
       Subtype.exists, exists_and_left, exists_prop, exists_eq_right_right]
   ·
-    intro x hx y hy_mem
-
-    intro hs
+    intro x hx y hy_mem hs
     have hx' := (S.mem_principalIdeal_iff (a:=a) (y:=x) ha).1 hx
     simp at hx'
     let mpi := (S.mem_principalIdeal_iff (a:=a) (y:=y) ha).2

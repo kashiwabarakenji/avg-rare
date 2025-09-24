@@ -34,5 +34,5 @@ lean_exe tests where
 require mathlib from git
   "https://github.com/leanprover-community/mathlib4.git"  @ "v4.23.0"
 
-require LeanCopilot from git
-  "https://github.com/lean-dojo/LeanCopilot.git" @ "v4.23.0"
+--require LeanCopilot from git
+--  "https://github.com/lean-dojo/LeanCopilot.git" @ "v4.23.0"

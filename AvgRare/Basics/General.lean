@@ -1,7 +1,7 @@
 import Mathlib.Data.Finset.Powerset
 import Mathlib.Algebra.BigOperators.Finsupp.Basic
 import Mathlib.Algebra.Order.BigOperators.Group.Finset
-import LeanCopilot
+--import LeanCopilot
 
 universe u
 
