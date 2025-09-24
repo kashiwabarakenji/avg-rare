@@ -32,7 +32,7 @@ lean_exe tests where
   root := `tests.SmallExamples
 
 require mathlib from git
-  "https://github.com/leanprover-community/mathlib4.git"  @ "v4.23.0-rc2"
+  "https://github.com/leanprover-community/mathlib4.git"  @ "v4.23.0"
 
 require LeanCopilot from git
-  "https://github.com/lean-dojo/LeanCopilot.git" @ "v4.22.0"
+  "https://github.com/lean-dojo/LeanCopilot.git" @ "v4.23.0"

@@ -27,6 +27,7 @@ These results formalize and generalize combinatorial phenomena related to set fa
 
 ## Build
 ```bash
+lake update
 lake build
 ```
 

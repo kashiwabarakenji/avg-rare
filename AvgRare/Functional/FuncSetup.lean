@@ -784,31 +784,21 @@ def stepRel : α → α → Prop := fun x y => f x = y
 private lemma iterate_commute_right (f : α → α) :
     ∀ n x, Nat.iterate f n (f x) = f (Nat.iterate f n x) := by
   intro n
-  induction' n with n ih
-  · intro x; rfl
-  · intro x
-    -- iterate (n+1) (f x) = iterate n (f (f x))
-    have h1 : Nat.iterate f (n+1) (f x) = Nat.iterate f n (f (f x)) := by
-      -- Definition expansion
-      simp [Nat.iterate]
-    -- Unpack the right side one step with `ih`
-    have h2 : Nat.iterate f n (f (f x)) = f (Nat.iterate f n (f x)) := by
-      -- Apply `ih` to `x := f x`
-      simpa using ih (f x)
-    -- Further substitute `(f^[n]) (f x)` with `ih`
-    have h3 : f (Nat.iterate f n (f x)) = f (f (Nat.iterate f n x)) := by
-      -- Use `ih x : (f^[n]) (f x) = f ((f^[n]) x)` inside `f ∘ _`
-      simpa using congrArg f (ih x)
-    -- Finish: by definition `(f^[n+1]) x = (f^[n]) (f x)`
-    calc
-      Nat.iterate f (n+1) (f x)
-          = Nat.iterate f n (f (f x)) := h1
-      _   = f (Nat.iterate f n (f x)) := h2
-      _   = f (f (Nat.iterate f n x)) := h3
-      _   = f (Nat.iterate f (n+1) x) := by
-              -- `Nat.iterate f (n+1) x = Nat.iterate f n (f x)`
-              simp [Nat.iterate]
-              simp_all only [Function.iterate_succ, Function.comp_apply]
+  induction n with
+  | zero =>
+      -- Base case: Nat.iterate f 0 (f x) = f x, Nat.iterate f 0 x = x
+      -- So f x = f x
+      intro x
+      simp_all only [Function.iterate_zero, id_eq]
+  | succ k ih =>
+      -- Inductive step: Nat.iterate f (k+1) (f x) = f (Nat.iterate f k (f x))
+      -- By induction hypothesis: Nat.iterate f k (f x) = f (Nat.iterate f k x)
+      intro x
+      calc
+        Nat.iterate f (k + 1) (f x)
+          = f (Nat.iterate f k (f x)) := by exact ih (f x)
+        _ = f (f (Nat.iterate f k x)) := by rw [ih]
+        _ = f (Nat.iterate f (k + 1) x) := by simp_all only [Function.iterate_succ, Function.comp_apply]
 
 /-- Main lemma: `ReflTransGen (stepRel f) x y ↔ ∃ k, (f^[k]) x = y` -/
 --Frequently cited from external files. Content overlaps with le_iff_exists_iter.
@@ -837,21 +827,21 @@ theorem reflTransGen_iff_exists_iterate
 
     have hx_to_iter : Relation.ReflTransGen (stepRel f) x (Nat.iterate f k x) := by
       revert x
-      induction' k with k ih
-      · intro x;
-        intro hk
-        subst hk
-        simp_all only [Function.iterate_zero, id_eq]
-        rfl
-
-      · intro x
-        have step : stepRel f (Nat.iterate f k x) (Nat.iterate f (k+1) x) := by
-          have h1 : Nat.iterate f (k+1) x = Nat.iterate f k (f x) := by
-            simp [Nat.iterate]
-          have h2 : Nat.iterate f k (f x) = f (Nat.iterate f k x) :=
-            iterate_commute_right f k x
-          exact (Eq.trans (Eq.symm h2) (Eq.symm h1))
-        exact fun hk => Relation.ReflTransGen.head rfl (ih hk)
+      -- filepath: /Users/kashiwa/avg-rare-formalization/AvgRare/Functional/FuncSetup.lean
+      induction k with
+      | zero =>
+          intro x hk
+          subst hk
+          simp_all only [Function.iterate_zero, id_eq]
+          rfl
+      | succ k ih =>
+          intro x hk
+          -- stepRel f (Nat.iterate f k x) (Nat.iterate f (k+1) x)
+          have h1 : Nat.iterate f (k+1) x = Nat.iterate f k (f x) := by simp [Nat.iterate]
+          have h2 : Nat.iterate f k (f x) = f (Nat.iterate f k x) := iterate_commute_right f k x
+          have step : stepRel f (Nat.iterate f k x) (Nat.iterate f (k+1) x) :=
+            Eq.trans (Eq.symm h2) (Eq.symm h1)
+          exact Relation.ReflTransGen.head rfl (ih hk)
 
     have : Relation.ReflTransGen (stepRel f) x y := by
       show Relation.ReflTransGen (stepRel f) x y
@@ -874,16 +864,18 @@ lemma le_iff_exists_iter {α} [DecidableEq α] (S : FuncSetup α) (x y : S.Elem)
 -- First small lemma: if g u = u then g^[n] u = u
 private lemma iterate_fixpoint {β} (g : β → β) (u : β) (n : ℕ) (hu : g u = u) :
     Nat.iterate g n u = u := by
-  induction' n with n ih
-  · simp [Nat.iterate]
-  ·
-    have : Nat.iterate g (n + 1) u = Nat.iterate g n (g u) := by
+  induction n with
+  | zero =>
       simp [Nat.iterate]
-    have : Nat.iterate g n (g u) = u := by
-      have : Nat.iterate g n (g u) = Nat.iterate g n u := by
-        simp [hu]
-      simp_all only
-    simp [Nat.iterate, hu, ih]
+  | succ n ih =>
+      have h1 : Nat.iterate g (n + 1) u = Nat.iterate g n (g u) := by simp [Nat.iterate]
+      have h2 : Nat.iterate g n (g u) = Nat.iterate g n u := by simp [hu]
+      have h3 : Nat.iterate g n u = u := ih
+      calc
+        Nat.iterate g (n + 1) u
+          = Nat.iterate g n (g u) := h1
+        _ = Nat.iterate g n u := h2
+        _ = u := h3
 
 /-- Iterate is monotonic: if `i ≤ j` then `(f^[i]) x ≤ (f^[j]) x`. -/
 --Unlike le_iff_exists_iter, this involves ordering of natural numbers
