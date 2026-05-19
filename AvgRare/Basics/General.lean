@@ -19,9 +19,7 @@ variable {α : Type u} [DecidableEq α]
 
 open Classical
 
-variable {α : Type u} [DecidableEq α]
-
-/- If `∑ f = |s|` and `∀ i∈s, 1 ≤ f i`, each term is 1. -/
+/-- The sum of the constant function `1` over a finset is the cardinality of the finset. -/
 lemma sum_one_eq_card {ι : Type u} [DecidableEq ι]
   (s : Finset ι) : ∑ _ ∈ s, (1 : Nat) = s.card := by
   classical
@@ -207,7 +205,7 @@ lemma card_filter_add_card_filter_not (s : Finset β) (p : β → Prop) [Decidab
                 exact this.symm
 -/
 
--- 補助：S.filter p = S.filter q ↔ ∀ x∈S, p x ↔ q x
+-- Auxiliary lemma: `S.filter p = S.filter q` iff `p` and `q` agree on `S`.
 lemma filter_eq_iff_on {β} [DecidableEq β]
   {S : Finset β} {p q : β → Prop}
   [DecidablePred p] [DecidablePred q] :

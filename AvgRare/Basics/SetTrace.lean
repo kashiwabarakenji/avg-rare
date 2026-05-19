@@ -522,7 +522,7 @@ theorem excess_trace
         (fun (C : {C // C ∈ classSet F}) => (C.1).erase u) := by
     apply erase_on_classSet_injective_of_parallel hasU
       (F := F) (hu := hu) (hne := huv) (hp := hp)
-  -- `card (image f S) = card S` を得る
+  -- Obtain `card (image f S) = card S`.
   have hcard_image :
       ((classSet F).image (fun C => C.erase u)).card
       = (classSet F).card := by

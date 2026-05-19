@@ -111,7 +111,7 @@ lemma edgeFinset_subset_powerset :
     rcases Finset.mem_filter.mp h with ⟨hPow, hDec⟩
     have hSub : A ⊆ F.ground := Finset.mem_powerset.mp hPow
     have hSets : F.sets A := by
-      -- ここは decide ↔ 命題の橋渡しを simp に任せる
+      -- Let `simp` bridge between `decide` and the proposition.
       simpa using (show decide (F.sets A) = true from hDec)
     exact ⟨hSub, hSets⟩
   · intro h

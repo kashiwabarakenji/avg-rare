@@ -213,7 +213,7 @@ private theorem ideals_card_ge_ground_card_succ
   (S : FuncSetup α) (hpos : isPoset S) :
   (S.idealFamily).numHyperedges ≥ S.ground.card + 1 := by
   classical
-  -- 下界集合 P
+  -- Lower-bound family `P`.
   let P : Finset (Finset α) :=
     (S.ground.attach.image (fun x : S.Elem => S.principalIdeal x.1 x.2)) ∪ {∅}
   -- P ⊆ edgeFinset
@@ -274,7 +274,7 @@ private theorem ideals_card_ge_ground_card_succ
 
   exact le_of_eq_of_le hP_eq.symm hEdgeGeP
 
---使っている
+-- Used below.
 private lemma lift_le_to_traceCore_if_not_m_below
   (S : FuncSetup α) (m : S.Elem) (geq2: S.ground.card ≥ 2)
   (hpos : isPoset S) (hmax : S.maximal m)
@@ -648,10 +648,10 @@ lemma arith_reduce (V n t : Nat) (hV : 1 ≤ V) :
     + ( -((n : Int) * (↑(V - 1)))
         + ((t : Int) + (t : Int)) ) ) := by
   classical
-  -- ↑(V-1) を (V:ℤ) - 1 に直す
+  -- Rewrite `↑(V - 1)` as `(V : ℤ) - 1`.
   have hCast : (↑(V - 1) : Int) = (V : Int) - 1 := (Nat.cast_sub hV)
 
-  -- 左辺を簡約： (V) + (-(V) + X) = X
+  -- Simplify the left-hand side: `(V) + (-(V) + X) = X`.
   have hL :
       (V : Int)
         + (-(V : Int)
@@ -671,7 +671,8 @@ lemma arith_reduce (V n t : Nat) (hV : 1 ≤ V) :
                 rw [zero_add]
                 simp_all only [Nat.cast_sub, Nat.cast_one, add_neg_cancel, zero_add]
 
-  -- 右辺を簡約： -(n) + (-(n*(V-1)) + (t+t)) を展開して -(n*V) + (t+t) に
+  -- Simplify the right-hand side by expanding `-(n) + (-(n*(V-1)) + (t+t))`
+  -- to `-(n*V) + (t+t)`.
   have hR :
       ( -(n : Int)
         + ( -((n : Int) * (↑(V - 1)))
@@ -679,9 +680,9 @@ lemma arith_reduce (V n t : Nat) (hV : 1 ≤ V) :
       =
       ( -((n : Int) * (V : Int))
         + ((t : Int) + (t : Int)) ) := by
-    -- まず ↑(V-1) を (V:ℤ)-1 に置換
+    -- First replace `↑(V - 1)` with `(V : ℤ) - 1`.
     have := hCast
-    -- `rw [this]` を段階的に適用
+    -- Apply `rw [this]` step by step.
     calc
       -(n : Int) + ( -((n : Int) * (↑(V - 1)))
                       + ((t : Int) + (t : Int)) )
@@ -691,7 +692,7 @@ lemma arith_reduce (V n t : Nat) (hV : 1 ≤ V) :
       _   = -(n : Int) + ( -(((n : Int) * (V : Int)) - (n : Int))
                             + ((t : Int) + (t : Int)) ) := by
                 -- n*(V-1) = n*V - n
-                -- `mul_sub` と `mul_one`
+                -- Use `mul_sub` and `mul_one`.
                 have hmul :
                     (n : Int) * ((V : Int) - 1)
                       = (n : Int) * (V : Int) - (n : Int) := by
@@ -708,9 +709,9 @@ lemma arith_reduce (V n t : Nat) (hV : 1 ≤ V) :
                 -- Actually `simp` would work too, but explicitly using `rw`
                 have : -((n : Int) * ((V : Int) - 1))
                           = -(((n : Int) * (V : Int)) - (n : Int)) := by
-                  -- 直前の hmul を使うだけ
+                  -- Use the preceding `hmul`.
                   exact congrArg Neg.neg hmul
-                -- これを使って置換
+                -- Use this to rewrite.
                 simp_all only [add_neg_cancel_left, Nat.cast_sub, Nat.cast_one, neg_sub]
       _   = -(n : Int) + ( (n : Int) - (n : Int) * (V : Int)
                             + ((t : Int) + (t : Int)) ) := by
@@ -718,11 +719,11 @@ lemma arith_reduce (V n t : Nat) (hV : 1 ≤ V) :
                 rw [Int.neg_sub ((n : Int) * (V : Int)) (n : Int)]
       _   = ( (-(n : Int) + (n : Int)) - (n : Int) * (V : Int)
               + ((t : Int) + (t : Int)) ) := by
-                -- b - a = b + (-a)、結合で並べ替え
-                -- まず外の `a + (b + c)` → `(a + b) + c`
+                -- Rewrite `b - a` as `b + (-a)` and reassociate.
+                -- First rewrite the outer `a + (b + c)` to `(a + b) + c`.
                 simp_all only [add_neg_cancel_left, Nat.cast_sub, Nat.cast_one, neg_add_cancel, zero_sub]
                 omega
-                -- ここまでで所望の並びに
+                -- At this point the terms are in the desired order.
       _   = ( -((n : Int) * (V : Int))
               + ((t : Int) + (t : Int)) ) := by
                 -- `-(n) + n = 0`
@@ -740,7 +741,7 @@ lemma arith_reduce (V n t : Nat) (hV : 1 ≤ V) :
                               -- 0 - a = -a
                               simp [sub_eq_add_neg, add_comm, add_assoc]
 
-  -- 左右を突き合わせて終了
+  -- Match the two sides.
   exact hL.trans hR.symm
 -/
 
@@ -839,7 +840,7 @@ private lemma totalHyperedgeSize_trace_sub_card_ground_of_max
       (S := S) (m := m) (hKeep := hKeep) (hBack := hBack)
   have h_onlyTop_filter :
       (F.edgeFinset.filter (fun A => m.1 ∈ A)) = {S.ground} := by
-    -- 同上
+    -- Same argument as above.
     apply Finset.Subset.antisymm_iff.mpr; constructor
     · intro A hA
       have hA_edge : A ∈ F.edgeFinset := (Finset.mem_filter.mp hA).1
@@ -883,13 +884,13 @@ private lemma totalHyperedgeSize_trace_sub_card_ground_of_max
           cases hAeq; exact hGround
     · intro hA
       by_cases hmA : m.1 ∈ A
-      · -- ground 側
+      · -- The ground side.
         have hA_sets : F.sets A := (SetFamily.mem_edgeFinset_iff_sets (F := F) (A := A)).1 hA
         have hA_ideal : SetFamily.isOrderIdealOn (S.leOn) S.ground A :=
           (S.sets_iff_isOrderIdeal (I := A)).1 hA_sets
         have hAeq : A = S.ground := hOnlyTop A hA_ideal hmA
         exact Finset.mem_union.mpr (Or.inr (by cases hAeq; exact Finset.mem_singleton_self _))
-      · -- F' 側
+      · -- The `F'` side.
         have hFilt : A ∈ F.edgeFinset.filter (fun B => m.1 ∉ B) :=
           Finset.mem_filter.mpr ⟨hA, hmA⟩
         have : A ∈ F'.edgeFinset := by
@@ -1066,7 +1067,7 @@ private theorem nds_diff_eq_root_delete_identity_uniqueMax
       (S := S) (m := m) (geq2 := geq2)
       (hOnlyTop := hOnlyTop) (hKeep := hKeep) (hBack := hBack)
 
-  -- `posetTraceOfUnique S hexu = posetTraceCore S m` を反映
+  -- Reflect `posetTraceOfUnique S hexu = posetTraceCore S m`.
   dsimp [posetTraceOfUnique, m] at base
   exact base
 
@@ -1079,7 +1080,7 @@ theorem nds_trace_nondecreasing_uniqueMax
   (S.idealFamily).NDS ≤ (S'.idealFamily).NDS := by
   classical
   intro S'
-  -- 記号
+  -- Local notation.
   set F  := S.idealFamily
   set F' := S'.idealFamily
 

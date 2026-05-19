@@ -627,7 +627,7 @@ private lemma mem_edge_sumProd_iff {α} [DecidableEq α]
     exact (SetFamily.mem_edgeFinset_iff_sets
             (F := SetFamily.sumProd F₁ F₂) (A := A ∪ B)).2 hXset
 
-/-- `edgeFinset` 自体の同一視（像としての記述）。 -/
+/-- Identifies `edgeFinset` itself as an image. -/
 --Called from MainStatement.lean
 theorem edgeFinset_sumProd {α} [DecidableEq α]
   (F₁ F₂ : SetFamily α) :
@@ -652,8 +652,8 @@ theorem edgeFinset_sumProd {α} [DecidableEq α]
     have := (mem_edge_sumProd_iff F₁ F₂ (X := p.1 ∪ p.2)).2 this
     exact this
 
-/-- principal ideal 側：`S₁ := restrictToIdeal S m hm` の `leOn` は
-    ground 上では `S` の `leOn` を含意する。 -/
+/-- On the principal-ideal side, the `leOn` relation of
+    `S₁ := restrictToIdeal S m hm` implies the `leOn` relation of `S` on the ground set. -/
 private lemma leOn_of_leOn_restrict_I
   (S : FuncSetup α) (m : S.Elem) (hm : S.maximal m)
   {x y : α} (hxI : x ∈ S.principalIdeal m.1 m.2) (hyI : y ∈ S.principalIdeal m.1 m.2)
@@ -670,8 +670,8 @@ private lemma leOn_of_leOn_restrict_I
   have hiffS := S.le_iff_leOn_val (x := ⟨x,hxG⟩) (y := ⟨y,hyG⟩)
   exact (leOn_iff S hxG hyG).mpr this
 
-/-- co-ideal 側：`S₂ := restrictToCoIdeal S m hpos notuniq` の `leOn` は
-    ground 上では `S` の `leOn` を含意する。 -/
+/-- On the co-ideal side, the `leOn` relation of
+    `S₂ := restrictToCoIdeal S m hpos notuniq` implies the `leOn` relation of `S` on the ground set. -/
 private lemma leOn_of_leOn_restrict_C
   (S : FuncSetup α) (m : S.Elem)
   (hpos : isPoset S) (notuniq : ¬ (∃! mm : S.Elem, S.maximal mm))
@@ -829,7 +829,7 @@ private lemma ideal_sets_iff_sumProd
     ((restrictToCoIdeal S m hpos notuniq).idealFamily).sets B ∧
     X = A ∪ B := by
   classical
-  -- 記号省略
+  -- Local abbreviations.
   let I : Finset α := S.principalIdeal m.1 m.2
   let C : Finset α := coIdeal S m
   let F  := S.idealFamily
@@ -1081,7 +1081,7 @@ private lemma ideal_ground_eq_sumProd_ground
 
   exact Eq.symm (ground_union_split S m hm hpos notuniq)
 
---Called from MainStatement.leanか
+-- Called from MainStatement.lean.
 theorem idealFamily_eq_sumProd_on_NDS
   (S : FuncSetup α) (m : S.Elem) (hm : S.maximal m)
   (hpos : isPoset S) (notuniq : ¬ (∃! mm : S.Elem, S.maximal mm)) :
@@ -1120,15 +1120,15 @@ theorem idealFamily_eq_sumProd_on_NDS
 
   simp_all
 
---使っている。
+-- Used below.
 omit [DecidableEq α] in
 private lemma sum_const_nat (s : Finset α) (c : Nat) :
   ∑ _ ∈ s, c = s.card * c := by
-  -- `sum_const` は `s.card • c` を返すので、`Nat.smul_def` で `*` に直す
+  -- `sum_const` returns `s.card • c`; rewrite the scalar multiplication as `*`.
   have := Finset.sum_const (c) (s := s)
   -- `∑ _∈s, c = s.card • c`
   have : (∑ _ ∈ s, c) = s.card • c := this
-  -- `n • m = n * m` を適用
+  -- Apply `n • m = n * m`.
   calc
     (∑ _ ∈ s, c) = s.card • c := this
     _ = s.card * c := rfl
@@ -1144,7 +1144,7 @@ private lemma sum_card_union_add_inter_general
   +
   (F₁.numHyperedges) * (∑ B ∈ F₂.edgeFinset, B.card) := by
   classical
-  -- 各ペアで `|A∪B| + |A∩B| = |A| + |B|`
+  -- For each pair, `|A∪B| + |A∩B| = |A| + |B|`.
   have hAB :
     ∀ (A B : Finset α), (A ∪ B).card + (A ∩ B).card = A.card + B.card := by
     intro A B
@@ -1223,8 +1223,8 @@ private lemma sum_card_union_add_inter_general
 
   exact eqn
 
--- 基本恒等式（減算形，Int 版）：
--- `(∑∑ |A∪B|) = (#F₂)*∑|A| + (#F₁)*∑|B| - (∑∑ |A∩B|)`。
+-- Basic identity, subtractive form over `Int`:
+-- `(∑∑ |A∪B|) = (#F₂)*∑|A| + (#F₁)*∑|B| - (∑∑ |A∩B|)`.
 
 private lemma sum_card_union_general_int
   (F₁ F₂ : SetFamily α) :
@@ -1293,7 +1293,7 @@ private lemma inter_card_zero_of_disjoint_ground
   exact Finset.mem_of_mem_filter a ha
   simp_all
 
-/-- 交差サイズの二重和は 0。 -/
+/-- The double sum of intersection sizes is zero. -/
 private lemma sum_inter_card_eq_zero_of_disjoint_ground
   (F₁ F₂ : SetFamily α) (hd : Disjoint F₁.ground F₂.ground) :
   ∑ A ∈ F₁.edgeFinset, ∑ B ∈ F₂.edgeFinset, (A ∩ B).card = 0 := by
@@ -1324,17 +1324,17 @@ private lemma sum_card_union_disjoint_int
   +
   (F₁.numHyperedges : Int) * (∑ B ∈ F₂.edgeFinset, (B.card : Int)) := by
   classical
-  -- 一般式を使い、交差項 0 で簡約
+  -- Use the general formula and simplify using the zero intersection term.
   have H :=
     sum_card_union_general_int (F₁ := F₁) (F₂ := F₂)
-  -- 交差二重和 = 0（Nat）→ Int へ
+  -- Move the zero double-intersection sum from `Nat` to `Int`.
   have h0nat :
       ∑ A ∈ F₁.edgeFinset, ∑ B ∈ F₂.edgeFinset, (A ∩ B).card = 0 :=
     sum_inter_card_eq_zero_of_disjoint_ground F₁ F₂ hd
   have h0int :
       ((∑ A ∈ F₁.edgeFinset, ∑ B ∈ F₂.edgeFinset, (A ∩ B).card) : Int) = 0 := by
     exact_mod_cast h0nat
-  -- 置換して `- 0` を消す
+  -- Substitute and remove `- 0`.
   calc
     ((∑ A ∈ F₁.edgeFinset, ∑ B ∈ F₂.edgeFinset, (A ∪ B).card) : Int)
         =
@@ -1481,7 +1481,7 @@ private lemma total_size_sumProd_eq_doubleSum_disjoint_nat
             Prod.mk.injEq, subset_refl]
           rw [Finset.sum_product]
 
-/-- 和積の総サイズ（Int）：disjoint 版。 -/
+/-- Total size of the sum product over `Int`, in the disjoint case. -/
 private lemma total_size_sumProd_eq_doubleSum_disjoint_int
   (F₁ F₂ : SetFamily α) (hd : Disjoint F₁.ground F₂.ground) :
   ((SetFamily.sumProd F₁ F₂).totalHyperedgeSize : Int)
@@ -1547,7 +1547,7 @@ private lemma NDS_sumProd_of_disjoint
 
           have := this
 
-          simp_all only [Finset.card_eq_zero, Finset.card_union_of_disjoint, Finset.card_empty, add_zero,Nat.cast_add, sub_self, Nat.cast_zero]))    -- 最後に `sumProd.ground = _` を使って置き換え
+          simp_all only [Finset.card_eq_zero, Finset.card_union_of_disjoint, Finset.card_empty, add_zero,Nat.cast_add, sub_self, Nat.cast_zero]))    -- Finally rewrite using `sumProd.ground = _`.
     simp_all only [Finset.card_eq_zero, Finset.card_union_of_disjoint, Finset.card_empty, add_zero, Nat.cast_add]
 
   have hH :
@@ -1651,14 +1651,14 @@ private lemma NDS_sumProd_of_disjoint
           simp_all only [SetFamily.NDS_def]
           norm_cast
 
-/-- principal と coIdeal の台集合は素に交わる。 -/
+/-- The ground sets of the principal ideal and the co-ideal are disjoint. -/
 private lemma disjoint_principal_coIdeal (S : FuncSetup α) (m : S.Elem) :
   Disjoint (S.principalIdeal m.1 m.2) (coIdeal S m) := by
   classical
   unfold coIdeal
   exact Finset.disjoint_sdiff
 
-/-- `restrictToIdeal` と `restrictToCoIdeal` の NDS 分解。 -/
+/-- NDS decomposition for `restrictToIdeal` and `restrictToCoIdeal`. -/
 --called from MainStatement.lean
 theorem NDS_restrict_sumProd_split
   (S : FuncSetup α) (m : S.Elem) (hm : S.maximal m)

@@ -129,7 +129,7 @@ lemma Phi_injective
     Function.Injective (Phi S u hmax) := by
   classical
   intro a b hEq
-  -- 展開
+  -- Expand the subtype witnesses.
   cases a with
   | mk I hI =>
     cases b with

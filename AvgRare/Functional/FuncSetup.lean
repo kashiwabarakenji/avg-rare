@@ -34,7 +34,7 @@ def cover (x y : S.Elem) : Prop := S.f x = y
 
 def le (x y : S.Elem) : Prop := Relation.ReflTransGen S.cover x y
 
-/- 記法：`x ≤ₛ y` / `x ⋖ₛ y` -/
+/- Notation: `x ≤ₛ y` / `x ⋖ₛ y`. -/
 /-
 scoped infix:50 " ≤ₛ " => FuncSetup.le
 scoped infix:50 " ⋖ₛ " => FuncSetup.cover
@@ -288,7 +288,7 @@ lemma f_ne_of_nontrivialClass (S : FuncSetup α) {u : S.Elem}
   have : u = y := S.fixed_point_unique u hfix hy_sim.1
   exact hy_ne this.symm
 
-/-! ## 2) 「機能性」：出次数高々 1 -/
+/-! ## 2) Functionality: out-degree at most one -/
 
 -- Maximal relation
 
@@ -852,7 +852,7 @@ theorem reflTransGen_iff_exists_iterate
     exact this
 
 /-- Paper Lemma 2.2:
-`x ≤ y` ↔ ある `k ≥ 0` で `f^[k] x = y`。 -/
+`x ≤ y` iff there exists `k ≥ 0` such that `f^[k] x = y`. -/
 --It is duplicated just like reflTransGen_iff_exists_iterate.Maybe it's better to unify it.
 --However, since the arguments are different, a simple replacement might not work.
 lemma le_iff_exists_iter {α} [DecidableEq α] (S : FuncSetup α) (x y : S.Elem) :
