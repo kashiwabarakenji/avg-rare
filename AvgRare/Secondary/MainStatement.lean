@@ -256,7 +256,7 @@ private lemma isPoset_posetTraceOfUnique
   let ipt := UniqueMax.isPoset_posetTraceCore S hpos (m := Classical.choose hexu.exists)
   exact @ipt geq2
 
--- Secondary main theorem
+-- Secondary main theorem (paper Lemma 2.9)
 theorem secondary_main_theorem
   (S : FuncSetup α) [Fintype S.Elem]
   (hpos : isPoset S) :

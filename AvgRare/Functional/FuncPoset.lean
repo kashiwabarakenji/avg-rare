@@ -149,7 +149,7 @@ private lemma classes_card_one_of_isPoset
   exact (by
     exact (Iff.mp hiff hcard))
 
--- Posets are antisymmetric. Used extensively.
+-- Posets are antisymmetric. Used extensively. (Related to Paper 2.10)
 lemma antisymm_of_isPoset
   (S : FuncSetup α) (h : isPoset_excess S) :
   ∀ {u v : S.Elem}, S.le u v → S.le v u → u = v := by
