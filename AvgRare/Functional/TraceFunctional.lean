@@ -41,6 +41,10 @@ private lemma le_of_rtg {α} [DecidableEq α] (S : FuncSetup α) {x z : S.Elem}
   rcases (reflTransGen_iff_exists_iterate (S.f)).1 h with ⟨k, hk⟩
   exact (le_iff_exists_iter S x z).2 ⟨k, hk⟩
 
+/-- Paper Lemma 3.6 (technical implementation):
+    When u is in a nontrivial equivalence class, we trace out u's equivalence class
+    by erasing u and redirecting any element that would map to u to instead map to v.
+    This function implements the core map for the traced FuncSetup. -/
 noncomputable def eraseOneMap
     (u v : {a // a ∈ S.ground}) (hvne : v ≠ u) :
     {x // x ∈ S.ground.erase u.1} → {y // y ∈ S.ground.erase u.1} :=
@@ -161,6 +165,12 @@ private lemma step_S'_to_S_usingSucc
 
 -- Replace `f` using the `eraseOneMap` definition. eraseOneMap only supports mapping, but this is FuncSetup.
 -- Not used outside of this file.
+/-- Paper Lemma 3.6 (core result):
+    Given a functional preorder S and a nontrivial equivalence class containing u and v,
+    construct a new FuncSetup S' on the reduced ground set (ground \ {u}) where:
+    - Elements not in the equivalence class of u keep their f-image
+    - u's equivalence class is traced: elements mapping to u now map to v
+    This reduces the problem to posets without nontrivial classes. -/
 noncomputable def eraseOne (u v : {a // a ∈ S.ground}) (hvne : v ≠ u) : FuncSetup α :=
 { ground := S.ground.erase u.1
   nonempty := by
@@ -637,6 +647,11 @@ private lemma idealFamily_traceAt_eq_eraseOne {α : Type u} [DecidableEq α]
 
 -- Rewrite of the above lemma.
 -- The trace of a functional family becomes functional again. Main result of this file. Used externally.
+/-- Paper Lemma 3.6 (main theorem):
+    The family of ideals of the traced functional family equals the trace of the original ideal family.
+    This is the crucial reduction step: by repeatedly tracing nontrivial equivalence classes,
+    we reduce to a functional partial order (where all equivalence classes are singletons),
+    enabling induction for the main result (Theorem 2.8). -/
 theorem  traced_is_functional_family {α : Type u} [DecidableEq α]
     (S : FuncSetup α) (u : S.Elem)
     (hNontriv : FuncSetup.nontrivialClass S u) :

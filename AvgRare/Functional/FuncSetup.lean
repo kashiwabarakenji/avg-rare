@@ -30,8 +30,13 @@ variable (S : FuncSetup α)
 
 abbrev Elem := {x : α // x ∈ S.ground}
 
+/-- Paper Definition 2.1: Cover relation. For elements x, y in the ground set,
+    x ⋖ y (written S.cover x y) iff f(x) = y. -/
 def cover (x y : S.Elem) : Prop := S.f x = y
 
+/-- Paper Definition 2.1: Order relation induced by functional preorder.
+    x ≤ y iff there is a path from x to y via iterated cover steps.
+    Formally: the reflexive-transitive closure of the cover relation. -/
 def le (x y : S.Elem) : Prop := Relation.ReflTransGen S.cover x y
 
 /- Notation: `x ≤ₛ y` / `x ⋖ₛ y`. -/
@@ -239,7 +244,9 @@ noncomputable def liftFinset
     exact (mem_coeFinset_val_iff S).2 ⟨⟨a, hJ haJ⟩, hz, rfl⟩
 --Equivalence class relation
 
-/-- Equivalence relation: `x ∼ y` iff `x ≤ y ∧ y ≤ x`. -/
+/-- Equivalence relation: `x ∼ y` iff `x ≤ y ∧ y ≤ x`.
+    Paper Definition 3.3 / context: Two elements are equivalent when they can reach each other
+    in the functional preorder. This partitions S.Elem into equivalence classes. -/
 def sim (x y : S.Elem) : Prop := S.le x y ∧ S.le y x
 
 /-- `sim` is an equivalence relation. -/
@@ -260,7 +267,9 @@ def simSetoid : Setoid S.Elem where
 
 
 
-/-- Practical form of "equivalence class is non-trivial (has another point)". -/
+/-- Paper Lemma 2.4: Characterization of equivalence classes in functional preorders.
+    A class has size ≥ 2 iff all its elements are non-fixed points (f(u) ≠ u).
+    Related to the structure of cycles in the functional dynamics. -/
 def nontrivialClass {α : Type u} [DecidableEq α] (S : FuncSetup α) (x : S.Elem) : Prop :=
   ∃ y : S.Elem, y ≠ x ∧ S.sim x y
 
@@ -292,7 +301,9 @@ lemma f_ne_of_nontrivialClass (S : FuncSetup α) {u : S.Elem}
 
 -- Maximal relation
 
-/-- Maximal: everything above `x` returns to `x` (preorder version). -/
+/-- Paper Definition 2.3: Maximal element. An element u is maximal in the preorder
+    if any element above u (in the order) must be above u itself. In a preorder,
+    this means u is the unique maximum in its equivalence class. -/
 def maximal (x : S.Elem) : Prop :=
   ∀ ⦃y⦄, S.le x y → S.le y x
 
@@ -378,6 +389,12 @@ lemma mem_simClass_iff
 /-- Give the order-ideal family corresponding to S as a `SetFamily` on ground type `α`. -/
 --It's convenient to be able to derive idealFamily from FuncSetup, so just giving the definition.
 --On second thought, there's no file that collects FuncSetup things using Ideal, so it might be good to separate.
+/-- Paper Definition 1.4 + main definition:
+    The family of all order ideals of the preorder induced by S.
+    For the functional preorder (V, ≤) defined by S, I(V,≤) is the set of all downward-closed subsets.
+    The NDS (normalized degree sum) of this family is the main quantity studied:
+    NDS(I(V,≤)) ≤ 0 is equivalent to the family being average-rare.
+    The paper's main theorem proves this for all functional preorders. -/
 noncomputable def idealFamily (S : FuncSetup α) : SetFamily α :=
   SetFamily.orderIdealFamily (le := leOn S) (V := S.ground)
 
