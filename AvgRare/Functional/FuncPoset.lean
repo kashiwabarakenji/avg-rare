@@ -20,6 +20,10 @@ variable {α : Type u} [DecidableEq α] (S : FuncSetup α)
 
 ----------------------------
 
+/-- Paper Definition 1.4 + foundational definition:
+    An order ideal on a preordered set (V,≤) is a downward-closed subset I ⊆ V
+    such that x ∈ I and y ≤ x implies y ∈ I.
+    For a functional preorder, principalIdeal captures ↓a = {x | x ≤ a}. -/
 noncomputable def principalIdeal (S : FuncSetup α) (a : α) (ha : a ∈ S.ground) : Finset α := by
   classical
   -- attach is {y // y ∈ ground}, predicate is `S.le y ⟨a,ha⟩`
@@ -103,6 +107,9 @@ private lemma principalIdeal_isOrderIdealOn
     exact (leOn_iff S hy_mem ha).mp this
 
 
+/-- The normalized degree sum NDS(I) = Σ_F∈I (2|F| - |F||V|).
+    When excess = 0, NDS is non-positive, meaning the family I is "average-rare"
+    (satisfies Frankl's conjecture). This is the quantitative goal of the paper. -/
 def isPoset_excess (S : FuncSetup α) : Prop :=
   excess (S.idealFamily) = 0
 
@@ -149,7 +156,9 @@ private lemma classes_card_one_of_isPoset
   exact (by
     exact (Iff.mp hiff hcard))
 
--- Posets are antisymmetric. Used extensively. (Related to Paper 2.10)
+-- Paper Lemma 2.10: A partial order on a finite set is functional iff it is a rooted forest.
+-- In other words, antisymmetry (combined with the functional structure) characterizes rooted forests.
+-- This lemma establishes the key structural property needed for the inductive proof.
 lemma antisymm_of_isPoset
   (S : FuncSetup α) (h : isPoset_excess S) :
   ∀ {u v : S.Elem}, S.le u v → S.le v u → u = v := by
@@ -288,8 +297,10 @@ private lemma iterate_has_collision
 def isPoset : Prop :=
   has_le_antisymm S
 
-/-- If iteration develops a cycle, antisymmetry forces it to be a fixed point (cycle of length 1). -/
--- Used in UniqueMax.lean.
+/-- Paper Lemma 3.1 + observation: If iteration develops a cycle in a poset,
+    antisymmetry forces the cycle to collapse to a fixed point (cycle of length 1).
+    By pigeonhole principle, any element in a finite poset eventually reaches a fixed point.
+    This fixed point is then maximal, making it rare (by Lemma 3.1). -/
 lemma eventually_hits_fixpoint
   (S : FuncSetup α) [Fintype S.Elem] (hpos : isPoset S)
   (x : S.Elem) :
@@ -456,8 +467,11 @@ lemma eventually_hits_fixpoint
       · exact xyle
       · exact this
 
---Existence of maximal element.
+--Existence of maximal element. (Paper Lemma 3.1)
 --Also used from MainStatement.
+/-- Paper Lemma 3.1: Any finite functional poset has a maximal element, which is therefore rare.
+    This is a direct corollary of eventually_hits_fixpoint: reaching a fixed point in a poset
+    guarantees maximality, and maximal elements are rare by the paper's definition. -/
 lemma exists_maximal_of_finite
   (S : FuncSetup α) [Fintype S.Elem] (hpos : isPoset S)
   (hne : S.ground.Nonempty) :
