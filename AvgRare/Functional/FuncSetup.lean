@@ -386,9 +386,9 @@ lemma mem_simClass_iff
 -------------------------------
 ----From here: Ideal-related
 
-/-- Give the order-ideal family corresponding to S as a `SetFamily` on ground type `α`. -/
---It's convenient to be able to derive idealFamily from FuncSetup, so just giving the definition.
---On second thought, there's no file that collects FuncSetup things using Ideal, so it might be good to separate.
+/- Give the order-ideal family corresponding to S as a `SetFamily` on ground type `α`. -/
+-- It's convenient to be able to derive idealFamily from FuncSetup, so just giving the definition.
+-- On second thought, there's no file that collects FuncSetup things using Ideal, so it might be good to separate.
 /-- Paper Definition 1.4 + main definition:
     The family of all order ideals of the preorder induced by S.
     For the functional preorder (V, ≤) defined by S, I(V,≤) is the set of all downward-closed subsets.
