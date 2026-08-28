@@ -420,7 +420,7 @@ theorem secondary_main_theorem
 
   exact main S.ground.card S (by simp_all) rfl
 
-/- The main theorem (statement)：(Paer Theorem 2.8)
+/- The main theorem (statement)：(Paper Theorem 2.8)
     the preorder induced by `f : V → V` has non-positive NDS. -/
 theorem main_nds_nonpos {α : Type u} [DecidableEq α]
   (S : FuncSetup α) :
