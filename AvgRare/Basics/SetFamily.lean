@@ -148,7 +148,7 @@ def Parallel_edge (F : SetFamily α) (u v : α) : Prop :=
   F.edgeFinset.filter (fun A => u ∈ A) =
   F.edgeFinset.filter (fun A => v ∈ A)
 
-/-- `Parallel` (equation in set collection) and `Parallel_edge` are the same value。 -/
+/-- `Parallel` (equation in set collection) and `Parallel_edge` are the same value -/
 lemma Parallel_edge_iff_Parallel (F : SetFamily α) (u v : α) :
   Parallel_edge F u v ↔ Parallel F u v := by
   constructor

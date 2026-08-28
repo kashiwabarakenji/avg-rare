@@ -100,7 +100,6 @@ private lemma walk_of_rtg (S : FuncSetup α)
 
         exact this
 
----証明を短くしようといろいろなAIに入れてみたがうまく証明が通らなかった。
 private lemma exists_dup_split
   {β : Type _} [DecidableEq β]
   {L : List β} (hdup : ¬ L.Nodup) :
